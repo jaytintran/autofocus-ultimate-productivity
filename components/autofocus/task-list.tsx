@@ -32,6 +32,9 @@ interface TaskRowProps {
 	onDragStart: (e: React.DragEvent, task: Task) => void;
 	onDragOver: (e: React.DragEvent, task: Task) => void;
 	onDragEnd: () => void;
+	onTouchStart: (e: React.TouchEvent, task: Task) => void;
+	onTouchMove: (e: React.TouchEvent) => void;
+	onTouchEnd: () => void;
 	isDragging: boolean;
 	isDropTarget: boolean;
 	disabled: boolean;
@@ -48,6 +51,9 @@ function TaskRow({
 	onDragStart,
 	onDragOver,
 	onDragEnd,
+	onTouchStart,
+	onTouchMove,
+	onTouchEnd,
 	isDragging,
 	isDropTarget,
 	disabled,
@@ -103,10 +109,14 @@ function TaskRow({
 
 	return (
 		<li
+			data-task-id={task.id}
 			draggable={!isWorking && !isEditing && !disabled}
 			onDragStart={(e) => onDragStart(e, task)}
 			onDragOver={(e) => onDragOver(e, task)}
 			onDragEnd={onDragEnd}
+			onTouchStart={(e) => onTouchStart(e, task)}
+			onTouchMove={onTouchMove}
+			onTouchEnd={onTouchEnd}
 			className={`
         group px-4 py-2.5 flex items-center gap-2
         ${isWorking ? "bg-[#8b9a6b]/15 border-l-2 border-[#8b9a6b]" : ""}
@@ -259,6 +269,8 @@ export function TaskList({
 	const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 	const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 	const [isReordering, setIsReordering] = useState(false);
+	const [touchStartY, setTouchStartY] = useState<number | null>(null);
+	const [touchCurrentY, setTouchCurrentY] = useState<number | null>(null);
 
 	const handleStart = useCallback(
 		async (task: Task) => {
@@ -363,6 +375,60 @@ export function TaskList({
 		}
 	}, [draggedTask, dropTargetId, onReorderTasks]);
 
+	const handleTouchStart = useCallback(
+		(e: React.TouchEvent, task: Task) => {
+			if (workingTaskId || loadingTaskId) return;
+			setDraggedTask(task);
+			setTouchStartY(e.touches[0].clientY);
+		},
+		[workingTaskId, loadingTaskId],
+	);
+
+	const handleTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			if (!draggedTask || !touchStartY) return;
+			e.preventDefault();
+			setTouchCurrentY(e.touches[0].clientY);
+
+			// Find the element at the touch position
+			const touch = e.touches[0];
+			const elementAtPoint = document.elementFromPoint(
+				touch.clientX,
+				touch.clientY,
+			);
+			const taskRow = elementAtPoint?.closest("li");
+			const taskId = taskRow?.getAttribute("data-task-id");
+
+			if (taskId && taskId !== draggedTask.id) {
+				setDropTargetId(taskId);
+			}
+		},
+		[draggedTask, touchStartY],
+	);
+
+	const handleTouchEnd = useCallback(async () => {
+		if (!draggedTask || !dropTargetId) {
+			setDraggedTask(null);
+			setDropTargetId(null);
+			setTouchStartY(null);
+			setTouchCurrentY(null);
+			return;
+		}
+
+		try {
+			setIsReordering(true);
+			await onReorderTasks(draggedTask.id, dropTargetId);
+		} catch (error) {
+			console.error("Failed to reorder tasks:", error);
+		} finally {
+			setIsReordering(false);
+			setDraggedTask(null);
+			setDropTargetId(null);
+			setTouchStartY(null);
+			setTouchCurrentY(null);
+		}
+	}, [draggedTask, dropTargetId, onReorderTasks]);
+
 	if (tasks.length === 0) {
 		return (
 			<div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
@@ -392,6 +458,9 @@ export function TaskList({
 						onDragStart={handleDragStart}
 						onDragOver={handleDragOver}
 						onDragEnd={handleDragEnd}
+						onTouchStart={handleTouchStart}
+						onTouchMove={handleTouchMove}
+						onTouchEnd={handleTouchEnd}
 						isDragging={draggedTask?.id === task.id}
 						isDropTarget={dropTargetId === task.id}
 						disabled={!!loadingTaskId || !!workingTaskId || isReordering}
