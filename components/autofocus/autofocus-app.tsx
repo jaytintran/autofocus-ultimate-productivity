@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { Header } from "./header";
 import { TimerBar } from "./timer-bar";
@@ -19,6 +19,7 @@ import {
 	getActiveTasks,
 	getAppState,
 	getCompletedTasks,
+	getTasksForPage,
 	getTotalPageCount,
 	markTaskDone,
 	pauseTimer,
@@ -183,6 +184,9 @@ export function AutofocusApp() {
 	const [optimisticState, setOptimisticState] =
 		useState<OptimisticStateSnapshot | null>(null);
 	const [visibleTaskCapacity, setVisibleTaskCapacity] = useState(12);
+	const [prefetchedTasks, setPrefetchedTasks] = useState<Map<number, Task[]>>(
+		new Map(),
+	);
 
 	// Fetch active tasks
 	const { data: activeTasks = [], mutate: mutateActive } = useSWR<Task[]>(
@@ -218,10 +222,47 @@ export function AutofocusApp() {
 	const displayedAppState = optimisticState?.appState ?? appState;
 	const displayedTotalPages = optimisticState?.totalPages ?? totalPages;
 
-	// Get tasks for current page
-	const tasksForCurrentPage = displayedActiveTasks
-		.filter((task) => task.page_number === currentPage)
-		.sort((a, b) => a.position - b.position);
+	// Pre-fetch adjacent pages (current + next 2 pages)
+	useEffect(() => {
+		const prefetchPages = async () => {
+			const pagesToPrefetch = [
+				currentPage,
+				currentPage + 1,
+				currentPage + 2,
+			].filter((page) => page <= displayedTotalPages);
+
+			const newPrefetchedTasks = new Map(prefetchedTasks);
+
+			for (const pageNum of pagesToPrefetch) {
+				if (!newPrefetchedTasks.has(pageNum)) {
+					try {
+						const tasks = await getTasksForPage(pageNum);
+						newPrefetchedTasks.set(pageNum, tasks);
+					} catch (error) {
+						console.error(`Failed to prefetch page ${pageNum}:`, error);
+					}
+				}
+			}
+
+			setPrefetchedTasks(newPrefetchedTasks);
+		};
+
+		prefetchPages();
+	}, [currentPage, displayedTotalPages]);
+
+	// Get tasks for current page with prefetch fallback
+	const tasksForCurrentPage = useMemo(() => {
+		// First try prefetched data
+		const prefetched = prefetchedTasks.get(currentPage);
+		if (prefetched && prefetched.length > 0) {
+			return prefetched.sort((a, b) => a.position - b.position);
+		}
+
+		// Fallback to main data
+		return displayedActiveTasks
+			.filter((task) => task.page_number === currentPage)
+			.sort((a, b) => a.position - b.position);
+	}, [currentPage, displayedActiveTasks, prefetchedTasks]);
 
 	// Get the working task
 	const workingTask = displayedAppState?.working_on_task_id
@@ -421,15 +462,44 @@ export function AutofocusApp() {
 		async (taskId: string) => {
 			if (!displayedAppState) return;
 
-			const optimisticActiveTasks = displayedActiveTasks.filter(
-				(task) => task.id !== taskId,
+			const deletedTask = displayedActiveTasks.find((t) => t.id === taskId);
+			if (!deletedTask) return;
+
+			// Optimistically reflow using prefetched data
+			const allTasksAfterDeleted = displayedActiveTasks
+				.filter((task) => task.id !== taskId)
+				.filter((task) => task.page_number >= deletedTask.page_number)
+				.sort(
+					(a, b) => a.page_number - b.page_number || a.position - b.position,
+				);
+
+			// Recalculate positions
+			const reflowedTasks = allTasksAfterDeleted.map((task, index) => ({
+				...task,
+				page_number: Math.floor(index / 12) + deletedTask.page_number,
+				position: index % 12,
+			}));
+
+			// Merge with tasks before deleted position
+			const optimisticActiveTasks = [
+				...displayedActiveTasks.filter(
+					(task) => task.page_number < deletedTask.page_number,
+				),
+				...reflowedTasks,
+			].sort(
+				(a, b) => a.page_number - b.page_number || a.position - b.position,
 			);
+
 			const optimisticCompletedTasks = displayedCompletedTasks.filter(
 				(task) => task.id !== taskId,
 			);
+
 			const deletingWorkingTask =
 				displayedAppState.working_on_task_id === taskId;
 			const now = new Date().toISOString();
+
+			// Clear prefetch cache to force refresh
+			setPrefetchedTasks(new Map());
 
 			await runOptimisticUpdate(
 				{
@@ -449,7 +519,6 @@ export function AutofocusApp() {
 				},
 				async () => {
 					await deleteTask(taskId);
-
 					if (deletingWorkingTask) {
 						await stopWorkingOnTask();
 					}
