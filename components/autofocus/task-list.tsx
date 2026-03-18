@@ -5,6 +5,12 @@ import { GripVertical, Play, Check, RefreshCw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { reenterTask, updateTask, getNextPosition } from "@/lib/store";
 import { formatTimeCompact } from "./timer-bar";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 interface TaskListProps {
 	tasks: Task[];
@@ -61,6 +67,7 @@ function TaskRow({
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState(task.text);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const [isExpanded, setIsExpanded] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -107,10 +114,12 @@ function TaskRow({
 		}
 	};
 
+	const isLongText = task.text.length > 50; // Adjust threshold as needed
+
 	return (
 		<li
 			data-task-id={task.id}
-			draggable={!isWorking && !isEditing && !disabled}
+			draggable={!isWorking && !disabled}
 			onDragStart={(e) => onDragStart(e, task)}
 			onDragOver={(e) => onDragOver(e, task)}
 			onDragEnd={onDragEnd}
@@ -118,7 +127,7 @@ function TaskRow({
 			onTouchMove={onTouchMove}
 			onTouchEnd={onTouchEnd}
 			className={`
-        group px-4 py-2.5 flex items-center gap-2
+        group px-4 py-2.5 flex items-start gap-2
         ${isWorking ? "bg-[#8b9a6b]/15 border-l-2 border-[#8b9a6b]" : ""}
         ${isDragging ? "opacity-50 bg-accent" : ""}
         ${isDropTarget ? "border-t-2 border-[#8b9a6b]" : ""}
@@ -128,7 +137,7 @@ function TaskRow({
 			{/* Drag handle */}
 			<div
 				className={`
-          cursor-grab active:cursor-grabbing text-muted-foreground
+          cursor-grab active:cursor-grabbing text-muted-foreground mt-0.5
           ${isWorking || disabled ? "opacity-30" : "opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"}
           transition-opacity flex-shrink-0
         `}
@@ -136,11 +145,8 @@ function TaskRow({
 				<GripVertical className="w-4 h-4" />
 			</div>
 
-			{/* Task text - clickable area to start task */}
-			<div
-				className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
-				onClick={() => !isWorking && !isEditing && !disabled && onStart(task)}
-			>
+			{/* Task text - collapsible on mobile */}
+			<div className="flex-1 min-w-0">
 				{isEditing ? (
 					<input
 						ref={inputRef}
@@ -150,24 +156,79 @@ function TaskRow({
 						onBlur={handleSave}
 						onKeyDown={handleKeyDown}
 						onClick={(e) => e.stopPropagation()}
-						className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
+						className="w-full bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
 					/>
+				) : isLongText ? (
+					<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+						<div className="flex items-start gap-2">
+							<CollapsibleTrigger className="md:hidden flex-shrink-0 mt-0.5">
+								<ChevronDown
+									className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+								/>
+							</CollapsibleTrigger>
+							<div
+								className="flex-1 min-w-0 cursor-pointer"
+								onClick={() => !isWorking && !disabled && onStart(task)}
+							>
+								<CollapsibleContent className="md:hidden">
+									<span
+										onClick={handleTextClick}
+										className={`
+										${isWorking ? "text-[#ddd4b8]" : ""}
+										${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
+									`}
+									>
+										{task.text}
+									</span>
+								</CollapsibleContent>
+								<div className="md:hidden">
+									{!isExpanded && (
+										<span
+											onClick={handleTextClick}
+											className={`
+											line-clamp-2 cursor-text
+											${isWorking ? "text-[#ddd4b8]" : ""}
+											${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
+										`}
+										>
+											{task.text}
+										</span>
+									)}
+								</div>
+								<span
+									onClick={handleTextClick}
+									className={`
+									hidden md:block cursor-text
+									${isWorking ? "text-[#ddd4b8]" : ""}
+									${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
+								`}
+								>
+									{task.text}
+								</span>
+							</div>
+						</div>
+					</Collapsible>
 				) : (
-					<span
-						onClick={handleTextClick}
-						className={`
-              truncate cursor-text
-              ${isWorking ? "text-[#ddd4b8]" : ""}
-              ${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
-            `}
+					<div
+						className="cursor-pointer"
+						onClick={() => !isWorking && !disabled && onStart(task)}
 					>
-						{task.text}
-					</span>
+						<span
+							onClick={handleTextClick}
+							className={`
+							cursor-text
+							${isWorking ? "text-[#ddd4b8]" : ""}
+							${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
+						`}
+						>
+							{task.text}
+						</span>
+					</div>
 				)}
 			</div>
 
 			{/* Right side: badges and action buttons */}
-			<div className="flex items-center gap-1.5 flex-shrink-0">
+			<div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
 				{/* Re-entered badge */}
 				{task.re_entered_from && !isEditing && (
 					<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
