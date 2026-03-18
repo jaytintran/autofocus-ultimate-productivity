@@ -218,12 +218,7 @@ function TaskRow({
 
 					{/* Action buttons */}
 					{!isWorking && !isEditing && (
-						<div
-							className={`
-								flex items-center gap-1 flex-shrink-0
-								md:opacity-0 md:group-hover:opacity-100 transition-opacity
-							`}
-						>
+						<div className="flex items-center gap-1 flex-shrink-0">
 							{/* Start button */}
 							<button
 								onClick={(e) => {
@@ -341,7 +336,6 @@ export function TaskList({
 	const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 	const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 	const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-	const [isReordering, setIsReordering] = useState(false);
 	const [touchStartY, setTouchStartY] = useState<number | null>(null);
 	const [touchCurrentY, setTouchCurrentY] = useState<number | null>(null);
 
@@ -440,55 +434,15 @@ export function TaskList({
 			return;
 		}
 
-		const targetTask = allTasks.find((t) => t.id === dropTargetId);
-		if (!targetTask) {
-			setDraggedTask(null);
-			setDropTargetId(null);
-			return;
-		}
-
-		// Calculate new positions
-		const updates: Array<{
-			id: string;
-			page_number: number;
-			position: number;
-		}> = [];
-
-		// Get tasks on the target page
-		const targetPageTasks = allTasks
-			.filter(
-				(t) =>
-					t.page_number === targetTask.page_number && t.id !== draggedTask.id,
-			)
-			.sort((a, b) => a.position - b.position);
-
-		// Find insert index
-		const insertIndex = targetPageTasks.findIndex(
-			(t) => t.id === targetTask.id,
-		);
-
-		// Insert dragged task at the new position
-		targetPageTasks.splice(insertIndex, 0, draggedTask);
-
-		// Update all positions on the target page
-		targetPageTasks.forEach((task, index) => {
-			updates.push({
-				id: task.id,
-				page_number: targetTask.page_number,
-				position: index,
-			});
-		});
-
 		try {
-			await reorderTasks(updates);
-			onRefresh();
+			await onReorderTasks(draggedTask.id, dropTargetId);
 		} catch (error) {
 			console.error("Failed to reorder tasks:", error);
 		}
 
 		setDraggedTask(null);
 		setDropTargetId(null);
-	}, [draggedTask, dropTargetId, allTasks, onRefresh]);
+	}, [draggedTask, dropTargetId, onReorderTasks]);
 
 	const handleTouchStart = useCallback(
 		(e: React.TouchEvent, task: Task) => {
@@ -530,17 +484,15 @@ export function TaskList({
 		}
 
 		try {
-			setIsReordering(true);
 			await onReorderTasks(draggedTask.id, dropTargetId);
 		} catch (error) {
 			console.error("Failed to reorder tasks:", error);
-		} finally {
-			setIsReordering(false);
-			setDraggedTask(null);
-			setDropTargetId(null);
-			setTouchStartY(null);
-			setTouchCurrentY(null);
 		}
+
+		setDraggedTask(null);
+		setDropTargetId(null);
+		setTouchStartY(null);
+		setTouchCurrentY(null);
 	}, [draggedTask, dropTargetId, onReorderTasks]);
 
 	if (tasks.length === 0) {
@@ -577,7 +529,7 @@ export function TaskList({
 						onTouchEnd={handleTouchEnd}
 						isDragging={draggedTask?.id === task.id}
 						isDropTarget={dropTargetId === task.id}
-						disabled={!!loadingTaskId || !!workingTaskId || isReordering}
+						disabled={!!loadingTaskId || !!workingTaskId}
 					/>
 				))}
 			</ul>
