@@ -183,9 +183,9 @@ export function TimerBar({
 	// No working task - show idle message
 	if (!workingTask) {
 		return (
-			<div className="border-y border-border/80 bg-[#24211d] px-6 py-6 md:px-10">
+			<div className="border-y border-border/80 bg-card px-6 py-6 md:px-10">
 				<div className="mx-auto flex min-h-[112px] max-w-6xl items-center justify-center text-center">
-					<p className="text-xs uppercase tracking-[0.2em] text-[#c4b99a] md:text-base">
+					<p className="text-xs uppercase tracking-[0.2em] text-muted-foreground md:text-base">
 						- Select a Task to Begin Working On It -
 					</p>
 				</div>
@@ -210,19 +210,19 @@ export function TimerBar({
 				: "Ready to start";
 
 	return (
-		<div className="border-y border-border/80 bg-[#24211d] px-6 py-4 md:px-10">
+		<div className="border-y border-border/80 bg-card px-6 py-4 md:px-10">
 			<div className="mx-auto flex max-w-6xl flex-col gap-4">
 				<div className="flex items-start justify-between gap-4">
 					<div className="min-w-0 flex-1 space-y-3">
 						<p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
 							Working On
 						</p>
-						<p className="truncate text-2xl font-semibold tracking-[0.04em] text-[#efe8d4] md:text-3xl">
+						<p className="truncate text-2xl font-semibold tracking-[0.04em] text-foreground md:text-3xl">
 							{workingTask.text}
 						</p>
 						<div className="flex flex-wrap items-center gap-3">
 							<span
-								className={`font-mono text-3xl tracking-[0.16em] md:text-4xl ${isRunning ? "text-[#f0ebdb]" : "text-[#ddd4b8]"}`}
+								className={`font-mono text-3xl tracking-[0.16em] md:text-4xl ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
 							>
 								{formatTimerDisplay(totalDisplayTime)}
 							</span>
@@ -371,7 +371,7 @@ export function TimerBar({
 					</div>
 				</div>
 
-				<div className="h-px w-full bg-[#d8d2c1]/85" />
+				<div className="h-px w-full bg-border" />
 			</div>
 		</div>
 	);
