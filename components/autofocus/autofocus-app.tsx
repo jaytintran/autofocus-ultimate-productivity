@@ -312,13 +312,13 @@ export function AutofocusApp() {
 
 			const placement = getNextTaskPlacement(
 				displayedActiveTasks,
-				visibleTaskCapacity,
+				DEFAULT_TASK_CAPACITY,
 			);
 
 			await addTask(trimmedText, placement.pageNumber, placement.position);
 			await refreshAll();
 		},
-		[displayedActiveTasks, refreshAll, visibleTaskCapacity],
+		[displayedActiveTasks, refreshAll],
 	);
 
 	const handleAddTasks = useCallback(
@@ -337,7 +337,7 @@ export function AutofocusApp() {
 			const tasksToAdd = trimmedTaskTexts.map((taskText) => {
 				const placement = appendProjectedTask(
 					projectedTasks,
-					visibleTaskCapacity,
+					DEFAULT_TASK_CAPACITY,
 				);
 
 				return {
@@ -350,7 +350,7 @@ export function AutofocusApp() {
 			await addMultipleTasks(tasksToAdd);
 			await refreshAll();
 		},
-		[displayedActiveTasks, refreshAll, visibleTaskCapacity],
+		[displayedActiveTasks, refreshAll],
 	);
 
 	const handleStartTask = useCallback(
@@ -548,7 +548,7 @@ export function AutofocusApp() {
 			);
 			const placement = getNextTaskPlacement(
 				remainingActiveTasks,
-				visibleTaskCapacity,
+				DEFAULT_TASK_CAPACITY,
 			);
 
 			await reenterTask(
@@ -561,7 +561,7 @@ export function AutofocusApp() {
 			await markTaskDone(task.id, task.total_time_ms);
 			await refreshAll();
 		},
-		[displayedActiveTasks, refreshAll, visibleTaskCapacity],
+		[displayedActiveTasks, refreshAll],
 	);
 
 	const handleRunTimer = useCallback(async () => {
@@ -776,7 +776,7 @@ export function AutofocusApp() {
 			);
 			const placement = getNextTaskPlacement(
 				remainingActiveTasks,
-				visibleTaskCapacity,
+				DEFAULT_TASK_CAPACITY,
 			);
 
 			const reenteredTask: Task = {
@@ -837,7 +837,6 @@ export function AutofocusApp() {
 			displayedAppState,
 			displayedCompletedTasks,
 			runOptimisticUpdate,
-			visibleTaskCapacity,
 		],
 	);
 
@@ -901,7 +900,7 @@ export function AutofocusApp() {
 				);
 				const placement = getNextTaskPlacement(
 					remainingActiveTasks,
-					visibleTaskCapacity,
+					DEFAULT_TASK_CAPACITY,
 				);
 
 				const reenteredTask: Task = {
@@ -971,7 +970,6 @@ export function AutofocusApp() {
 			displayedAppState,
 			displayedCompletedTasks,
 			runOptimisticUpdate,
-			visibleTaskCapacity,
 		],
 	);
 
