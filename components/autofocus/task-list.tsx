@@ -3,27 +3,29 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { GripVertical, Play, Check, RefreshCw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
-import { reenterTask, updateTask, getNextPosition } from "@/lib/store";
-import { formatTimeCompact } from "./timer-bar";
 import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+	startTask,
+	deleteTask,
+	reenterTask,
+	markTaskDone,
+	updateTask,
+	reorderTasks,
+	getNextPosition,
+} from "@/lib/store";
+import { formatTimeCompact } from "./timer-bar";
 
 interface TaskListProps {
 	tasks: Task[];
 	allTasks: Task[]; // All active tasks for cross-page reordering
 	workingTaskId: string | null;
-	onRefresh: () => Promise<void>;
+	onRefresh: () => void;
 	pageSize: number;
-	onStartTask: (task: Task) => Promise<void>;
-	onDoneTask: (task: Task) => Promise<void>;
-	onDeleteTask: (taskId: string) => Promise<void>;
+	onStartTask: (taskId: string) => void;
+	onDoneTask: (taskId: string) => void;
+	onDeleteTask: (taskId: string) => void;
 	onReorderTasks: (
 		draggedTaskId: string,
-		targetTaskId: string,
+		dropTargetId: string,
 	) => Promise<void>;
 }
 
@@ -67,7 +69,6 @@ function TaskRow({
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState(task.text);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-	const [isExpanded, setIsExpanded] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -114,12 +115,10 @@ function TaskRow({
 		}
 	};
 
-	const isLongText = task.text.length > 50; // Adjust threshold as needed
-
 	return (
 		<li
 			data-task-id={task.id}
-			draggable={!isWorking && !disabled}
+			draggable={!isWorking && !isEditing && !disabled}
 			onDragStart={(e) => onDragStart(e, task)}
 			onDragOver={(e) => onDragOver(e, task)}
 			onDragEnd={onDragEnd}
@@ -127,7 +126,8 @@ function TaskRow({
 			onTouchMove={onTouchMove}
 			onTouchEnd={onTouchEnd}
 			className={`
-        group px-4 py-2.5 flex items-start gap-2
+        group px-4 py-2.5 flex items-center gap-2
+        touch-none
         ${isWorking ? "bg-[#8b9a6b]/15 border-l-2 border-[#8b9a6b]" : ""}
         ${isDragging ? "opacity-50 bg-accent" : ""}
         ${isDropTarget ? "border-t-2 border-[#8b9a6b]" : ""}
@@ -137,7 +137,7 @@ function TaskRow({
 			{/* Drag handle */}
 			<div
 				className={`
-          cursor-grab active:cursor-grabbing text-muted-foreground mt-0.5
+          cursor-grab active:cursor-grabbing text-muted-foreground
           ${isWorking || disabled ? "opacity-30" : "opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"}
           transition-opacity flex-shrink-0
         `}
@@ -145,8 +145,8 @@ function TaskRow({
 				<GripVertical className="w-4 h-4" />
 			</div>
 
-			{/* Task text - collapsible on mobile */}
-			<div className="flex-1 min-w-0">
+			{/* Task text - clickable area to edit task */}
+			<div className="flex-1 min-w-0 flex items-center gap-2">
 				{isEditing ? (
 					<input
 						ref={inputRef}
@@ -156,73 +156,23 @@ function TaskRow({
 						onBlur={handleSave}
 						onKeyDown={handleKeyDown}
 						onClick={(e) => e.stopPropagation()}
-						className="w-full bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
+						className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
 					/>
-				) : isLongText ? (
-					<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-						<div className="flex items-start gap-2">
-							<CollapsibleTrigger className="md:hidden flex-shrink-0 mt-0.5">
-								<ChevronDown
-									className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
-								/>
-							</CollapsibleTrigger>
-							<div className="flex-1 min-w-0">
-								<div className="md:hidden">
-									<div
-										className="cursor-pointer"
-										onClick={() => !isWorking && !disabled && onStart(task)}
-									>
-										<span
-											onClick={handleTextClick}
-											className={`
-												cursor-text ${isExpanded ? "" : "line-clamp-2"}
-												${isWorking ? "text-[#ddd4b8]" : ""}
-												${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
-											`}
-										>
-											{task.text}
-										</span>
-									</div>
-								</div>
-								<div
-									className="hidden md:block cursor-pointer"
-									onClick={() => !isWorking && !disabled && onStart(task)}
-								>
-									<span
-										onClick={handleTextClick}
-										className={`
-											cursor-text
-											${isWorking ? "text-[#ddd4b8]" : ""}
-											${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
-										`}
-									>
-										{task.text}
-									</span>
-								</div>
-							</div>
-						</div>
-					</Collapsible>
 				) : (
-					<div
-						className="cursor-pointer"
-						onClick={() => !isWorking && !disabled && onStart(task)}
-					>
-						<span
-							onClick={handleTextClick}
-							className={`
-							cursor-text
+					<span
+						onClick={handleTextClick}
+						className={`
+							truncate cursor-text
 							${isWorking ? "text-[#ddd4b8]" : ""}
-							${!isWorking && !disabled ? "hover:text-[#ddd4b8]" : ""}
 						`}
-						>
-							{task.text}
-						</span>
-					</div>
+					>
+						{task.text}
+					</span>
 				)}
 			</div>
 
 			{/* Right side: badges and action buttons */}
-			<div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+			<div className="flex items-center gap-1.5 flex-shrink-0">
 				{/* Re-entered badge */}
 				{task.re_entered_from && !isEditing && (
 					<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
@@ -332,12 +282,13 @@ export function TaskList({
 			if (loadingTaskId || workingTaskId) return;
 			setLoadingTaskId(task.id);
 			try {
-				await onStartTask(task);
+				await startTask(task.id);
+				onRefresh();
 			} finally {
 				setLoadingTaskId(null);
 			}
 		},
-		[loadingTaskId, workingTaskId, onStartTask],
+		[loadingTaskId, workingTaskId, onRefresh],
 	);
 
 	const handleDone = useCallback(
@@ -345,12 +296,13 @@ export function TaskList({
 			if (loadingTaskId) return;
 			setLoadingTaskId(task.id);
 			try {
-				await onDoneTask(task);
+				await markTaskDone(task.id, task.total_time_ms);
+				onRefresh();
 			} finally {
 				setLoadingTaskId(null);
 			}
 		},
-		[loadingTaskId, onDoneTask],
+		[loadingTaskId, onRefresh],
 	);
 
 	const handleReenter = useCallback(
@@ -361,13 +313,14 @@ export function TaskList({
 				const maxPage = Math.max(...allTasks.map((t) => t.page_number), 1);
 				const position = await getNextPosition(maxPage);
 				await reenterTask(task.id, task.text, maxPage, position);
-				await onDoneTask(task);
-				await onRefresh();
+				// Mark original as completed
+				await markTaskDone(task.id, task.total_time_ms);
+				onRefresh();
 			} finally {
 				setLoadingTaskId(null);
 			}
 		},
-		[loadingTaskId, allTasks, onDoneTask, onRefresh],
+		[loadingTaskId, allTasks, onRefresh],
 	);
 
 	const handleDelete = useCallback(
@@ -375,19 +328,20 @@ export function TaskList({
 			if (loadingTaskId) return;
 			setLoadingTaskId(taskId);
 			try {
-				await onDeleteTask(taskId);
+				await deleteTask(taskId);
+				onRefresh();
 			} finally {
 				setLoadingTaskId(null);
 			}
 		},
-		[loadingTaskId, onDeleteTask],
+		[loadingTaskId, onRefresh],
 	);
 
 	const handleUpdateText = useCallback(
 		async (taskId: string, newText: string) => {
 			try {
 				await updateTask(taskId, { text: newText });
-				await onRefresh();
+				onRefresh();
 			} catch (error) {
 				console.error("Failed to update task text:", error);
 			}
@@ -418,17 +372,55 @@ export function TaskList({
 			return;
 		}
 
-		try {
-			setIsReordering(true);
-			await onReorderTasks(draggedTask.id, dropTargetId);
-		} catch (error) {
-			console.error("Failed to reorder tasks:", error);
-		} finally {
-			setIsReordering(false);
+		const targetTask = allTasks.find((t) => t.id === dropTargetId);
+		if (!targetTask) {
 			setDraggedTask(null);
 			setDropTargetId(null);
+			return;
 		}
-	}, [draggedTask, dropTargetId, onReorderTasks]);
+
+		// Calculate new positions
+		const updates: Array<{
+			id: string;
+			page_number: number;
+			position: number;
+		}> = [];
+
+		// Get tasks on the target page
+		const targetPageTasks = allTasks
+			.filter(
+				(t) =>
+					t.page_number === targetTask.page_number && t.id !== draggedTask.id,
+			)
+			.sort((a, b) => a.position - b.position);
+
+		// Find insert index
+		const insertIndex = targetPageTasks.findIndex(
+			(t) => t.id === targetTask.id,
+		);
+
+		// Insert dragged task at the new position
+		targetPageTasks.splice(insertIndex, 0, draggedTask);
+
+		// Update all positions on the target page
+		targetPageTasks.forEach((task, index) => {
+			updates.push({
+				id: task.id,
+				page_number: targetTask.page_number,
+				position: index,
+			});
+		});
+
+		try {
+			await reorderTasks(updates);
+			onRefresh();
+		} catch (error) {
+			console.error("Failed to reorder tasks:", error);
+		}
+
+		setDraggedTask(null);
+		setDropTargetId(null);
+	}, [draggedTask, dropTargetId, allTasks, onRefresh]);
 
 	const handleTouchStart = useCallback(
 		(e: React.TouchEvent, task: Task) => {
@@ -442,7 +434,6 @@ export function TaskList({
 	const handleTouchMove = useCallback(
 		(e: React.TouchEvent) => {
 			if (!draggedTask || !touchStartY) return;
-			e.preventDefault();
 			setTouchCurrentY(e.touches[0].clientY);
 
 			// Find the element at the touch position
