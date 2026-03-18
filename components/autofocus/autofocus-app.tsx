@@ -462,33 +462,39 @@ export function AutofocusApp() {
 		async (taskId: string) => {
 			if (!displayedAppState) return;
 
-			const deletedTask = displayedActiveTasks.find((t) => t.id === taskId);
-			if (!deletedTask) return;
-
-			// Optimistically reflow using prefetched data
-			const allTasksAfterDeleted = displayedActiveTasks
-				.filter((task) => task.id !== taskId)
-				.filter((task) => task.page_number >= deletedTask.page_number)
-				.sort(
-					(a, b) => a.page_number - b.page_number || a.position - b.position,
-				);
-
-			// Recalculate positions
-			const reflowedTasks = allTasksAfterDeleted.map((task, index) => ({
-				...task,
-				page_number: Math.floor(index / 12) + deletedTask.page_number,
-				position: index % 12,
-			}));
-
-			// Merge with tasks before deleted position
-			const optimisticActiveTasks = [
-				...displayedActiveTasks.filter(
-					(task) => task.page_number < deletedTask.page_number,
-				),
-				...reflowedTasks,
-			].sort(
-				(a, b) => a.page_number - b.page_number || a.position - b.position,
+			const deletedActiveTask = displayedActiveTasks.find(
+				(t) => t.id === taskId,
 			);
+			const deletingCompletedTask = displayedCompletedTasks.some(
+				(task) => task.id === taskId,
+			);
+
+			if (!deletedActiveTask && !deletingCompletedTask) return;
+
+			const optimisticActiveTasks = deletedActiveTask
+				? [
+						...displayedActiveTasks
+							.filter((task) => task.id !== taskId)
+							.filter(
+								(task) => task.page_number >= deletedActiveTask.page_number,
+							)
+							.sort(
+								(a, b) =>
+									a.page_number - b.page_number || a.position - b.position,
+							)
+							.map((task, index) => ({
+								...task,
+								page_number:
+									Math.floor(index / 12) + deletedActiveTask.page_number,
+								position: index % 12,
+							})),
+						...displayedActiveTasks.filter(
+							(task) => task.page_number < deletedActiveTask.page_number,
+						),
+					].sort(
+						(a, b) => a.page_number - b.page_number || a.position - b.position,
+					)
+				: displayedActiveTasks;
 
 			const optimisticCompletedTasks = displayedCompletedTasks.filter(
 				(task) => task.id !== taskId,
@@ -498,8 +504,10 @@ export function AutofocusApp() {
 				displayedAppState.working_on_task_id === taskId;
 			const now = new Date().toISOString();
 
-			// Clear prefetch cache to force refresh
-			setPrefetchedTasks(new Map());
+			if (deletedActiveTask) {
+				// Clear prefetch cache to force refresh after list reflow
+				setPrefetchedTasks(new Map());
+			}
 
 			await runOptimisticUpdate(
 				{

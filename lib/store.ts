@@ -239,7 +239,7 @@ export async function deleteTask(id: string): Promise<void> {
 	// Get the task being deleted
 	const { data: deletedTask, error: fetchError } = await supabase
 		.from("tasks")
-		.select("page_number, position")
+		.select("page_number, position, status")
 		.eq("id", id)
 		.single();
 
@@ -251,6 +251,8 @@ export async function deleteTask(id: string): Promise<void> {
 		.delete()
 		.eq("id", id);
 	if (deleteError) throw deleteError;
+
+	if (!deletedTask || deletedTask.status === "completed") return;
 
 	// Get all active tasks after the deleted position
 	const { data: tasksToReorder, error: reorderFetchError } = await supabase
