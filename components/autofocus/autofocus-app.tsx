@@ -59,6 +59,26 @@ interface TaskReorderUpdate {
 	position: number;
 }
 
+function createOptimisticTask(
+	text: string,
+	placement: TaskPlacement,
+	now: string,
+): Task {
+	return {
+		id: crypto.randomUUID(),
+		text,
+		status: "active",
+		page_number: placement.pageNumber,
+		position: placement.position,
+		added_at: now,
+		completed_at: null,
+		total_time_ms: 0,
+		re_entered_from: null,
+		created_at: now,
+		updated_at: now,
+	};
+}
+
 function getVisibleTotalPages(tasks: Task[]): number {
 	return tasks.length > 0
 		? Math.max(...tasks.map((task) => task.page_number))
@@ -252,6 +272,12 @@ export function AutofocusApp() {
 
 	// Get tasks for current page with prefetch fallback
 	const tasksForCurrentPage = useMemo(() => {
+		if (optimisticState) {
+			return optimisticState.activeTasks
+				.filter((task) => task.page_number === currentPage)
+				.sort((a, b) => a.position - b.position);
+		}
+
 		// First try prefetched data
 		const prefetched = prefetchedTasks.get(currentPage);
 		if (prefetched && prefetched.length > 0) {
@@ -262,7 +288,7 @@ export function AutofocusApp() {
 		return displayedActiveTasks
 			.filter((task) => task.page_number === currentPage)
 			.sort((a, b) => a.position - b.position);
-	}, [currentPage, displayedActiveTasks, prefetchedTasks]);
+	}, [currentPage, displayedActiveTasks, optimisticState, prefetchedTasks]);
 
 	// Get the working task
 	const workingTask = displayedAppState?.working_on_task_id
@@ -308,21 +334,66 @@ export function AutofocusApp() {
 	const handleAddTask = useCallback(
 		async (text: string) => {
 			const trimmedText = text.trim();
-			if (!trimmedText) return;
+			if (!trimmedText || !displayedAppState) return;
 
 			const placement = getNextTaskPlacement(
 				displayedActiveTasks,
 				DEFAULT_TASK_CAPACITY,
 			);
+			const now = new Date().toISOString();
+			const optimisticTask = createOptimisticTask(trimmedText, placement, now);
+			const optimisticActiveTasks = [
+				...displayedActiveTasks,
+				optimisticTask,
+			].sort(
+				(a, b) => a.page_number - b.page_number || a.position - b.position,
+			);
+			const shouldNavigateToNewPage =
+				currentPage === displayedTotalPages &&
+				placement.pageNumber > currentPage;
 
-			await addTask(trimmedText, placement.pageNumber, placement.position);
-			await refreshAll();
+			setPrefetchedTasks(new Map());
+			if (shouldNavigateToNewPage) {
+				setCurrentPage(placement.pageNumber);
+			}
+
+			try {
+				await runOptimisticUpdate(
+					{
+						activeTasks: optimisticActiveTasks,
+						completedTasks: displayedCompletedTasks,
+						appState: displayedAppState,
+						totalPages: getVisibleTotalPages(optimisticActiveTasks),
+					},
+					async () => {
+						await addTask(
+							trimmedText,
+							placement.pageNumber,
+							placement.position,
+						);
+					},
+				);
+			} catch (error) {
+				if (shouldNavigateToNewPage) {
+					setCurrentPage(currentPage);
+				}
+				throw error;
+			}
 		},
-		[displayedActiveTasks, refreshAll],
+		[
+			currentPage,
+			displayedActiveTasks,
+			displayedAppState,
+			displayedCompletedTasks,
+			displayedTotalPages,
+			runOptimisticUpdate,
+		],
 	);
 
 	const handleAddTasks = useCallback(
 		async (taskTexts: string[]) => {
+			if (!displayedAppState) return;
+
 			const trimmedTaskTexts = taskTexts
 				.map((taskText) => taskText.trim())
 				.filter((taskText) => taskText.length > 0);
@@ -346,11 +417,56 @@ export function AutofocusApp() {
 					position: placement.position,
 				};
 			});
+			const now = new Date().toISOString();
+			const optimisticActiveTasks = [
+				...displayedActiveTasks,
+				...tasksToAdd.map((task) =>
+					createOptimisticTask(
+						task.text,
+						{ pageNumber: task.pageNumber, position: task.position },
+						now,
+					),
+				),
+			].sort(
+				(a, b) => a.page_number - b.page_number || a.position - b.position,
+			);
+			const lastAddedTask = tasksToAdd[tasksToAdd.length - 1];
+			const shouldNavigateToNewPage =
+				currentPage === displayedTotalPages &&
+				lastAddedTask.pageNumber > currentPage;
 
-			await addMultipleTasks(tasksToAdd);
-			await refreshAll();
+			setPrefetchedTasks(new Map());
+			if (shouldNavigateToNewPage) {
+				setCurrentPage(lastAddedTask.pageNumber);
+			}
+
+			try {
+				await runOptimisticUpdate(
+					{
+						activeTasks: optimisticActiveTasks,
+						completedTasks: displayedCompletedTasks,
+						appState: displayedAppState,
+						totalPages: getVisibleTotalPages(optimisticActiveTasks),
+					},
+					async () => {
+						await addMultipleTasks(tasksToAdd);
+					},
+				);
+			} catch (error) {
+				if (shouldNavigateToNewPage) {
+					setCurrentPage(currentPage);
+				}
+				throw error;
+			}
 		},
-		[displayedActiveTasks, refreshAll],
+		[
+			currentPage,
+			displayedActiveTasks,
+			displayedAppState,
+			displayedCompletedTasks,
+			displayedTotalPages,
+			runOptimisticUpdate,
+		],
 	);
 
 	const handleStartTask = useCallback(
@@ -936,6 +1052,8 @@ export function AutofocusApp() {
 					total_time_ms: totalTime,
 					updated_at: now,
 				};
+
+				setPrefetchedTasks(new Map());
 
 				await runOptimisticUpdate(
 					{
