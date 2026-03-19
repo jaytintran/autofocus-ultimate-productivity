@@ -144,56 +144,43 @@ function buildReorderedActiveTasks(
 	draggedTaskId: string,
 	targetTaskId: string,
 ): { activeTasks: Task[]; updates: TaskReorderUpdate[] } | null {
-	const draggedTask = tasks.find((task) => task.id === draggedTaskId);
-	const targetTask = tasks.find((task) => task.id === targetTaskId);
+	const draggedTaskIndex = tasks.findIndex((task) => task.id === draggedTaskId);
+	const targetTaskIndex = tasks.findIndex((task) => task.id === targetTaskId);
 
-	if (!draggedTask || !targetTask || draggedTask.id === targetTask.id) {
+	if (
+		draggedTaskIndex === -1 ||
+		targetTaskIndex === -1 ||
+		draggedTaskIndex === targetTaskIndex
+	) {
 		return null;
 	}
 
-	const reorderedPageTasks = tasks
-		.filter(
-			(task) =>
-				task.page_number === targetTask.page_number &&
-				task.id !== draggedTask.id,
-		)
-		.sort((a, b) => a.position - b.position);
+	const reorderedTasks = [...tasks];
+	const [draggedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
+	reorderedTasks.splice(targetTaskIndex, 0, draggedTask);
 
-	const insertIndex = reorderedPageTasks.findIndex(
-		(task) => task.id === targetTask.id,
-	);
-
-	if (insertIndex === -1) {
-		return null;
-	}
-
-	reorderedPageTasks.splice(insertIndex, 0, {
-		...draggedTask,
-		page_number: targetTask.page_number,
-	});
-
+	// Recalculate page_number and position for all tasks
 	const now = new Date().toISOString();
-	const updates = reorderedPageTasks.map((task, index) => ({
+	const updates = reorderedTasks.map((task, index) => ({
 		id: task.id,
-		page_number: targetTask.page_number,
-		position: index,
+		page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+		position: index % DEFAULT_TASK_CAPACITY,
 	}));
+
 	const updatesByTaskId = new Map(updates.map((update) => [update.id, update]));
 
 	return {
-		activeTasks: tasks
-			.map((task) => {
-				const update = updatesByTaskId.get(task.id);
-				return update
-					? {
-							...task,
-							page_number: update.page_number,
-							position: update.position,
-							updated_at: now,
-						}
-					: task;
-			})
-			.sort((a, b) => a.page_number - b.page_number || a.position - b.position),
+		activeTasks: reorderedTasks.map((task) => {
+			const update = updatesByTaskId.get(task.id);
+			return update
+				? {
+						...task,
+						page_number: update.page_number,
+						position: update.position,
+						updated_at: now,
+					}
+				: task;
+		}),
 		updates,
 	};
 }
@@ -281,17 +268,28 @@ export function AutofocusApp() {
 				.sort((a, b) => a.position - b.position);
 		}
 
-		// First try prefetched data
-		const prefetched = prefetchedTasks.get(currentPage);
-		if (prefetched && prefetched.length > 0) {
-			return prefetched.sort((a, b) => a.position - b.position);
-		}
-
-		// Fallback to main data
-		return displayedActiveTasks
+		const currentPageTasks = displayedActiveTasks
 			.filter((task) => task.page_number === currentPage)
 			.sort((a, b) => a.position - b.position);
-	}, [currentPage, displayedActiveTasks, optimisticState, prefetchedTasks]);
+
+		if (activeTasks.length > 0) {
+			return currentPageTasks;
+		}
+
+		// Fall back to prefetched data only before the full active task list loads.
+		const prefetched = prefetchedTasks.get(currentPage);
+		if (prefetched && prefetched.length > 0) {
+			return [...prefetched].sort((a, b) => a.position - b.position);
+		}
+
+		return currentPageTasks;
+	}, [
+		activeTasks.length,
+		currentPage,
+		displayedActiveTasks,
+		optimisticState,
+		prefetchedTasks,
+	]);
 
 	// Get the working task
 	const workingTask = displayedAppState?.working_on_task_id
