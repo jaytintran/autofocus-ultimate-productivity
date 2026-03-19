@@ -1174,7 +1174,7 @@ export function AutofocusApp() {
 				/>
 			)}
 
-			<main className="flex-1 flex flex-col min-h-0">
+			<main className="flex-1 flex flex-col min-h-0 pb-24">
 				{activeView === "tasks" ? (
 					<TaskList
 						tasks={tasksForCurrentPage}
