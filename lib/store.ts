@@ -144,69 +144,7 @@ export async function completeTask(
 	return data;
 }
 
-export async function dismissTask(id: string): Promise<Task> {
-	const supabase = createClient();
-
-	// Get the task being dismissed
-	const { data: dismissedTask, error: fetchError } = await supabase
-		.from("tasks")
-		.select("page_number, position")
-		.eq("id", id)
-		.single();
-
-	if (fetchError) throw fetchError;
-
-	// Mark as dismissed
-	const { data, error } = await supabase
-		.from("tasks")
-		.update({
-			status: "dismissed",
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", id)
-		.select()
-		.single();
-
-	if (error) throw error;
-
-	// Reflow remaining tasks
-	const { data: tasksToReorder, error: reorderFetchError } = await supabase
-		.from("tasks")
-		.select("*")
-		.in("status", ["active", "in-progress"])
-		.gte("page_number", dismissedTask.page_number)
-		.order("page_number", { ascending: true })
-		.order("position", { ascending: true });
-
-	if (reorderFetchError) throw reorderFetchError;
-
-	if (tasksToReorder && tasksToReorder.length > 0) {
-		const PAGE_SIZE = 12;
-		const updates = tasksToReorder.map((task, index) => {
-			const newPageNumber =
-				Math.floor(index / PAGE_SIZE) + dismissedTask.page_number;
-			const newPosition = index % PAGE_SIZE;
-			return {
-				id: task.id,
-				page_number: newPageNumber,
-				position: newPosition,
-			};
-		});
-
-		for (const update of updates) {
-			await supabase
-				.from("tasks")
-				.update({
-					page_number: update.page_number,
-					position: update.position,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("id", update.id);
-		}
-	}
-
-	return data;
-}
+// dismissTask function removed
 
 export async function reenterTask(
 	originalTaskId: string,
@@ -236,7 +174,6 @@ export async function reenterTask(
 export async function deleteTask(id: string): Promise<void> {
 	const supabase = createClient();
 
-	// Get the task being deleted
 	const { data: deletedTask, error: fetchError } = await supabase
 		.from("tasks")
 		.select("page_number, position, status")
@@ -245,7 +182,6 @@ export async function deleteTask(id: string): Promise<void> {
 
 	if (fetchError) throw fetchError;
 
-	// Delete the task
 	const { error: deleteError } = await supabase
 		.from("tasks")
 		.delete()
@@ -254,7 +190,6 @@ export async function deleteTask(id: string): Promise<void> {
 
 	if (!deletedTask || deletedTask.status === "completed") return;
 
-	// Get all active tasks after the deleted position
 	const { data: tasksToReorder, error: reorderFetchError } = await supabase
 		.from("tasks")
 		.select("*")
@@ -266,7 +201,6 @@ export async function deleteTask(id: string): Promise<void> {
 	if (reorderFetchError) throw reorderFetchError;
 	if (!tasksToReorder || tasksToReorder.length === 0) return;
 
-	// Reflow tasks to fill the gap
 	const PAGE_SIZE = 12;
 	const updates = tasksToReorder.map((task, index) => {
 		const newPageNumber =
@@ -279,7 +213,6 @@ export async function deleteTask(id: string): Promise<void> {
 		};
 	});
 
-	// Update all tasks
 	for (const update of updates) {
 		const { error } = await supabase
 			.from("tasks")
@@ -641,4 +574,13 @@ export async function updateTaskTag(
 		.eq("id", taskId);
 
 	if (error) throw error;
+}
+
+// Add this function to clean up any dismissed tasks
+export async function cleanupDismissedTasks(): Promise<void> {
+	const supabase = createClient();
+	await supabase
+		.from("tasks")
+		.update({ status: "active", updated_at: new Date().toISOString() })
+		.eq("status", "dismissed");
 }

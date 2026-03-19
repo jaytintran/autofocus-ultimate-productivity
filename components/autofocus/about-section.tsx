@@ -8,6 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function AboutSection() {
 	const [isOpen, setIsOpen] = useState(false);
@@ -29,17 +30,100 @@ export function AboutSection() {
 						<DialogTitle>About Autofocus (AF4)</DialogTitle>
 					</DialogHeader>
 
-					<div className="text-sm text-muted-foreground space-y-4 pt-4">
-						<p>
-							<strong className="text-foreground">Autofocus</strong> is a time
-							management system created by Mark Forster. AF4 is the fourth and
-							final version.
-						</p>
+					<Tabs defaultValue="philosophy" className="pt-4">
+						<TabsList className="w-full">
+							<TabsTrigger value="philosophy" className="flex-1">
+								The Philosophy
+							</TabsTrigger>
+							<TabsTrigger value="how" className="flex-1">
+								How It Works
+							</TabsTrigger>
+							<TabsTrigger value="steps" className="flex-1">
+								The Steps
+							</TabsTrigger>
+						</TabsList>
 
-						<div>
-							<h4 className="text-foreground font-medium mb-2">
-								How it works:
-							</h4>
+						<TabsContent
+							value="philosophy"
+							className="text-sm text-muted-foreground space-y-4 mt-4"
+						>
+							<p>
+								Most productivity systems fail because they rely entirely on
+								your rational mind to decide what to do next. You make a
+								prioritized list, you follow it top to bottom, and you ignore
+								the fact that your brain doesn't actually work that way. The
+								result is resistance, procrastination, and a nagging sense that
+								you're working on the wrong things.
+							</p>
+							<p>
+								Autofocus is different. It works by balancing two parts of your
+								mind — the rational and the intuitive. Your rational mind
+								captures everything (the list). Your intuitive mind decides
+								what's ready to be done (the "standing out" feeling). Neither
+								part runs the show alone. Together, they produce decisions that
+								feel right and actually get executed.
+							</p>
+							<p>
+								The result: less friction, less stress, more output, and a focus
+								that feels genuinely aligned with what matters — not just what
+								looks urgent on paper.
+							</p>
+							<div>
+								<h4 className="text-foreground font-medium mb-2">
+									Key principles:
+								</h4>
+								<ul className="list-disc list-inside space-y-1.5 ml-2">
+									<li>
+										<strong>Trust your intuition</strong> — Don&apos;t force
+										priorities; let tasks naturally rise
+									</li>
+									<li>
+										<strong>No pressure</strong> — Work on what feels right, not
+										what seems urgent
+									</li>
+									<li>
+										<strong>Keep moving</strong> — If nothing stands out, move
+										to the next page
+									</li>
+									<li>
+										<strong>Re-enter freely</strong> — Incomplete tasks get
+										another chance at the end
+									</li>
+								</ul>
+							</div>
+						</TabsContent>
+
+						<TabsContent
+							value="how"
+							className="text-sm text-muted-foreground space-y-4 mt-4"
+						>
+							<p>
+								Add tasks to the list as they come to mind — no sorting, no
+								ranking. New tasks always go at the end.
+							</p>
+							<p>
+								Work through the list page by page. On each page, read through
+								the tasks and wait for one to stand out — to feel ready,
+								interesting, or simply right. That's the one you work on. Click
+								it, start the timer, and go.
+							</p>
+							<p>
+								When you're done with a task (or ready to move on), mark it
+								complete, re-enter it at the end of the list, or delete it. Then
+								look at the page again and see what stands out next. Repeat
+								until nothing is calling to you, then move to the next page.
+							</p>
+							<p>
+								Trust the process. If a task keeps being skipped, that's
+								information — either break it down into something smaller, or
+								delete it honestly.
+							</p>
+						</TabsContent>
+
+						<TabsContent
+							value="steps"
+							className="text-sm text-muted-foreground space-y-4 mt-4"
+						>
 							<ol className="list-decimal list-inside space-y-1.5 ml-2">
 								<li>Write down everything you need to do in one long list</li>
 								<li>Work through the list page by page</li>
@@ -62,44 +146,20 @@ export function AboutSection() {
 									move to the next page
 								</li>
 							</ol>
-						</div>
+						</TabsContent>
+					</Tabs>
 
-						<div>
-							<h4 className="text-foreground font-medium mb-2">
-								Key principles:
-							</h4>
-							<ul className="list-disc list-inside space-y-1.5 ml-2">
-								<li>
-									<strong>Trust your intuition</strong> — Don&apos;t force
-									priorities; let tasks naturally rise
-								</li>
-								<li>
-									<strong>No pressure</strong> — Work on what feels right, not
-									what seems urgent
-								</li>
-								<li>
-									<strong>Keep moving</strong> — If nothing stands out, move to
-									the next page
-								</li>
-								<li>
-									<strong>Re-enter freely</strong> — Incomplete tasks get
-									another chance at the end
-								</li>
-							</ul>
-						</div>
-
-						<p className="text-xs border-t border-border pt-4 mt-4">
-							Learn more at{" "}
-							<a
-								href="http://markforster.squarespace.com/autofocus-system/"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-af4-olive hover:underline"
-							>
-								Mark Forster&apos;s website
-							</a>
-						</p>
-					</div>
+					<p className="text-xs border-t border-border pt-4 mt-4 text-muted-foreground">
+						Learn more at{" "}
+						<a
+							href="http://markforster.squarespace.com/autofocus-system/"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-af4-olive hover:underline"
+						>
+							Mark Forster&apos;s website
+						</a>
+					</p>
 				</DialogContent>
 			</Dialog>
 		</>

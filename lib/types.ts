@@ -1,4 +1,4 @@
-export type TaskStatus = 'active' | 'in-progress' | 'completed' | 'dismissed'
+export type TaskStatus = 'active' | 'in-progress' | 'completed'
 export type TimerState = 'idle' | 'running' | 'paused' | 'stopped'
 
 export interface Task {
@@ -32,5 +32,6 @@ export interface AppState {
 export interface TaskWithTimer extends Task {
   isWorking: boolean
 }
+
 
 

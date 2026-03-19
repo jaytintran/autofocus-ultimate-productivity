@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   text TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'in-progress', 'completed', 'dismissed')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'in-progress', 'completed')),
   page_number INTEGER NOT NULL DEFAULT 1,
   position INTEGER NOT NULL DEFAULT 0,
   added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -40,5 +40,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_added_at ON tasks(added_at);
 INSERT INTO app_state (id, current_page, page_size, last_pass_had_no_action, timer_state, current_session_ms)
 VALUES ('00000000-0000-0000-0000-000000000001', 1, 12, FALSE, 'idle', 0)
 ON CONFLICT (id) DO NOTHING;
+
 
 
