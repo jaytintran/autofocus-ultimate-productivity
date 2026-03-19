@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useMemo } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { RotateCcw, Trash2, Sunrise, CloudSun, Moon } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { revertTask } from "@/lib/store";
 import { formatTimeCompact } from "./timer-bar";
@@ -60,6 +60,73 @@ interface GroupedTasks {
 	dateKey: string;
 	dateLabel: string;
 	tasks: Task[];
+	timeBlocks: TimeBlock[];
+}
+
+interface TimeBlock {
+	period: "morning" | "afternoon" | "evening";
+	label: string;
+	icon: typeof Sunrise | typeof CloudSun | typeof Moon;
+	tasks: Task[];
+}
+
+function getTimePeriod(
+	dateString: string,
+): "morning" | "afternoon" | "evening" {
+	const hour = new Date(dateString).getHours();
+	if (hour < 12) return "morning";
+	if (hour < 18) return "afternoon";
+	return "evening";
+}
+
+function getTimePeriodLabel(
+	period: "morning" | "afternoon" | "evening",
+): string {
+	switch (period) {
+		case "morning":
+			return "Morning (00:00 - 11:59)";
+		case "afternoon":
+			return "Afternoon (12:00 - 17:59)";
+		case "evening":
+			return "Evening (18:00 - 23:59)";
+	}
+}
+
+function getTimePeriodIcon(period: "morning" | "afternoon" | "evening") {
+	switch (period) {
+		case "morning":
+			return Sunrise;
+		case "afternoon":
+			return CloudSun;
+		case "evening":
+			return Moon;
+	}
+}
+
+function getTimePeriodColor(
+	period: "morning" | "afternoon" | "evening",
+): string {
+	switch (period) {
+		case "morning":
+			return "bg-blue-500/5";
+		case "afternoon":
+			return "bg-amber-500/5";
+		case "evening":
+			return "bg-indigo-500/5";
+	}
+}
+
+function getTimePeriodIconColor(
+	period: "morning" | "afternoon" | "evening",
+): string {
+	switch (period) {
+		case "morning":
+			return "text-blue-500/60";
+		case "afternoon":
+			return "text-amber-500/60";
+		case "evening":
+			return "text-indigo-500/60";
+	}
 }
 
 export function CompletedList({
@@ -110,10 +177,38 @@ export function CompletedList({
 		const result: GroupedTasks[] = [];
 		groups.forEach((groupTasks, dateKey) => {
 			if (groupTasks.length > 0 && groupTasks[0].completed_at) {
+				// Group tasks by time of day within this date
+				const timeBlocksMap = new Map<string, Task[]>();
+
+				groupTasks.forEach((task) => {
+					if (!task.completed_at) return;
+					const period = getTimePeriod(task.completed_at);
+					if (!timeBlocksMap.has(period)) {
+						timeBlocksMap.set(period, []);
+					}
+					timeBlocksMap.get(period)!.push(task);
+				});
+
+				// Convert to array and sort by time period (morning -> afternoon -> evening)
+				const periodOrder = ["morning", "afternoon", "evening"];
+				const timeBlocks: TimeBlock[] = periodOrder
+					.filter((period) => timeBlocksMap.has(period))
+					.map((period) => ({
+						period: period as "morning" | "afternoon" | "evening",
+						label: getTimePeriodLabel(
+							period as "morning" | "afternoon" | "evening",
+						),
+						icon: getTimePeriodIcon(
+							period as "morning" | "afternoon" | "evening",
+						),
+						tasks: timeBlocksMap.get(period)!,
+					}));
+
 				result.push({
 					dateKey,
 					dateLabel: formatDateGroup(groupTasks[0].completed_at),
 					tasks: groupTasks,
+					timeBlocks,
 				});
 			}
 		});
@@ -176,87 +271,119 @@ export function CompletedList({
 				{groupedTasks.map((group) => (
 					<div key={group.dateKey} className="mb-4">
 						{/* Date header */}
-						<div className="px-4 py-2 bg-secondary/50 border-b border-border sticky top-0">
+						<div className="px-4 py-2 bg-secondary/50 border-b border-border sticky top-0 z-10">
 							<span className="text-sm text-muted-foreground font-medium">
 								{group.dateLabel}
 							</span>
 						</div>
 
-						{/* Tasks in this group */}
-						<ul className="divide-y divide-border">
-							{group.tasks.map((task) => {
-								const isLoading = task.id === loadingTaskId;
+						{/* Time blocks within this date */}
+						{group.timeBlocks.map((timeBlock) => {
+							const Icon = timeBlock.icon;
+							return (
+								<div
+									key={timeBlock.period}
+									className={`flex gap-3 ${getTimePeriodColor(timeBlock.period)} py-2 px-3`}
+								>
+									{/* Time period icon on the left - vertically centered */}
+									<div className="flex items-center">
+										<Icon
+											className={`w-4 h-4 ${getTimePeriodIconColor(timeBlock.period)}`}
+										/>
+									</div>
 
-								return (
-									<li
-										key={task.id}
-										className={`
-                    group px-4 py-2.5 flex items-center gap-3
-                    ${isLoading ? "opacity-50" : ""}
-                  `}
-									>
-										{/* Checkmark */}
-										<span className="text-[#8b9a6b] flex-shrink-0">✓</span>
+									{/* Tasks in this time block */}
+									<div className="flex-1 min-w-0">
+										<ul className="divide-y divide-border/50">
+											{timeBlock.tasks.map((task) => {
+												const isLoading = task.id === loadingTaskId;
 
-										{/* Task text */}
-										<span className="flex-1 truncate text-muted-foreground line-through">
-											{task.text}
-										</span>
+												return (
+													<li
+														key={task.id}
+														className={`
+															group py-2.5 flex items-center gap-3
+															${isLoading ? "opacity-50" : ""}
+														`}
+													>
+														{/* Checkmark */}
+														<span className="text-[#8b9a6b] flex-shrink-0">
+															✓
+														</span>
 
-										{/* Completion time */}
-										{task.completed_at && (
-											<span className="text-xs text-muted-foreground flex-shrink-0">
-												{formatCompletionTime(task.completed_at)}
-											</span>
-										)}
+														{/* Task text */}
+														<span className="flex-1 truncate text-muted-foreground line-through">
+															{task.text}
+														</span>
 
-										{/* Time spent */}
-										{task.total_time_ms > 0 && (
-											<span className="text-xs text-[#8b9a6b] flex-shrink-0">
-												{formatTimeCompact(task.total_time_ms)}
-											</span>
-										)}
+														{/* Completion time */}
+														{task.completed_at && (
+															<span className="text-xs text-muted-foreground flex-shrink-0">
+																{formatCompletionTime(task.completed_at)}
+															</span>
+														)}
 
-										{/* Action buttons */}
-										<div
-											className={`
-                    flex items-center gap-1 flex-shrink-0
-                    md:opacity-0 md:group-hover:opacity-100 transition-opacity
-                  `}
-										>
-											{/* Revert button */}
-											<button
-												onClick={() => handleRevert(task)}
-												disabled={isLoading}
-												className="p-1.5 hover:bg-accent rounded transition-colors disabled:opacity-30"
-												title="Move back to active tasks"
-											>
-												<RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-											</button>
+														{/* Time spent */}
+														{task.total_time_ms > 0 && (
+															<span className="text-xs text-[#8b9a6b] flex-shrink-0">
+																{formatTimeCompact(task.total_time_ms)}
+															</span>
+														)}
 
-											{/* Delete button */}
-											{showDeleteConfirm === task.id ? (
-												<button
-													onClick={() => handleDelete(task.id)}
-													className="px-2 py-1 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 rounded transition-colors"
-												>
-													Yes
-												</button>
-											) : (
-												<button
-													onClick={() => handleDelete(task.id)}
-													disabled={isLoading}
-													className="p-1.5 hover:bg-accent rounded transition-colors disabled:opacity-30"
-													title="Delete permanently"
-												>
-													<Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-												</button>
-											)}
-										</div>
-									</li>
-								);
-							})}
-						</ul>
+														{/* Tag pill */}
+														{task.tag && (
+															<TagPill
+																tagId={task.tag}
+																className="flex-shrink-0"
+															/>
+														)}
+
+														{/* Action buttons */}
+														<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+															{/* Revert button */}
+															<button
+																type="button"
+																onClick={() => handleRevert(task)}
+																disabled={isLoading}
+																className="p-1.5 hover:bg-accent rounded-sm transition-colors disabled:opacity-50"
+																title="Re-enter task"
+															>
+																<RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+															</button>
+
+															{/* Delete button */}
+															<button
+																type="button"
+																onClick={() => handleDelete(task.id)}
+																disabled={isLoading}
+																className={`p-1.5 rounded-sm transition-colors disabled:opacity-50 ${
+																	showDeleteConfirm === task.id
+																		? "bg-destructive/20 hover:bg-destructive/30"
+																		: "hover:bg-accent"
+																}`}
+																title={
+																	showDeleteConfirm === task.id
+																		? "Click again to confirm"
+																		: "Delete task"
+																}
+															>
+																<Trash2
+																	className={`w-3.5 h-3.5 ${
+																		showDeleteConfirm === task.id
+																			? "text-destructive"
+																			: "text-muted-foreground"
+																	}`}
+																/>
+															</button>
+														</div>
+													</li>
+												);
+											})}
+										</ul>
+									</div>
+								</div>
+							);
+						})}
 					</div>
 				))}
 			</div>
