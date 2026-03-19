@@ -3,6 +3,7 @@
 import { Moon, Sun, Type } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { AboutSection } from "./about-section";
 
 export function Header() {
 	const { theme, setTheme } = useTheme();
@@ -47,6 +48,7 @@ export function Header() {
 				</p>
 			</div>
 			<div className="flex items-center gap-2">
+				<AboutSection />
 				<button
 					onClick={toggleFont}
 					className="p-2 hover:bg-accent rounded transition-colors"

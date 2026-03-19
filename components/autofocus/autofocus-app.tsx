@@ -1163,6 +1163,7 @@ export function AutofocusApp() {
 				onViewChange={setActiveView}
 				selectedTags={selectedTags}
 				onToggleTag={handleToggleTag}
+				onAddTasks={handleAddTasks}
 			/>
 
 			{activeView === "tasks" && (
@@ -1202,11 +1203,8 @@ export function AutofocusApp() {
 			{activeView === "tasks" && (
 				<>
 					<TaskInput onAddTask={handleAddTask} />
-					<BacklogDump onAddTasks={handleAddTasks} />
 				</>
 			)}
-
-			<AboutSection />
 		</div>
 	);
 }

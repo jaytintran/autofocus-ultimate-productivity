@@ -1,13 +1,15 @@
 "use client";
 
-import { TagFilter } from "./tag-filter";
 import type { TagId } from "@/lib/tags";
+import { TagFilter } from "./tag-filter";
+import { BacklogDump } from "./backlog-dump";
 
 interface ViewTabsProps {
 	activeView: "tasks" | "completed";
 	onViewChange: (view: "tasks" | "completed") => void;
 	selectedTags: Set<TagId | "none">;
 	onToggleTag: (tag: TagId | "none" | "all") => void;
+	onAddTasks: (tasks: string[]) => Promise<void>;
 }
 
 export function ViewTabs({
@@ -15,6 +17,7 @@ export function ViewTabs({
 	onViewChange,
 	selectedTags,
 	onToggleTag,
+	onAddTasks,
 }: ViewTabsProps) {
 	return (
 		<div className="flex items-center justify-between px-6 py-3">
@@ -41,7 +44,10 @@ export function ViewTabs({
 				</button>
 			</div>
 
-			<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
+			<div className="flex items-center gap-2">
+				<BacklogDump onAddTasks={onAddTasks} />
+				<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
+			</div>
 		</div>
 	);
 }
