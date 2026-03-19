@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { RotateCcw, Trash2, Sunrise, CloudSun, Moon } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { revertTask } from "@/lib/store";
@@ -8,6 +8,12 @@ import { formatTimeCompact } from "./timer-bar";
 import { TagFilter } from "./tag-filter";
 import { TagPill } from "./tag-pill";
 import type { TagId } from "@/lib/tags";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 
 interface CompletedListProps {
 	tasks: Task[];
@@ -139,6 +145,8 @@ export function CompletedList({
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
 		null,
 	);
+	const [showTaskModal, setShowTaskModal] = useState<string | null>(null);
+	const textRefs = useRef<{ [key: string]: HTMLSpanElement }>({});
 
 	// Filter tasks by selected tags
 	const filteredTasks = useMemo(() => {
@@ -312,21 +320,38 @@ export function CompletedList({
 														</span>
 
 														{/* Task text */}
-														<span className="flex-1 truncate text-muted-foreground line-through">
+														<span
+															ref={(el) => {
+																if (el && task.id) {
+																	textRefs.current[task.id] = el;
+																}
+															}}
+															className="flex-1 truncate text-muted-foreground line-through cursor-pointer hover:text-foreground/70 transition-colors"
+															onClick={() => {
+																const element = textRefs.current[task.id];
+																if (
+																	element &&
+																	element.scrollWidth > element.clientWidth
+																) {
+																	setShowTaskModal(task.id);
+																}
+															}}
+															title="Click to view full text"
+														>
 															{task.text}
 														</span>
-
-														{/* Completion time */}
-														{task.completed_at && (
-															<span className="text-xs text-muted-foreground flex-shrink-0">
-																{formatCompletionTime(task.completed_at)}
-															</span>
-														)}
 
 														{/* Time spent */}
 														{task.total_time_ms > 0 && (
 															<span className="text-xs text-[#8b9a6b] flex-shrink-0">
 																{formatTimeCompact(task.total_time_ms)}
+															</span>
+														)}
+
+														{/* Completion time */}
+														{task.completed_at && (
+															<span className="text-xs text-muted-foreground flex-shrink-0">
+																{formatCompletionTime(task.completed_at)}
 															</span>
 														)}
 
@@ -339,7 +364,7 @@ export function CompletedList({
 														)}
 
 														{/* Action buttons */}
-														<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+														<div className="flex items-center gap-1 flex-shrink-0">
 															{/* Revert button */}
 															<button
 																type="button"
@@ -387,6 +412,25 @@ export function CompletedList({
 					</div>
 				))}
 			</div>
+
+			{/* Task detail modal */}
+			{showTaskModal && (
+				<Dialog
+					open={!!showTaskModal}
+					onOpenChange={() => setShowTaskModal(null)}
+				>
+					<DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)]">
+						<DialogHeader>
+							<DialogTitle>Completed Task</DialogTitle>
+						</DialogHeader>
+						<div className="pt-4 overflow-hidden">
+							<p className="text-sm text-muted-foreground line-through break-words overflow-wrap-anywhere">
+								{tasks.find((t) => t.id === showTaskModal)?.text}
+							</p>
+						</div>
+					</DialogContent>
+				</Dialog>
+			)}
 		</div>
 	);
 }
