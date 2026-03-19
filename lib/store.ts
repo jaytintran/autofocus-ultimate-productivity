@@ -626,3 +626,19 @@ export async function startTask(taskId: string): Promise<AppState> {
 
 	return data;
 }
+
+export async function updateTaskTag(
+	taskId: string,
+	tag: "read" | "learn" | "file" | null,
+): Promise<void> {
+	const supabase = createClient();
+	const { error } = await supabase
+		.from("tasks")
+		.update({
+			tag,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId);
+
+	if (error) throw error;
+}

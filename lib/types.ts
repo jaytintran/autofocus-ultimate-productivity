@@ -13,6 +13,7 @@ export interface Task {
   re_entered_from: string | null
   created_at: string
   updated_at: string
+  tag: "read" | "learn" | "file" | null
 }
 
 export interface AppState {
@@ -20,7 +21,7 @@ export interface AppState {
   current_page: number
   page_size: number
   last_pass_had_no_action: boolean
-  working_on_task_id: string | null
+  working_on_task_id: string | nullnpm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
   session_start_time: string | null
   timer_state: TimerState
   current_session_ms: number
@@ -31,3 +32,4 @@ export interface AppState {
 export interface TaskWithTimer extends Task {
   isWorking: boolean
 }
+

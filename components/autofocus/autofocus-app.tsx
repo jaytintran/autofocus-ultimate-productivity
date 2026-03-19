@@ -200,6 +200,9 @@ function buildReorderedActiveTasks(
 
 export function AutofocusApp() {
 	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
+	const [selectedTags, setSelectedTags] = useState<Set<TagId | "none">>(
+		new Set(),
+	);
 	const [currentPage, setCurrentPage] = useState(1);
 	const [optimisticState, setOptimisticState] =
 		useState<OptimisticStateSnapshot | null>(null);
@@ -1116,6 +1119,23 @@ export function AutofocusApp() {
 		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
+	const handleToggleTag = useCallback((tag: TagId | "none" | "all") => {
+		if (tag === "all") {
+			setSelectedTags(new Set());
+			return;
+		}
+
+		setSelectedTags((prev) => {
+			const next = new Set(prev);
+			if (next.has(tag)) {
+				next.delete(tag);
+			} else {
+				next.add(tag);
+			}
+			return next;
+		});
+	}, []);
+
 	if (!displayedAppState) {
 		return (
 			<div className="min-h-screen bg-background flex items-center justify-center">
@@ -1140,7 +1160,12 @@ export function AutofocusApp() {
 				onReenterTask={handlePanelReenterTask}
 			/>
 
-			<ViewTabs activeView={activeView} onViewChange={setActiveView} />
+			<ViewTabs
+				activeView={activeView}
+				onViewChange={setActiveView}
+				selectedTags={selectedTags}
+				onToggleTag={handleToggleTag}
+			/>
 
 			{activeView === "tasks" && (
 				<PageNav
@@ -1156,6 +1181,7 @@ export function AutofocusApp() {
 						tasks={tasksForCurrentPage}
 						allTasks={displayedActiveTasks}
 						workingTaskId={displayedAppState.working_on_task_id}
+						selectedTags={selectedTags}
 						onRefresh={refreshAll}
 						onStartTask={handleStartTask}
 						onDoneTask={handleDoneTask}
@@ -1168,6 +1194,7 @@ export function AutofocusApp() {
 				) : (
 					<CompletedList
 						tasks={displayedCompletedTasks}
+						selectedTags={selectedTags}
 						onRefresh={refreshAll}
 						onDeleteTask={handleDeleteTask}
 					/>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { GripVertical, Play, Check, RefreshCw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { updateTask } from "@/lib/store";
@@ -11,11 +11,35 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DndContext,
+	closestCenter,
+	PointerSensor,
+	TouchSensor,
+	useSensor,
+	useSensors,
+	DragEndEvent,
+	DragStartEvent,
+	DragOverlay,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	verticalListSortingStrategy,
+	arrayMove,
+} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { TagPicker } from "./tag-picker";
+import { TagPill } from "./tag-pill";
+import { TagFilter } from "./tag-filter";
+import { updateTaskTag } from "@/lib/store";
+import type { TagId } from "@/lib/tags";
 
 interface TaskListProps {
 	tasks: Task[];
 	allTasks: Task[]; // All active tasks for cross-page reordering
 	workingTaskId: string | null;
+	selectedTags: Set<TagId | "none">;
 	onRefresh: () => void;
 	onStartTask: (task: Task) => Promise<void>;
 	onDoneTask: (task: Task) => Promise<void>;
@@ -43,19 +67,13 @@ interface TaskRowProps {
 	onReenter: (task: Task) => void;
 	onDelete: (taskId: string) => void;
 	onUpdateText: (taskId: string, newText: string) => void;
+	onUpdateTag: (taskId: string, tag: TagId | null) => void;
 	onSwitchTask: (
 		newTask: Task,
 		action: "complete" | "reenter",
 	) => Promise<void>;
-	onDragStart: (e: React.DragEvent, task: Task) => void;
-	onDragOver: (e: React.DragEvent, task: Task) => void;
-	onDragEnd: () => void;
-	onTouchStart: (e: React.TouchEvent, task: Task) => void;
-	onTouchMove: (e: React.TouchEvent) => void;
-	onTouchEnd: () => void;
-	isDragging: boolean;
-	isDropTarget: boolean;
 	disabled: boolean;
+	isDragOverlay?: boolean;
 }
 
 function TaskRow({
@@ -67,16 +85,10 @@ function TaskRow({
 	onReenter,
 	onDelete,
 	onUpdateText,
+	onUpdateTag,
 	onSwitchTask,
-	onDragStart,
-	onDragOver,
-	onDragEnd,
-	onTouchStart,
-	onTouchMove,
-	onTouchEnd,
-	isDragging,
-	isDropTarget,
 	disabled,
+	isDragOverlay = false,
 }: TaskRowProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState(task.text);
@@ -85,51 +97,28 @@ function TaskRow({
 	const [modalEditText, setModalEditText] = useState(task.text);
 	const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
 	const [pendingTask, setPendingTask] = useState<Task | null>(null);
-	const [longPressActive, setLongPressActive] = useState(false);
-	const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-	const reenterButtonRef = useRef<HTMLButtonElement>(null);
-	const inputRef = useRef<HTMLInputElement>(null);
+
 	const spanRef = useRef<HTMLSpanElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const reenterButtonRef = useRef<HTMLButtonElement>(null);
 
-	const handleTouchStartWithDelay = (e: React.TouchEvent) => {
-		if (isWorking || disabled) return;
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({
+		id: task.id,
+		disabled: isWorking || isEditing || disabled,
+	});
 
-		longPressTimerRef.current = setTimeout(() => {
-			setLongPressActive(true);
-			onTouchStart(e, task);
-		}, 1000);
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
 	};
-
-	const handleTouchMoveWithDelay = (e: React.TouchEvent) => {
-		if (!longPressActive) {
-			// Cancel long press if user moves before 1 second
-			if (longPressTimerRef.current) {
-				clearTimeout(longPressTimerRef.current);
-				longPressTimerRef.current = null;
-			}
-			return;
-		}
-		onTouchMove(e);
-	};
-
-	const handleTouchEndWithDelay = () => {
-		if (longPressTimerRef.current) {
-			clearTimeout(longPressTimerRef.current);
-			longPressTimerRef.current = null;
-		}
-		if (longPressActive) {
-			setLongPressActive(false);
-			onTouchEnd();
-		}
-	};
-
-	useEffect(() => {
-		return () => {
-			if (longPressTimerRef.current) {
-				clearTimeout(longPressTimerRef.current);
-			}
-		};
-	}, []);
 
 	useEffect(() => {
 		if (isEditing && inputRef.current) {
@@ -228,33 +217,28 @@ function TaskRow({
 	return (
 		<>
 			<li
+				ref={setNodeRef}
+				style={style}
 				data-task-id={task.id}
-				draggable={!isWorking && !isEditing}
-				onDragStart={(e) => onDragStart(e, task)}
-				onDragOver={(e) => onDragOver(e, task)}
-				onDragEnd={onDragEnd}
-				onTouchStart={handleTouchStartWithDelay}
-				onTouchMove={handleTouchMoveWithDelay}
-				onTouchEnd={handleTouchEndWithDelay}
 				className={`
-					group px-4 py-2.5 flex items-center gap-2
-					touch-none
-					${isWorking ? "bg-[#8b9a6b]/15 border-l-2 border-[#8b9a6b]" : ""}
-					${isDragging || longPressActive ? "opacity-50 bg-accent" : ""}
-					${isDropTarget ? "border-t-2 border-[#8b9a6b]" : ""}
+					group relative flex items-center gap-2 px-3 py-2.5
+					${isWorking ? "bg-[#8b9a6b]/5" : "hover:bg-accent/50"}
+					${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
 					transition-colors
 				`}
 			>
 				{/* Drag handle */}
-				<div
-					className={`
-						cursor-grab active:cursor-grabbing text-muted-foreground
-						${isWorking ? "opacity-30" : "opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"}
-						transition-opacity flex-shrink-0
-					`}
-				>
-					<GripVertical className="w-4 h-4" />
-				</div>
+				{!isWorking && !isEditing && !isDragOverlay && (
+					<button
+						{...attributes}
+						{...listeners}
+						type="button"
+						className="cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
+						aria-label="Drag to reorder"
+					>
+						<GripVertical className="w-4 h-4 text-muted-foreground pointer-events-none" />
+					</button>
+				)}
 
 				{/* Task text - clickable area to edit task */}
 				<div className="flex-1 min-w-0 flex items-center gap-2">
@@ -299,6 +283,14 @@ function TaskRow({
 						</span>
 					)}
 
+					{/* Tag pill - shown before action buttons */}
+					{task.tag && !isEditing && (
+						<TagPill
+							tagId={task.tag}
+							onClick={() => !disabled && setShowModal(true)}
+						/>
+					)}
+
 					{/* Action buttons */}
 					{!isWorking && !isEditing && (
 						<div className="flex items-center gap-1 flex-shrink-0">
@@ -310,6 +302,13 @@ function TaskRow({
 							>
 								<Play className="w-3.5 h-3.5 text-[#8b9a6b]" />
 							</button>
+
+							{/* Tag picker */}
+							<TagPicker
+								currentTag={task.tag}
+								onSelectTag={(tag) => onUpdateTag(task.id, tag)}
+								disabled={disabled}
+							/>
 
 							{/* Done button */}
 							<button
@@ -442,6 +441,7 @@ export function TaskList({
 	tasks,
 	allTasks,
 	workingTaskId,
+	selectedTags,
 	onRefresh,
 	onStartTask,
 	onDoneTask,
@@ -452,15 +452,74 @@ export function TaskList({
 	onVisibleCapacityChange,
 }: TaskListProps) {
 	const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
-	const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-	const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-	const [touchStartY, setTouchStartY] = useState<number | null>(null);
-	const [touchCurrentY, setTouchCurrentY] = useState<number | null>(null);
+	const [activeId, setActiveId] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
-	const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	const workingTask = allTasks.find((t) => t.id === workingTaskId) || null;
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: {
+				distance: 5,
+			},
+		}),
+		useSensor(TouchSensor, {
+			activationConstraint: {
+				delay: 150,
+				tolerance: 5,
+			},
+		}),
+	);
+
+	// Filter tasks by selected tags
+	const filteredTasks = useMemo(() => {
+		if (selectedTags.size === 0) return tasks;
+
+		return tasks.filter((task) => {
+			if (selectedTags.has("none")) {
+				return task.tag === null;
+			}
+			return task.tag && selectedTags.has(task.tag);
+		});
+	}, [tasks, selectedTags]);
+
+	const handleUpdateTag = useCallback(
+		async (taskId: string, tag: TagId | null) => {
+			if (loadingTaskId) return;
+			setLoadingTaskId(taskId);
+			try {
+				await updateTaskTag(taskId, tag);
+				await onRefresh();
+			} finally {
+				setLoadingTaskId(null);
+			}
+		},
+		[loadingTaskId, onRefresh],
+	);
+
+	const handleDragStart = useCallback((event: DragStartEvent) => {
+		setActiveId(event.active.id as string);
+	}, []);
+
+	const handleDragEnd = useCallback(
+		async (event: DragEndEvent) => {
+			const { active, over } = event;
+			setActiveId(null);
+
+			if (!over || active.id === over.id) return;
+
+			try {
+				await onReorderTasks(active.id as string, over.id as string);
+			} catch (error) {
+				console.error("Failed to reorder tasks:", error);
+			}
+		},
+		[onReorderTasks],
+	);
+
+	const activeTask = activeId ? allTasks.find((t) => t.id === activeId) : null;
+	const workingTask = workingTaskId
+		? allTasks.find((t) => t.id === workingTaskId)
+		: null;
 
 	useEffect(() => {
 		if (!onVisibleCapacityChange) return;
@@ -565,90 +624,6 @@ export function TaskList({
 		[onRefresh],
 	);
 
-	const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
-		setDraggedTask(task);
-		e.dataTransfer.effectAllowed = "move";
-		e.dataTransfer.setData("text/plain", task.id);
-	}, []);
-
-	const handleDragOver = useCallback(
-		(e: React.DragEvent, targetTask: Task) => {
-			e.preventDefault();
-			if (draggedTask && draggedTask.id !== targetTask.id) {
-				setDropTargetId(targetTask.id);
-			}
-		},
-		[draggedTask],
-	);
-
-	const handleDragEnd = useCallback(async () => {
-		if (!draggedTask || !dropTargetId) {
-			setDraggedTask(null);
-			setDropTargetId(null);
-			return;
-		}
-
-		try {
-			await onReorderTasks(draggedTask.id, dropTargetId);
-		} catch (error) {
-			console.error("Failed to reorder tasks:", error);
-		}
-
-		setDraggedTask(null);
-		setDropTargetId(null);
-	}, [draggedTask, dropTargetId, onReorderTasks]);
-
-	const handleTouchStart = useCallback(
-		(e: React.TouchEvent, task: Task) => {
-			if (workingTaskId || loadingTaskId) return;
-			setDraggedTask(task);
-			setTouchStartY(e.touches[0].clientY);
-		},
-		[workingTaskId, loadingTaskId],
-	);
-
-	const handleTouchMove = useCallback(
-		(e: React.TouchEvent) => {
-			if (!draggedTask || !touchStartY) return;
-			setTouchCurrentY(e.touches[0].clientY);
-
-			// Find the element at the touch position
-			const touch = e.touches[0];
-			const elementAtPoint = document.elementFromPoint(
-				touch.clientX,
-				touch.clientY,
-			);
-			const taskRow = elementAtPoint?.closest("li");
-			const taskId = taskRow?.getAttribute("data-task-id");
-
-			if (taskId && taskId !== draggedTask.id) {
-				setDropTargetId(taskId);
-			}
-		},
-		[draggedTask, touchStartY],
-	);
-
-	const handleTouchEnd = useCallback(async () => {
-		if (!draggedTask || !dropTargetId) {
-			setDraggedTask(null);
-			setDropTargetId(null);
-			setTouchStartY(null);
-			setTouchCurrentY(null);
-			return;
-		}
-
-		try {
-			await onReorderTasks(draggedTask.id, dropTargetId);
-		} catch (error) {
-			console.error("Failed to reorder tasks:", error);
-		}
-
-		setDraggedTask(null);
-		setDropTargetId(null);
-		setTouchStartY(null);
-		setTouchCurrentY(null);
-	}, [draggedTask, dropTargetId, onReorderTasks]);
-
 	const handleSwitchTask = useCallback(
 		async (newTask: Task, action: "complete" | "reenter") => {
 			if (loadingTaskId) return;
@@ -662,73 +637,58 @@ export function TaskList({
 		[loadingTaskId, onSwitchTask],
 	);
 
-	const handleContainerTouchStart = useCallback((e: React.TouchEvent) => {
-		setTouchStartY(e.touches[0].clientY);
-	}, []);
-
-	const handleContainerTouchMove = useCallback(
-		(e: React.TouchEvent) => {
-			if (touchStartY === null || !containerRef.current) return;
-
-			const currentY = e.touches[0].clientY;
-			const deltaY = touchStartY - currentY;
-
-			containerRef.current.scrollTop += deltaY;
-			setTouchStartY(currentY);
-		},
-		[touchStartY],
-	);
-
-	const handleContainerTouchEnd = useCallback(() => {
-		setTouchStartY(null);
-	}, []);
-
-	if (tasks.length === 0) {
-		return (
-			<div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
-				<p className="text-muted-foreground font-medium">
-					No tasks on this page.
-				</p>
-				<p className="text-muted-foreground text-sm mt-1">
-					Add tasks below to get started.
-				</p>
-			</div>
-		);
-	}
-
 	return (
-		<div
-			ref={containerRef}
-			className="flex-1 overflow-y-auto min-h-0"
-			onTouchStart={handleContainerTouchStart}
-			onTouchMove={handleContainerTouchMove}
-			onTouchEnd={handleContainerTouchEnd}
-		>
-			<ul ref={listRef} className="divide-y divide-border">
-				{tasks.map((task) => (
-					<TaskRow
-						key={task.id}
-						task={task}
-						isWorking={task.id === workingTaskId}
-						workingTask={workingTask}
-						onStart={handleStart}
-						onDone={handleDone}
-						onReenter={handleReenter}
-						onDelete={handleDelete}
-						onUpdateText={handleUpdateText}
-						onSwitchTask={handleSwitchTask}
-						onDragStart={handleDragStart}
-						onDragOver={handleDragOver}
-						onDragEnd={handleDragEnd}
-						onTouchStart={handleTouchStart}
-						onTouchMove={handleTouchMove}
-						onTouchEnd={handleTouchEnd}
-						isDragging={draggedTask?.id === task.id}
-						isDropTarget={dropTargetId === task.id}
-						disabled={!!loadingTaskId}
-					/>
-				))}
-			</ul>
+		<div ref={containerRef} className="flex-1 flex flex-col min-h-0">
+			<div className="flex-1 overflow-y-auto">
+				<DndContext
+					sensors={sensors}
+					collisionDetection={closestCenter}
+					onDragStart={handleDragStart}
+					onDragEnd={handleDragEnd}
+				>
+					<SortableContext
+						items={filteredTasks.map((t) => t.id)}
+						strategy={verticalListSortingStrategy}
+					>
+						<ul ref={listRef} className="divide-y divide-border">
+							{filteredTasks.map((task) => (
+								<TaskRow
+									key={task.id}
+									task={task}
+									isWorking={task.id === workingTaskId}
+									workingTask={workingTask}
+									onStart={handleStart}
+									onDone={handleDone}
+									onReenter={handleReenter}
+									onDelete={handleDelete}
+									onUpdateText={handleUpdateText}
+									onUpdateTag={handleUpdateTag}
+									onSwitchTask={handleSwitchTask}
+									disabled={!!loadingTaskId}
+								/>
+							))}
+						</ul>
+					</SortableContext>
+					<DragOverlay>
+						{activeTask && (
+							<TaskRow
+								task={activeTask}
+								isWorking={activeTask.id === workingTaskId}
+								workingTask={workingTask}
+								onStart={() => {}}
+								onDone={() => {}}
+								onReenter={() => {}}
+								onDelete={() => {}}
+								onUpdateText={() => {}}
+								onUpdateTag={() => {}}
+								onSwitchTask={async () => {}}
+								disabled={false}
+								isDragOverlay
+							/>
+						)}
+					</DragOverlay>
+				</DndContext>
+			</div>
 		</div>
 	);
 }

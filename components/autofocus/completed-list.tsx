@@ -5,9 +5,13 @@ import { RotateCcw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { revertTask } from "@/lib/store";
 import { formatTimeCompact } from "./timer-bar";
+import { TagFilter } from "./tag-filter";
+import { TagPill } from "./tag-pill";
+import type { TagId } from "@/lib/tags";
 
 interface CompletedListProps {
 	tasks: Task[];
+	selectedTags: Set<TagId | "none">;
 	onRefresh: () => Promise<void>;
 	onDeleteTask: (taskId: string) => Promise<void>;
 }
@@ -58,6 +62,7 @@ interface GroupedTasks {
 
 export function CompletedList({
 	tasks,
+	selectedTags,
 	onRefresh,
 	onDeleteTask,
 }: CompletedListProps) {
@@ -66,12 +71,24 @@ export function CompletedList({
 		null,
 	);
 
+	// Filter tasks by selected tags
+	const filteredTasks = useMemo(() => {
+		if (selectedTags.size === 0) return tasks;
+
+		return tasks.filter((task) => {
+			if (selectedTags.has("none")) {
+				return task.tag === null;
+			}
+			return task.tag && selectedTags.has(task.tag);
+		});
+	}, [tasks, selectedTags]);
+
 	// Group tasks by completion date
 	const groupedTasks = useMemo(() => {
 		const groups: Map<string, Task[]> = new Map();
 
 		// Sort tasks by completion time descending
-		const sortedTasks = [...tasks].sort((a, b) => {
+		const sortedTasks = [...filteredTasks].sort((a, b) => {
 			if (!a.completed_at || !b.completed_at) return 0;
 			return (
 				new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
@@ -100,7 +117,7 @@ export function CompletedList({
 		});
 
 		return result;
-	}, [tasks]);
+	}, [filteredTasks]);
 
 	const handleRevert = useCallback(
 		async (task: Task) => {
@@ -152,93 +169,95 @@ export function CompletedList({
 	}
 
 	return (
-		<div className="flex-1 overflow-y-auto min-h-0">
-			{groupedTasks.map((group) => (
-				<div key={group.dateKey} className="mb-4">
-					{/* Date header */}
-					<div className="px-4 py-2 bg-secondary/50 border-b border-border sticky top-0">
-						<span className="text-sm text-muted-foreground font-medium">
-							{group.dateLabel}
-						</span>
-					</div>
+		<div className="flex-1 flex flex-col min-h-0">
+			<div className="flex-1 overflow-y-auto">
+				{groupedTasks.map((group) => (
+					<div key={group.dateKey} className="mb-4">
+						{/* Date header */}
+						<div className="px-4 py-2 bg-secondary/50 border-b border-border sticky top-0">
+							<span className="text-sm text-muted-foreground font-medium">
+								{group.dateLabel}
+							</span>
+						</div>
 
-					{/* Tasks in this group */}
-					<ul className="divide-y divide-border">
-						{group.tasks.map((task) => {
-							const isLoading = task.id === loadingTaskId;
+						{/* Tasks in this group */}
+						<ul className="divide-y divide-border">
+							{group.tasks.map((task) => {
+								const isLoading = task.id === loadingTaskId;
 
-							return (
-								<li
-									key={task.id}
-									className={`
+								return (
+									<li
+										key={task.id}
+										className={`
                     group px-4 py-2.5 flex items-center gap-3
                     ${isLoading ? "opacity-50" : ""}
                   `}
-								>
-									{/* Checkmark */}
-									<span className="text-[#8b9a6b] flex-shrink-0">✓</span>
+									>
+										{/* Checkmark */}
+										<span className="text-[#8b9a6b] flex-shrink-0">✓</span>
 
-									{/* Task text */}
-									<span className="flex-1 truncate text-muted-foreground line-through">
-										{task.text}
-									</span>
-
-									{/* Completion time */}
-									{task.completed_at && (
-										<span className="text-xs text-muted-foreground flex-shrink-0">
-											{formatCompletionTime(task.completed_at)}
+										{/* Task text */}
+										<span className="flex-1 truncate text-muted-foreground line-through">
+											{task.text}
 										</span>
-									)}
 
-									{/* Time spent */}
-									{task.total_time_ms > 0 && (
-										<span className="text-xs text-[#8b9a6b] flex-shrink-0">
-											{formatTimeCompact(task.total_time_ms)}
-										</span>
-									)}
+										{/* Completion time */}
+										{task.completed_at && (
+											<span className="text-xs text-muted-foreground flex-shrink-0">
+												{formatCompletionTime(task.completed_at)}
+											</span>
+										)}
 
-									{/* Action buttons */}
-									<div
-										className={`
+										{/* Time spent */}
+										{task.total_time_ms > 0 && (
+											<span className="text-xs text-[#8b9a6b] flex-shrink-0">
+												{formatTimeCompact(task.total_time_ms)}
+											</span>
+										)}
+
+										{/* Action buttons */}
+										<div
+											className={`
                     flex items-center gap-1 flex-shrink-0
                     md:opacity-0 md:group-hover:opacity-100 transition-opacity
                   `}
-									>
-										{/* Revert button */}
-										<button
-											onClick={() => handleRevert(task)}
-											disabled={isLoading}
-											className="p-1.5 hover:bg-accent rounded transition-colors disabled:opacity-30"
-											title="Move back to active tasks"
 										>
-											<RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-										</button>
-
-										{/* Delete button */}
-										{showDeleteConfirm === task.id ? (
+											{/* Revert button */}
 											<button
-												onClick={() => handleDelete(task.id)}
-												className="px-2 py-1 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 rounded transition-colors"
-											>
-												Yes
-											</button>
-										) : (
-											<button
-												onClick={() => handleDelete(task.id)}
+												onClick={() => handleRevert(task)}
 												disabled={isLoading}
 												className="p-1.5 hover:bg-accent rounded transition-colors disabled:opacity-30"
-												title="Delete permanently"
+												title="Move back to active tasks"
 											>
-												<Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+												<RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
 											</button>
-										)}
-									</div>
-								</li>
-							);
-						})}
-					</ul>
-				</div>
-			))}
+
+											{/* Delete button */}
+											{showDeleteConfirm === task.id ? (
+												<button
+													onClick={() => handleDelete(task.id)}
+													className="px-2 py-1 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 rounded transition-colors"
+												>
+													Yes
+												</button>
+											) : (
+												<button
+													onClick={() => handleDelete(task.id)}
+													disabled={isLoading}
+													className="p-1.5 hover:bg-accent rounded transition-colors disabled:opacity-30"
+													title="Delete permanently"
+												>
+													<Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+												</button>
+											)}
+										</div>
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				))}
+			</div>
 		</div>
 	);
 }
