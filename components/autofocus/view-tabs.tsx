@@ -9,7 +9,7 @@ interface ViewTabsProps {
 	onViewChange: (view: "tasks" | "completed") => void;
 	selectedTags: Set<TagId | "none">;
 	onToggleTag: (tag: TagId | "none" | "all") => void;
-	onAddTasks: (tasks: string[]) => Promise<void>;
+	onAddTasks: (tasks: string[], tag?: TagId | null) => Promise<void>;
 }
 
 export function ViewTabs({
@@ -45,7 +45,7 @@ export function ViewTabs({
 			</div>
 
 			<div className="flex items-center gap-2">
-				<BacklogDump onAddTasks={onAddTasks} />
+				<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />
 				<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
 			</div>
 		</div>

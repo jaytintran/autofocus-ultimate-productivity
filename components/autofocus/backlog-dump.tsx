@@ -11,13 +11,20 @@ import {
 import { Button } from "@/components/ui/button";
 
 interface BacklogDumpProps {
-	onAddTasks: (tasks: string[]) => Promise<void>;
+	onAddTasks: (tasks: string[], tag?: TagId | null) => Promise<void>;
+	selectedTags?: Set<TagId | "none">;
 }
 
-export function BacklogDump({ onAddTasks }: BacklogDumpProps) {
+export function BacklogDump({ onAddTasks, selectedTags }: BacklogDumpProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [text, setText] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+
+	// Determine active tag
+	const activeTag =
+		selectedTags && selectedTags.size === 1 && !selectedTags.has("none")
+			? (Array.from(selectedTags)[0] as TagId)
+			: null;
 
 	const handleSubmit = useCallback(async () => {
 		const lines = text
@@ -29,13 +36,13 @@ export function BacklogDump({ onAddTasks }: BacklogDumpProps) {
 
 		setIsLoading(true);
 		try {
-			await onAddTasks(lines);
+			await onAddTasks(lines, activeTag);
 			setText("");
 			setIsOpen(false);
 		} finally {
 			setIsLoading(false);
 		}
-	}, [text, isLoading, onAddTasks]);
+	}, [text, isLoading, onAddTasks, activeTag]);
 
 	return (
 		<>

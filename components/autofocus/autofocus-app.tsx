@@ -333,7 +333,7 @@ export function AutofocusApp() {
 	}, []);
 
 	const handleAddTask = useCallback(
-		async (text: string) => {
+		async (text: string, tag?: TagId | null) => {
 			const trimmedText = text.trim();
 			if (!trimmedText || !displayedAppState) return;
 
@@ -342,7 +342,10 @@ export function AutofocusApp() {
 				DEFAULT_TASK_CAPACITY,
 			);
 			const now = new Date().toISOString();
-			const optimisticTask = createOptimisticTask(trimmedText, placement, now);
+			const optimisticTask = {
+				...createOptimisticTask(trimmedText, placement, now),
+				tag: tag ?? null,
+			};
 			const optimisticActiveTasks = [
 				...displayedActiveTasks,
 				optimisticTask,
@@ -371,6 +374,7 @@ export function AutofocusApp() {
 							trimmedText,
 							placement.pageNumber,
 							placement.position,
+							tag ?? null,
 						);
 					},
 				);
@@ -392,7 +396,7 @@ export function AutofocusApp() {
 	);
 
 	const handleAddTasks = useCallback(
-		async (taskTexts: string[]) => {
+		async (taskTexts: string[], tag?: TagId | null) => {
 			if (!displayedAppState) return;
 
 			const trimmedTaskTexts = taskTexts
@@ -416,18 +420,20 @@ export function AutofocusApp() {
 					text: taskText,
 					pageNumber: placement.pageNumber,
 					position: placement.position,
+					tag: tag ?? null,
 				};
 			});
 			const now = new Date().toISOString();
 			const optimisticActiveTasks = [
 				...displayedActiveTasks,
-				...tasksToAdd.map((task) =>
-					createOptimisticTask(
+				...tasksToAdd.map((task) => ({
+					...createOptimisticTask(
 						task.text,
 						{ pageNumber: task.pageNumber, position: task.position },
 						now,
 					),
-				),
+					tag: task.tag,
+				})),
 			].sort(
 				(a, b) => a.page_number - b.page_number || a.position - b.position,
 			);
@@ -1202,7 +1208,7 @@ export function AutofocusApp() {
 
 			{activeView === "tasks" && (
 				<>
-					<TaskInput onAddTask={handleAddTask} />
+					<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />
 				</>
 			)}
 		</div>

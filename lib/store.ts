@@ -70,6 +70,7 @@ export async function addTask(
 	text: string,
 	pageNumber: number,
 	position: number,
+	tag?: TagId | null,
 ): Promise<Task> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -79,6 +80,7 @@ export async function addTask(
 			page_number: pageNumber,
 			position,
 			status: "active",
+			tag: tag ?? null,
 		})
 		.select()
 		.single();
@@ -88,7 +90,12 @@ export async function addTask(
 }
 
 export async function addMultipleTasks(
-	tasks: Array<{ text: string; pageNumber: number; position: number }>,
+	tasks: Array<{
+		text: string;
+		pageNumber: number;
+		position: number;
+		tag?: TagId | null;
+	}>,
 ): Promise<Task[]> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -99,6 +106,7 @@ export async function addMultipleTasks(
 				page_number: t.pageNumber,
 				position: t.position,
 				status: "active" as TaskStatus,
+				tag: t.tag ?? null,
 			})),
 		)
 		.select();
