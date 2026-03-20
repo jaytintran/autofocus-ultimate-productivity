@@ -324,13 +324,10 @@ export function AutofocusApp() {
 			return sourceList.slice(startIndex, endIndex);
 		}
 
+		// Unfiltered view - use original page_number logic
 		const currentPageTasks = sourceList
 			.filter((task) => task.page_number === pageNum)
 			.sort((a, b) => a.position - b.position);
-
-		if (optimisticState) {
-			return currentPageTasks;
-		}
 
 		if (activeTasks.length > 0) {
 			return currentPageTasks;
@@ -618,26 +615,15 @@ export function AutofocusApp() {
 			if (!displayedAppState) return;
 
 			const now = new Date().toISOString();
-			const optimisticActiveTasks = displayedActiveTasks
-				.filter((activeTask) => activeTask.id !== task.id)
-				.sort(
-					(a, b) => a.page_number - b.page_number || a.position - b.position,
-				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
-
+			const optimisticActiveTasks = displayedActiveTasks.filter(
+				(activeTask) => activeTask.id !== task.id,
+			);
 			const completedTask: Task = {
 				...task,
 				status: "completed",
 				completed_at: now,
 				updated_at: now,
 			};
-
-			setPrefetchedTasks(new Map()); // ← ADD THIS
 
 			await runOptimisticUpdate(
 				{
@@ -749,7 +735,7 @@ export function AutofocusApp() {
 		],
 	);
 
-	const handleReenterTaskOldOld = useCallback(
+	const handleReenterTask = useCallback(
 		async (task: Task) => {
 			const remainingActiveTasks = displayedActiveTasks.filter(
 				(activeTask) => activeTask.id !== task.id,
@@ -770,161 +756,6 @@ export function AutofocusApp() {
 			await refreshAll();
 		},
 		[displayedActiveTasks, refreshAll],
-	);
-
-	const handleReenterTaskOld = useCallback(
-		async (task: Task) => {
-			if (!displayedAppState) return;
-
-			const now = new Date().toISOString();
-			const remainingActiveTasks = displayedActiveTasks.filter(
-				(activeTask) => activeTask.id !== task.id,
-			);
-			const placement = getNextTaskPlacement(
-				remainingActiveTasks,
-				DEFAULT_TASK_CAPACITY,
-			);
-
-			const reenteredTask: Task = {
-				...task,
-				id: crypto.randomUUID(),
-				page_number: placement.pageNumber,
-				position: placement.position,
-				status: "active",
-				re_entered_from: task.id,
-				added_at: now,
-				completed_at: null,
-				updated_at: now,
-			};
-
-			const completedTask: Task = {
-				...task,
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			};
-
-			const optimisticActiveTasks = [
-				...remainingActiveTasks,
-				reenteredTask,
-			].sort(
-				(a, b) => a.page_number - b.page_number || a.position - b.position,
-			);
-
-			setPrefetchedTasks(new Map());
-
-			await runOptimisticUpdate(
-				{
-					activeTasks: optimisticActiveTasks,
-					completedTasks: [completedTask, ...displayedCompletedTasks],
-					appState: displayedAppState,
-					totalPages: getVisibleTotalPages(optimisticActiveTasks),
-				},
-				async () => {
-					await reenterTask(
-						task.id,
-						task.text,
-						placement.pageNumber,
-						placement.position,
-						task.total_time_ms,
-					);
-					await markTaskDone(task.id, task.total_time_ms);
-				},
-			);
-		},
-		[
-			displayedActiveTasks,
-			displayedAppState,
-			displayedCompletedTasks,
-			runOptimisticUpdate,
-		],
-	);
-
-	const handleReenterTask = useCallback(
-		async (task: Task) => {
-			if (!displayedAppState) return;
-
-			const now = new Date().toISOString();
-			const remainingActiveTasks = displayedActiveTasks.filter(
-				(activeTask) => activeTask.id !== task.id,
-			);
-			const placement = getNextTaskPlacement(
-				remainingActiveTasks,
-				DEFAULT_TASK_CAPACITY,
-			);
-
-			const reenteredTask: Task = {
-				...task,
-				id: crypto.randomUUID(),
-				page_number: placement.pageNumber,
-				position: placement.position,
-				status: "active",
-				re_entered_from: task.id,
-				added_at: now,
-				completed_at: null,
-				updated_at: now,
-			};
-
-			const completedTask: Task = {
-				...task,
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			};
-
-			// Re-index remaining tasks to close the gap, then append re-entered task at end
-			const reindexedRemaining = remainingActiveTasks
-				.sort(
-					(a, b) => a.page_number - b.page_number || a.position - b.position,
-				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
-
-			// Recompute placement based on re-indexed remaining tasks
-			const reindexedPlacement = getNextTaskPlacement(
-				reindexedRemaining,
-				DEFAULT_TASK_CAPACITY,
-			);
-
-			const reenteredTaskFinal: Task = {
-				...reenteredTask,
-				page_number: reindexedPlacement.pageNumber,
-				position: reindexedPlacement.position,
-			};
-
-			const optimisticActiveTasks = [...reindexedRemaining, reenteredTaskFinal];
-
-			setPrefetchedTasks(new Map());
-
-			await runOptimisticUpdate(
-				{
-					activeTasks: optimisticActiveTasks,
-					completedTasks: [completedTask, ...displayedCompletedTasks],
-					appState: displayedAppState,
-					totalPages: getVisibleTotalPages(optimisticActiveTasks),
-				},
-				async () => {
-					await reenterTask(
-						task.id,
-						task.text,
-						reindexedPlacement.pageNumber,
-						reindexedPlacement.position,
-						task.total_time_ms,
-					);
-					await markTaskDone(task.id, task.total_time_ms);
-				},
-			);
-		},
-		[
-			displayedActiveTasks,
-			displayedAppState,
-			displayedCompletedTasks,
-			runOptimisticUpdate,
-		],
 	);
 
 	const handleRunTimer = useCallback(async () => {
@@ -1030,8 +861,7 @@ export function AutofocusApp() {
 		],
 	);
 
-	/* handleCompleteWorkingTaskOld
-	const handleCompleteWorkingTaskOld = useCallback(
+	const handleCompleteWorkingTask = useCallback(
 		async (task: Task, sessionMs: number) => {
 			if (!displayedAppState) return;
 
@@ -1047,64 +877,6 @@ export function AutofocusApp() {
 				total_time_ms: totalTime,
 				updated_at: now,
 			};
-
-			await runOptimisticUpdate(
-				{
-					activeTasks: optimisticActiveTasks,
-					completedTasks: [completedTask, ...displayedCompletedTasks],
-					appState: {
-						...displayedAppState,
-						working_on_task_id: null,
-						timer_state: "idle",
-						current_session_ms: 0,
-						session_start_time: null,
-						updated_at: now,
-					},
-					totalPages: getVisibleTotalPages(optimisticActiveTasks),
-				},
-				async () => {
-					await completeTask(task.id, totalTime);
-					await stopWorkingOnTask();
-				},
-			);
-		},
-		[
-			displayedActiveTasks,
-			displayedAppState,
-			displayedCompletedTasks,
-			runOptimisticUpdate,
-		],
-	);	
-	*/
-
-	const handleCompleteWorkingTask = useCallback(
-		async (task: Task, sessionMs: number) => {
-			if (!displayedAppState) return;
-
-			const now = new Date().toISOString();
-			const totalTime = task.total_time_ms + sessionMs;
-
-			const optimisticActiveTasks = displayedActiveTasks
-				.filter((activeTask) => activeTask.id !== task.id)
-				.sort(
-					(a, b) => a.page_number - b.page_number || a.position - b.position,
-				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
-
-			const completedTask: Task = {
-				...task,
-				status: "completed",
-				completed_at: now,
-				total_time_ms: totalTime,
-				updated_at: now,
-			};
-
-			setPrefetchedTasks(new Map()); // ← ADD THIS
 
 			await runOptimisticUpdate(
 				{
@@ -1188,8 +960,7 @@ export function AutofocusApp() {
 		],
 	);
 
-	/* handlePanelReenterTaskOld
-	const handlePanelReenterTaskOld = useCallback(
+	const handlePanelReenterTask = useCallback(
 		async (task: Task) => {
 			if (!displayedAppState) return;
 
@@ -1262,95 +1033,8 @@ export function AutofocusApp() {
 			runOptimisticUpdate,
 		],
 	);
-	 */
 
-	const handlePanelReenterTask = useCallback(
-		async (task: Task) => {
-			if (!displayedAppState) return;
-
-			const now = new Date().toISOString();
-			const remainingActiveTasks = displayedActiveTasks.filter(
-				(activeTask) => activeTask.id !== task.id,
-			);
-
-			// Re-index remaining to close the gap first
-			const reindexedRemaining = remainingActiveTasks
-				.sort(
-					(a, b) => a.page_number - b.page_number || a.position - b.position,
-				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
-
-			// Compute placement from re-indexed list
-			const placement = getNextTaskPlacement(
-				reindexedRemaining,
-				DEFAULT_TASK_CAPACITY,
-			);
-
-			const reenteredTask: Task = {
-				...task,
-				id: crypto.randomUUID(),
-				page_number: placement.pageNumber,
-				position: placement.position,
-				status: "active",
-				re_entered_from: task.id,
-				added_at: now,
-				completed_at: null,
-				updated_at: now,
-			};
-
-			const completedTask: Task = {
-				...task,
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			};
-
-			const optimisticActiveTasks = [...reindexedRemaining, reenteredTask];
-
-			setPrefetchedTasks(new Map());
-
-			await runOptimisticUpdate(
-				{
-					activeTasks: optimisticActiveTasks,
-					completedTasks: [completedTask, ...displayedCompletedTasks],
-					appState: {
-						...displayedAppState,
-						working_on_task_id: null,
-						timer_state: "idle",
-						current_session_ms: 0,
-						session_start_time: null,
-						updated_at: now,
-					},
-					totalPages: getVisibleTotalPages(optimisticActiveTasks),
-				},
-				async () => {
-					await reenterTask(
-						task.id,
-						task.text,
-						placement.pageNumber,
-						placement.position,
-						task.total_time_ms,
-					);
-					await markTaskDone(task.id, task.total_time_ms);
-					await stopWorkingOnTask();
-				},
-			);
-		},
-		[
-			displayedActiveTasks,
-			displayedAppState,
-			displayedCompletedTasks,
-			runOptimisticUpdate,
-		],
-	);
-
-	/* handleSwitchTaskOld
-	const handleSwitchTaskOld = useCallback(
+	const handleSwitchTask = useCallback(
 		async (newTask: Task, action: "complete" | "reenter") => {
 			if (!displayedAppState?.working_on_task_id) return;
 
@@ -1438,160 +1122,6 @@ export function AutofocusApp() {
 				].sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
 				);
-
-				const completedTask: Task = {
-					...workingTask,
-					status: "completed",
-					completed_at: now,
-					total_time_ms: totalTime,
-					updated_at: now,
-				};
-
-				setPrefetchedTasks(new Map());
-
-				await runOptimisticUpdate(
-					{
-						activeTasks: optimisticActiveTasks,
-						completedTasks: [completedTask, ...displayedCompletedTasks],
-						appState: {
-							...displayedAppState,
-							working_on_task_id: newTask.id,
-							timer_state: "idle",
-							current_session_ms: 0,
-							session_start_time: null,
-							updated_at: now,
-						},
-						totalPages: getVisibleTotalPages(optimisticActiveTasks),
-					},
-					async () => {
-						await reenterTask(
-							workingTask.id,
-							workingTask.text,
-							placement.pageNumber,
-							placement.position,
-							totalTime,
-						);
-						await markTaskDone(workingTask.id, totalTime);
-						await startTask(newTask.id);
-					},
-				);
-			}
-		},
-		[
-			displayedActiveTasks,
-			displayedAppState,
-			displayedCompletedTasks,
-			runOptimisticUpdate,
-		],
-	);	
-	*/
-
-	const handleSwitchTask = useCallback(
-		async (newTask: Task, action: "complete" | "reenter") => {
-			if (!displayedAppState?.working_on_task_id) return;
-
-			const workingTask = displayedActiveTasks.find(
-				(t) => t.id === displayedAppState.working_on_task_id,
-			);
-			if (!workingTask) return;
-
-			const nowDate = new Date();
-			const now = nowDate.toISOString();
-			const sessionMs = getCurrentSessionMs(
-				displayedAppState,
-				nowDate.getTime(),
-			);
-			const totalTime = workingTask.total_time_ms + sessionMs;
-
-			if (action === "complete") {
-				// Re-index remaining after removing working task
-				const reindexedRemaining = displayedActiveTasks
-					.filter((t) => t.id !== workingTask.id)
-					.sort(
-						(a, b) => a.page_number - b.page_number || a.position - b.position,
-					)
-					.map((t, index) => ({
-						...t,
-						page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-						position: index % DEFAULT_TASK_CAPACITY,
-						updated_at: now,
-					}));
-
-				const optimisticActiveTasks = reindexedRemaining.map((t) =>
-					t.id === newTask.id
-						? { ...t, status: "in-progress", updated_at: now }
-						: t,
-				);
-
-				const completedTask: Task = {
-					...workingTask,
-					status: "completed",
-					completed_at: now,
-					total_time_ms: totalTime,
-					updated_at: now,
-				};
-
-				setPrefetchedTasks(new Map());
-
-				await runOptimisticUpdate(
-					{
-						activeTasks: optimisticActiveTasks,
-						completedTasks: [completedTask, ...displayedCompletedTasks],
-						appState: {
-							...displayedAppState,
-							working_on_task_id: newTask.id,
-							timer_state: "idle",
-							current_session_ms: 0,
-							session_start_time: null,
-							updated_at: now,
-						},
-						totalPages: getVisibleTotalPages(optimisticActiveTasks),
-					},
-					async () => {
-						await markTaskDone(workingTask.id, totalTime);
-						await startTask(newTask.id);
-					},
-				);
-			} else {
-				// Re-enter branch
-				const reindexedRemaining = displayedActiveTasks
-					.filter((t) => t.id !== workingTask.id)
-					.sort(
-						(a, b) => a.page_number - b.page_number || a.position - b.position,
-					)
-					.map((t, index) => ({
-						...t,
-						page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-						position: index % DEFAULT_TASK_CAPACITY,
-						updated_at: now,
-					}));
-
-				const placement = getNextTaskPlacement(
-					reindexedRemaining,
-					DEFAULT_TASK_CAPACITY,
-				);
-
-				const reenteredTask: Task = {
-					...workingTask,
-					id: crypto.randomUUID(),
-					page_number: placement.pageNumber,
-					position: placement.position,
-					status: "active",
-					total_time_ms: totalTime,
-					re_entered_from: workingTask.id,
-					added_at: now,
-					completed_at: null,
-					updated_at: now,
-				};
-
-				const optimisticActiveTasks = [
-					...reindexedRemaining.map((t) =>
-						t.id === newTask.id
-							? { ...t, status: "in-progress", updated_at: now }
-							: t,
-					),
-					reenteredTask,
-				];
 
 				const completedTask: Task = {
 					...workingTask,

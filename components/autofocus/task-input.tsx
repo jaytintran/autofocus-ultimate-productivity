@@ -33,7 +33,7 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		// Capitalize first letter of each word
 		const capitalized = trimmed
 			.split(" ")
-			.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(" ");
 
 		setIsLoading(true);

@@ -87,7 +87,7 @@ function TaskRow({
 	onUpdateText,
 	onUpdateTag,
 	onSwitchTask,
-	disabled,
+	disabled = false,
 	isDragOverlay = false,
 }: TaskRowProps) {
 	const [isEditing, setIsEditing] = useState(false);
@@ -451,10 +451,22 @@ export function TaskList({
 	onSwitchTask,
 	onVisibleCapacityChange,
 }: TaskListProps) {
-	const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
+	// const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null); (Old)
+
+	const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
+
+	const addLoading = (id: string) =>
+		setLoadingTaskIds((prev) => new Set(prev).add(id));
+
+	const removeLoading = (id: string) =>
+		setLoadingTaskIds((prev) => {
+			const next = new Set(prev);
+			next.delete(id);
+			return next;
+		});
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
@@ -482,7 +494,8 @@ export function TaskList({
 		});
 	}, [tasks, selectedTags]);
 
-	const handleUpdateTag = useCallback(
+	/* handleUpdateTagOld
+	const handleUpdateTagOld = useCallback(
 		async (taskId: string, tag: TagId | null) => {
 			if (loadingTaskId) return;
 			setLoadingTaskId(taskId);
@@ -494,6 +507,21 @@ export function TaskList({
 			}
 		},
 		[loadingTaskId, onRefresh],
+	);
+	*/
+
+	const handleUpdateTag = useCallback(
+		async (taskId: string, tag: TagId | null) => {
+			if (loadingTaskIds.has(taskId)) return;
+			addLoading(taskId);
+			try {
+				await updateTaskTag(taskId, tag);
+				await onRefresh();
+			} finally {
+				removeLoading(taskId);
+			}
+		},
+		[loadingTaskIds, onRefresh],
 	);
 
 	const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -560,7 +588,8 @@ export function TaskList({
 		return () => observer.disconnect();
 	}, [tasks, onVisibleCapacityChange]);
 
-	const handleStart = useCallback(
+	/* handleStartOld
+	const handleStartOld = useCallback(
 		async (task: Task) => {
 			if (loadingTaskId) return;
 			setLoadingTaskId(task.id);
@@ -572,7 +601,22 @@ export function TaskList({
 		},
 		[loadingTaskId, onStartTask],
 	);
+	 */
 
+	const handleStart = useCallback(
+		async (task: Task) => {
+			if (loadingTaskIds.has(task.id)) return;
+			addLoading(task.id);
+			try {
+				await onStartTask(task);
+			} finally {
+				removeLoading(task.id);
+			}
+		},
+		[loadingTaskIds, onStartTask],
+	);
+
+	/* handleDoneOld
 	const handleDone = useCallback(
 		async (task: Task) => {
 			if (loadingTaskId) return;
@@ -585,8 +629,23 @@ export function TaskList({
 		},
 		[loadingTaskId, onDoneTask],
 	);
+	*/
 
-	const handleReenter = useCallback(
+	const handleDone = useCallback(
+		async (task: Task) => {
+			if (loadingTaskIds.has(task.id)) return;
+			addLoading(task.id);
+			try {
+				await onDoneTask(task);
+			} finally {
+				removeLoading(task.id);
+			}
+		},
+		[loadingTaskIds, onDoneTask],
+	);
+
+	/* handleReenterOld
+		const handleReenter = useCallback(
 		async (task: Task) => {
 			if (loadingTaskId) return;
 			setLoadingTaskId(task.id);
@@ -597,9 +656,24 @@ export function TaskList({
 			}
 		},
 		[loadingTaskId, onReenterTask],
+		);
+	*/
+
+	const handleReenter = useCallback(
+		async (task: Task) => {
+			if (loadingTaskIds.has(task.id)) return;
+			addLoading(task.id);
+			try {
+				await onReenterTask(task);
+			} finally {
+				removeLoading(task.id);
+			}
+		},
+		[loadingTaskIds, onReenterTask],
 	);
 
-	const handleDelete = useCallback(
+	/* handleDeleteOld
+		const handleDelete = useCallback(
 		async (taskId: string) => {
 			if (loadingTaskId) return;
 			setLoadingTaskId(taskId);
@@ -610,6 +684,20 @@ export function TaskList({
 			}
 		},
 		[loadingTaskId, onDeleteTask],
+		);
+	*/
+
+	const handleDelete = useCallback(
+		async (taskId: string) => {
+			if (loadingTaskIds.has(taskId)) return;
+			addLoading(taskId);
+			try {
+				await onDeleteTask(taskId);
+			} finally {
+				removeLoading(taskId);
+			}
+		},
+		[loadingTaskIds, onDeleteTask],
 	);
 
 	const handleUpdateText = useCallback(
@@ -624,6 +712,7 @@ export function TaskList({
 		[onRefresh],
 	);
 
+	/* handleSwitchTaskOld
 	const handleSwitchTask = useCallback(
 		async (newTask: Task, action: "complete" | "reenter") => {
 			if (loadingTaskId) return;
@@ -635,6 +724,20 @@ export function TaskList({
 			}
 		},
 		[loadingTaskId, onSwitchTask],
+	);
+	*/
+
+	const handleSwitchTask = useCallback(
+		async (newTask: Task, action: "complete" | "reenter") => {
+			if (loadingTaskIds.has(newTask.id)) return;
+			addLoading(newTask.id);
+			try {
+				await onSwitchTask(newTask, action);
+			} finally {
+				removeLoading(newTask.id);
+			}
+		},
+		[loadingTaskIds, onSwitchTask],
 	);
 
 	return (
@@ -664,7 +767,7 @@ export function TaskList({
 									onUpdateText={handleUpdateText}
 									onUpdateTag={handleUpdateTag}
 									onSwitchTask={handleSwitchTask}
-									disabled={!!loadingTaskId}
+									disabled={loadingTaskIds.has(task.id)}
 								/>
 							))}
 						</ul>

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Task, AppState, TaskStatus } from "@/lib/types";
+import { TagId } from "@/lib/tags";
 
 const APP_STATE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -213,6 +214,34 @@ export async function completeTask(
 		.single();
 
 	if (error) throw error;
+
+	// Re-index all remaining active tasks
+	const { data: remainingTasks, error: fetchError } = await supabase
+		.from("tasks")
+		.select("id, page_number, position")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
+	if (fetchError) throw fetchError;
+	if (!remainingTasks || remainingTasks.length === 0) return data;
+
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+
+	for (const [index, task] of remainingTasks.entries()) {
+		const { error: updateError } = await supabase
+			.from("tasks")
+			.update({
+				page_number: Math.floor(index / PAGE_SIZE) + 1,
+				position: index % PAGE_SIZE,
+				updated_at: now,
+			})
+			.eq("id", task.id);
+
+		if (updateError) throw updateError;
+	}
+
 	return data;
 }
 
@@ -262,38 +291,29 @@ export async function deleteTask(id: string): Promise<void> {
 
 	if (!deletedTask || deletedTask.status === "completed") return;
 
-	const { data: tasksToReorder, error: reorderFetchError } = await supabase
+	// Re-index the full active list (not just from deleted page)
+	const { data: remainingTasks, error: reorderFetchError } = await supabase
 		.from("tasks")
-		.select("*")
+		.select("id, page_number, position")
 		.in("status", ["active", "in-progress"])
-		.gte("page_number", deletedTask.page_number)
 		.order("page_number", { ascending: true })
 		.order("position", { ascending: true });
 
 	if (reorderFetchError) throw reorderFetchError;
-	if (!tasksToReorder || tasksToReorder.length === 0) return;
+	if (!remainingTasks || remainingTasks.length === 0) return;
 
 	const PAGE_SIZE = 12;
-	const updates = tasksToReorder.map((task, index) => {
-		const newPageNumber =
-			Math.floor(index / PAGE_SIZE) + deletedTask.page_number;
-		const newPosition = index % PAGE_SIZE;
-		return {
-			id: task.id,
-			page_number: newPageNumber,
-			position: newPosition,
-		};
-	});
+	const now = new Date().toISOString();
 
-	for (const update of updates) {
+	for (const [index, task] of remainingTasks.entries()) {
 		const { error } = await supabase
 			.from("tasks")
 			.update({
-				page_number: update.page_number,
-				position: update.position,
-				updated_at: new Date().toISOString(),
+				page_number: Math.floor(index / PAGE_SIZE) + 1,
+				position: index % PAGE_SIZE,
+				updated_at: now,
 			})
-			.eq("id", update.id);
+			.eq("id", task.id);
 
 		if (error) throw error;
 	}
@@ -556,7 +576,7 @@ export async function reorderTasks(
 	}
 }
 
-export async function revertTask(taskId: string): Promise<Task> {
+export async function revertTaskOld(taskId: string): Promise<Task> {
 	const supabase = createClient();
 
 	// Get the max position on the last page
@@ -585,7 +605,89 @@ export async function revertTask(taskId: string): Promise<Task> {
 	return data;
 }
 
-export async function markTaskDone(
+export async function revertTaskLastPosition(taskId: string): Promise<Task> {
+	const supabase = createClient();
+
+	const activeTasks = await getActiveTasks();
+	const PAGE_SIZE = 12;
+
+	// Compute correct placement respecting page capacity
+	const lastPageNumber =
+		activeTasks.length > 0
+			? Math.max(...activeTasks.map((t) => t.page_number))
+			: 1;
+	const lastPageTasks = activeTasks.filter(
+		(t) => t.page_number === lastPageNumber,
+	);
+
+	const pageNumber =
+		lastPageTasks.length >= PAGE_SIZE ? lastPageNumber + 1 : lastPageNumber;
+	const position = lastPageTasks.length >= PAGE_SIZE ? 0 : lastPageTasks.length;
+
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({
+			status: "active",
+			completed_at: null,
+			page_number: pageNumber,
+			position: position,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function revertTask(taskId: string): Promise<Task> {
+	const supabase = createClient();
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+
+	// Shift all existing active tasks down by 1 to make room at page 1, position 0
+	const { data: existingTasks, error: fetchError } = await supabase
+		.from("tasks")
+		.select("id, page_number, position")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
+	if (fetchError) throw fetchError;
+
+	for (const [index, task] of (existingTasks || []).entries()) {
+		const { error } = await supabase
+			.from("tasks")
+			.update({
+				page_number: Math.floor((index + 1) / PAGE_SIZE) + 1,
+				position: (index + 1) % PAGE_SIZE,
+				updated_at: now,
+			})
+			.eq("id", task.id);
+
+		if (error) throw error;
+	}
+
+	// Place the reverted task at page 1, position 0
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({
+			status: "active",
+			completed_at: null,
+			page_number: 1,
+			position: 0,
+			updated_at: now,
+		})
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function markTaskDoneOld(
 	taskId: string,
 	totalTimeMs: number = 0,
 ): Promise<Task> {
@@ -603,6 +705,66 @@ export async function markTaskDone(
 		.single();
 
 	if (error) throw error;
+	return data;
+}
+
+export async function markTaskDone(
+	taskId: string,
+	totalTimeMs: number = 0,
+): Promise<Task> {
+	const supabase = createClient();
+
+	// 1. Mark the task as done
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({
+			status: "completed",
+			completed_at: new Date().toISOString(),
+			total_time_ms: totalTimeMs,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+
+	// 2. Fetch ALL remaining active tasks (both active and in-progress)
+	const { data: remainingTasks, error: fetchError } = await supabase
+		.from("tasks")
+		.select("id, page_number, position")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
+	if (fetchError) throw fetchError;
+
+	if (!remainingTasks || remainingTasks.length === 0) return data;
+
+	// 3. Re-index them contiguously from page 1
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+	const updates = remainingTasks.map((task, index) => ({
+		id: task.id,
+		page_number: Math.floor(index / PAGE_SIZE) + 1,
+		position: index % PAGE_SIZE,
+		updated_at: now,
+	}));
+
+	// 4. Upsert the re-indexed positions back
+	for (const update of updates) {
+		const { error: updateError } = await supabase
+			.from("tasks")
+			.update({
+				page_number: update.page_number,
+				position: update.position,
+				updated_at: update.updated_at,
+			})
+			.eq("id", update.id);
+
+		if (updateError) throw updateError;
+	}
+
 	return data;
 }
 
