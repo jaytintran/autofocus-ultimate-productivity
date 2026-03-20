@@ -11,10 +11,8 @@ interface TaskInputProps {
 
 export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 	const [text, setText] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	// Determine if exactly one tag filter is active
 	const activeTag =
 		selectedTags && selectedTags.size === 1 && !selectedTags.has("none")
 			? (Array.from(selectedTags)[0] as TagId)
@@ -26,26 +24,24 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		inputRef.current?.focus();
 	}, []);
 
-	const handleSubmit = useCallback(async () => {
+	const handleSubmit = useCallback(() => {
 		const trimmed = text.trim();
-		if (!trimmed || isLoading) return;
+		if (!trimmed) return;
 
-		// Capitalize first letter of each word
 		const capitalized = trimmed
 			.split(" ")
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(" ");
 
-		setIsLoading(true);
+		// Clear and refocus immediately — don't wait for server
 		setText("");
+		inputRef.current?.focus();
 
-		try {
-			await onAddTask(capitalized, activeTag);
-		} finally {
-			setIsLoading(false);
-			inputRef.current?.focus();
-		}
-	}, [text, isLoading, onAddTask, activeTag]);
+		// Fire and forget — same pattern as the parent
+		onAddTask(capitalized, activeTag).catch((error) => {
+			console.error("Failed to add task:", error);
+		});
+	}, [text, onAddTask, activeTag]);
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent<HTMLInputElement>) => {
@@ -76,13 +72,11 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 					onChange={(e) => setText(e.target.value)}
 					onKeyDown={handleKeyDown}
 					placeholder="Add a task..."
-					disabled={isLoading}
-					autoFocus
-					className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground disabled:opacity-50 text-sm"
+					className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
 				/>
 				<button
 					onClick={handleSubmit}
-					disabled={!text.trim() || isLoading}
+					disabled={!text.trim()}
 					type="button"
 					className="p-1.5 hover:bg-accent rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
 				>

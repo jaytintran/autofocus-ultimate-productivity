@@ -35,6 +35,81 @@ import { TagFilter } from "./tag-filter";
 import { updateTaskTag } from "@/lib/store";
 import type { TagId } from "@/lib/tags";
 
+function useIsMobile() {
+	const [isMobile, setIsMobile] = useState(false);
+	useEffect(() => {
+		const check = () => setIsMobile(window.innerWidth < 768);
+		check();
+		window.addEventListener("resize", check);
+		return () => window.removeEventListener("resize", check);
+	}, []);
+	return isMobile;
+}
+
+function useSwipeReveal() {
+	const [swiped, setSwiped] = useState(false);
+	const startXRef = useRef<number | null>(null);
+
+	const onTouchStart = useCallback((e: React.TouchEvent) => {
+		startXRef.current = e.touches[0].clientX;
+	}, []);
+
+	const onTouchEnd = useCallback((e: React.TouchEvent) => {
+		if (startXRef.current === null) return;
+		const diff = startXRef.current - e.changedTouches[0].clientX;
+		if (diff > 40) setSwiped(true);
+		else if (diff < -40) setSwiped(false);
+		startXRef.current = null;
+	}, []);
+
+	const close = useCallback(() => setSwiped(false), []);
+
+	return { swiped, onTouchStart, onTouchEnd, close };
+}
+
+function getTaskAge(addedAt: string): string {
+	const now = new Date();
+	const added = new Date(addedAt);
+	const diffMs = now.getTime() - added.getTime();
+	const diffMins = Math.floor(diffMs / (1000 * 60));
+	const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+	const diffWeeks = Math.floor(diffDays / 7);
+	const diffMonths = Math.floor(diffDays / 30);
+
+	if (diffMins < 60) return `${diffMins}m`;
+	if (diffHours < 24) return `${diffHours}h`;
+	if (diffDays < 7) return `${diffDays}d`;
+	if (diffWeeks < 5) return `${diffWeeks}w`;
+	return `${diffMonths}mo`;
+}
+
+function playCompletionSound() {
+	try {
+		const ctx = new AudioContext();
+		const oscillator = ctx.createOscillator();
+		const gain = ctx.createGain();
+
+		oscillator.connect(gain);
+		gain.connect(ctx.destination);
+
+		oscillator.type = "sine";
+		oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+		oscillator.frequency.exponentialRampToValueAtTime(
+			1200,
+			ctx.currentTime + 0.1,
+		);
+
+		gain.gain.setValueAtTime(0.15, ctx.currentTime);
+		gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+		oscillator.start(ctx.currentTime);
+		oscillator.stop(ctx.currentTime + 0.3);
+	} catch {
+		// Silently fail if AudioContext is unavailable
+	}
+}
+
 interface TaskListProps {
 	tasks: Task[];
 	allTasks: Task[]; // All active tasks for cross-page reordering
@@ -87,7 +162,7 @@ function TaskRow({
 	onUpdateText,
 	onUpdateTag,
 	onSwitchTask,
-	disabled = false,
+	disabled,
 	isDragOverlay = false,
 }: TaskRowProps) {
 	const [isEditing, setIsEditing] = useState(false);
@@ -101,6 +176,9 @@ function TaskRow({
 	const spanRef = useRef<HTMLSpanElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const reenterButtonRef = useRef<HTMLButtonElement>(null);
+
+	const isMobile = useIsMobile();
+	const { swiped, onTouchStart, onTouchEnd, close } = useSwipeReveal();
 
 	const {
 		attributes,
@@ -140,8 +218,8 @@ function TaskRow({
 
 	const handleTextClick = (e: React.MouseEvent) => {
 		if (isWorking) return;
-		e.stopPropagation();
 
+		e.stopPropagation();
 		if (isTextOverflowing()) {
 			setModalEditText(task.text);
 			setShowModal(true);
@@ -153,24 +231,19 @@ function TaskRow({
 
 	const handleModalSave = () => {
 		const trimmed = modalEditText.trim();
-		if (trimmed && trimmed !== task.text) {
-			onUpdateText(task.id, trimmed);
-		}
+		if (trimmed && trimmed !== task.text) onUpdateText(task.id, trimmed);
 		setShowModal(false);
 	};
 
 	const handleSave = () => {
 		const trimmed = editText.trim();
-		if (trimmed && trimmed !== task.text) {
-			onUpdateText(task.id, trimmed);
-		}
+		if (trimmed && trimmed !== task.text) onUpdateText(task.id, trimmed);
 		setIsEditing(false);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") {
-			handleSave();
-		} else if (e.key === "Escape") {
+		if (e.key === "Enter") handleSave();
+		else if (e.key === "Escape") {
 			setEditText(task.text);
 			setIsEditing(false);
 		}
@@ -183,7 +256,6 @@ function TaskRow({
 			setShowDeleteConfirm(false);
 		} else {
 			setShowDeleteConfirm(true);
-			// Auto-hide after 3 seconds
 			setTimeout(() => setShowDeleteConfirm(false), 3000);
 		}
 	};
@@ -221,142 +293,223 @@ function TaskRow({
 				style={style}
 				data-task-id={task.id}
 				className={`
-					group relative flex items-center gap-2 px-3 py-2.5
-					${isWorking ? "bg-[#8b9a6b]/5" : "hover:bg-accent/50"}
-					${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
-					transition-colors
-				`}
+                group relative flex items-stretch
+                ${isWorking ? "bg-[#8b9a6b]/5" : ""}
+                ${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
+                transition-colors overflow-hidden
+            `}
+				onTouchStart={isMobile ? onTouchStart : undefined}
+				onTouchEnd={isMobile ? onTouchEnd : undefined}
 			>
-				{/* Drag handle */}
-				{!isWorking && !isEditing && !isDragOverlay && (
-					<button
-						{...attributes}
-						{...listeners}
-						type="button"
-						className="cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
-						aria-label="Drag to reorder"
-					>
-						<GripVertical className="w-4 h-4 text-muted-foreground pointer-events-none" />
-					</button>
-				)}
-
-				{/* Task text - clickable area to edit task */}
-				<div className="flex-1 min-w-0 flex items-center gap-2">
-					{isEditing ? (
-						<input
-							ref={inputRef}
-							type="text"
-							value={editText}
-							onChange={(e) => setEditText(e.target.value)}
-							onBlur={handleSave}
-							onKeyDown={handleKeyDown}
-							onClick={(e) => e.stopPropagation()}
-							className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
-						/>
-					) : (
-						<span
-							ref={spanRef}
-							onClick={handleTextClick}
-							className={`
-								truncate cursor-text
-								${isWorking ? "text-[#ddd4b8]" : ""}
-							`}
+				{/* Sliding wrapper — this moves left to reveal buttons behind it */}
+				<div
+					className={`
+					relative flex items-center gap-2 px-3 py-2.5 w-full
+					transition-transform duration-200 ease-out
+					${isMobile && swiped ? "-translate-x-[240px]" : "translate-x-0"}
+					${!isMobile && !isWorking ? "hover:bg-accent/50" : ""}
+					bg-background
+				`}
+					style={{ zIndex: 1 }}
+					onTouchEnd={
+						isMobile && swiped
+							? (e) => {
+									e.stopPropagation();
+									close();
+								}
+							: undefined
+					}
+				>
+					{/* Drag handle */}
+					{!isWorking && !isEditing && !isDragOverlay && (
+						<button
+							{...attributes}
+							{...listeners}
+							type="button"
+							className="cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
+							aria-label="Drag to reorder"
 						>
-							{task.text}
-						</span>
+							<GripVertical className="w-4 h-4 text-muted-foreground pointer-events-none" />
+						</button>
 					)}
+
+					{/* Task text */}
+					<div className="flex-1 min-w-0 flex items-center gap-2">
+						{isEditing ? (
+							<input
+								ref={inputRef}
+								type="text"
+								value={editText}
+								onChange={(e) => setEditText(e.target.value)}
+								onBlur={handleSave}
+								onKeyDown={handleKeyDown}
+								onClick={(e) => e.stopPropagation()}
+								className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
+							/>
+						) : (
+							<span
+								ref={spanRef}
+								onClick={handleTextClick}
+								className={`
+                                truncate cursor-text
+                                ${isWorking ? "text-[#ddd4b8]" : ""}
+                            `}
+							>
+								{task.text}
+							</span>
+						)}
+					</div>
+
+					{/* Right side badges */}
+					<div className="flex items-center gap-1.5 flex-shrink-0">
+						{task.re_entered_from && !isEditing && (
+							<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
+								re-entered
+							</span>
+						)}
+						{task.total_time_ms > 0 && !isEditing && (
+							<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
+								{formatTimeCompact(task.total_time_ms)}
+							</span>
+						)}
+						{!isEditing && (
+							<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-transparent text-muted-foreground/50 flex-shrink-0">
+								{getTaskAge(task.added_at)}
+							</span>
+						)}
+						{task.tag && !isEditing && (
+							<TagPill
+								tagId={task.tag}
+								onClick={() => !disabled && !isMobile && setShowModal(true)}
+							/>
+						)}
+
+						{/* Desktop action buttons only */}
+						{!isMobile && !isWorking && !isEditing && (
+							<div className="flex items-center gap-1 flex-shrink-0">
+								<button
+									onClick={handleStartClick}
+									className="p-1.5 hover:bg-accent rounded transition-colors"
+									title="Start working on this task"
+								>
+									<Play className="w-3.5 h-3.5 text-[#8b9a6b]" />
+								</button>
+								<TagPicker
+									currentTag={task.tag}
+									onSelectTag={(tag) => onUpdateTag(task.id, tag)}
+									disabled={disabled}
+								/>
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										onDone(task);
+									}}
+									className="p-1.5 hover:bg-accent rounded transition-colors"
+									title="Mark as done"
+								>
+									<Check className="w-3.5 h-3.5 text-[#8b9a6b]" />
+								</button>
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										onReenter(task);
+									}}
+									className="p-1.5 hover:bg-accent rounded transition-colors"
+									title="Re-enter at end of list"
+								>
+									<RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+								</button>
+								{showDeleteConfirm ? (
+									<button
+										onClick={handleDeleteClick}
+										className="px-2 py-1 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 rounded transition-colors"
+									>
+										Yes
+									</button>
+								) : (
+									<button
+										onClick={handleDeleteClick}
+										className="p-1.5 hover:bg-accent rounded transition-colors"
+										title="Delete task"
+									>
+										<Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+									</button>
+								)}
+							</div>
+						)}
+					</div>
 				</div>
 
-				{/* Right side: badges and action buttons */}
-				<div className="flex items-center gap-1.5 flex-shrink-0">
-					{/* Re-entered badge */}
-					{task.re_entered_from && !isEditing && (
-						<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
-							re-entered
-						</span>
-					)}
-
-					{/* Time spent badge */}
-					{task.total_time_ms > 0 && !isEditing && (
-						<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
-							{formatTimeCompact(task.total_time_ms)}
-						</span>
-					)}
-
-					{/* Tag pill - shown before action buttons */}
-					{task.tag && !isEditing && (
-						<TagPill
-							tagId={task.tag}
-							onClick={() => !disabled && setShowModal(true)}
-						/>
-					)}
-
-					{/* Action buttons */}
-					{!isWorking && !isEditing && (
-						<div className="flex items-center gap-1 flex-shrink-0">
-							{/* Start button */}
-							<button
-								onClick={handleStartClick}
-								className="p-1.5 hover:bg-accent rounded transition-colors"
-								title="Start working on this task"
-							>
-								<Play className="w-3.5 h-3.5 text-[#8b9a6b]" />
-							</button>
-
-							{/* Tag picker */}
+				{/* Mobile action buttons — rendered BEHIND the sliding content, fixed to right edge */}
+				{isMobile && !isWorking && !isEditing && (
+					<div
+						className="absolute right-0 top-0 h-full flex items-stretch"
+						style={{ zIndex: 0 }}
+					>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								close();
+								handleStartClick(e as any);
+							}}
+							className="w-12 flex items-center justify-center bg-[#8b9a6b] active:opacity-80"
+						>
+							<Play className="w-4 h-4 text-white" />
+						</button>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								close();
+								onDone(task);
+							}}
+							className="w-12 flex items-center justify-center bg-[#7a9e7e] active:opacity-80"
+						>
+							<Check className="w-4 h-4 text-white" />
+						</button>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								close();
+								onReenter(task);
+							}}
+							className="w-12 flex items-center justify-center bg-[#c49a6b] active:opacity-80"
+						>
+							<RefreshCw className="w-4 h-4 text-white" />
+						</button>
+						<div className="w-12 flex items-center justify-center bg-[#6b7fa3]">
 							<TagPicker
 								currentTag={task.tag}
-								onSelectTag={(tag) => onUpdateTag(task.id, tag)}
+								onSelectTag={(tag) => {
+									close();
+									onUpdateTag(task.id, tag);
+								}}
 								disabled={disabled}
 							/>
-
-							{/* Done button */}
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									onDone(task);
-								}}
-								className="p-1.5 hover:bg-accent rounded transition-colors"
-								title="Mark as done"
-							>
-								<Check className="w-3.5 h-3.5 text-[#8b9a6b]" />
-							</button>
-
-							{/* Re-enter button */}
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									onReenter(task);
-								}}
-								className="p-1.5 hover:bg-accent rounded transition-colors"
-								title="Re-enter at end of list"
-							>
-								<RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-							</button>
-
-							{/* Delete button */}
-							{showDeleteConfirm ? (
-								<button
-									onClick={handleDeleteClick}
-									className="px-2 py-1 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 rounded transition-colors"
-								>
-									Yes
-								</button>
-							) : (
-								<button
-									onClick={handleDeleteClick}
-									className="p-1.5 hover:bg-accent rounded transition-colors"
-									title="Delete task"
-								>
-									<Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-								</button>
-							)}
 						</div>
-					)}
-				</div>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								if (showDeleteConfirm) {
+									close();
+									onDelete(task.id);
+									setShowDeleteConfirm(false);
+								} else {
+									setShowDeleteConfirm(true);
+								}
+							}}
+							className="w-12 flex items-center justify-center bg-destructive active:opacity-80"
+						>
+							{showDeleteConfirm ? (
+								<span className="text-[10px] text-white font-bold">YES</span>
+							) : (
+								<Trash2 className="w-4 h-4 text-white" />
+							)}
+						</button>
+					</div>
+				)}
 			</li>
 
-			{/* Modal for editing long text */}
+			{/* Edit modal */}
 			<Dialog open={showModal} onOpenChange={setShowModal}>
 				<DialogContent className="sm:max-w-[500px] top-[20%] sm:top-[50%] translate-y-[-20%] sm:translate-y-[-50%]">
 					<DialogHeader>
@@ -369,11 +522,8 @@ function TaskRow({
 							className="w-full min-h-[120px] bg-transparent border border-[#8b9a6b] rounded-md p-3 outline-none text-foreground resize-none"
 							autoFocus
 							onKeyDown={(e) => {
-								if (e.key === "Enter" && e.ctrlKey) {
-									handleModalSave();
-								} else if (e.key === "Escape") {
-									setShowModal(false);
-								}
+								if (e.key === "Enter" && e.ctrlKey) handleModalSave();
+								else if (e.key === "Escape") setShowModal(false);
 							}}
 						/>
 						<div className="flex justify-end gap-2">
@@ -394,7 +544,7 @@ function TaskRow({
 				</DialogContent>
 			</Dialog>
 
-			{/* Switch task confirmation dialog */}
+			{/* Switch task dialog */}
 			<Dialog open={showSwitchConfirm} onOpenChange={setShowSwitchConfirm}>
 				<DialogContent showCloseButton={false}>
 					<DialogHeader>
@@ -635,6 +785,7 @@ export function TaskList({
 		async (task: Task) => {
 			if (loadingTaskIds.has(task.id)) return;
 			addLoading(task.id);
+			playCompletionSound();
 			try {
 				await onDoneTask(task);
 			} finally {
