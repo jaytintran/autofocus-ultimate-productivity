@@ -23,6 +23,9 @@ interface CompletedListProps {
 	completedSort: CompletedSortKey;
 	onRefresh: () => Promise<void>;
 	onDeleteTask: (taskId: string) => Promise<void>;
+	hasMore: boolean;
+	isLoadingMore: boolean;
+	onLoadMore: () => void;
 }
 
 function formatCompletionTime(dateString: string): string {
@@ -142,6 +145,9 @@ export function CompletedList({
 	tasks,
 	selectedTags,
 	completedSort,
+	hasMore,
+	isLoadingMore,
+	onLoadMore,
 	onRefresh,
 	onDeleteTask,
 }: CompletedListProps) {
@@ -440,6 +446,28 @@ export function CompletedList({
 						})}
 					</div>
 				))}
+
+				{/* Load More */}
+				{hasMore && (
+					<div className="flex justify-center py-6">
+						<button
+							type="button"
+							onClick={onLoadMore}
+							disabled={isLoadingMore}
+							className="px-4 py-2 text-sm border border-border rounded-full hover:bg-accent transition-colors disabled:opacity-50 text-muted-foreground"
+						>
+							{isLoadingMore ? "Loading..." : "Load more"}
+						</button>
+					</div>
+				)}
+
+				{!hasMore && tasks.length > 0 && (
+					<div className="flex justify-center py-6">
+						<p className="text-xs text-muted-foreground">
+							All completed tasks loaded 🎉
+						</p>
+					</div>
+				)}
 			</div>
 
 			{/* Task detail modal */}

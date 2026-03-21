@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import useSWR from "swr";
 import { Header } from "./header";
 import { TimerBar } from "./timer-bar";
@@ -211,11 +211,21 @@ export function AutofocusApp() {
 	);
 
 	// Fetch completed tasks
-	const { data: completedTasks = [], mutate: mutateCompleted } = useSWR<Task[]>(
-		"completed-tasks",
-		getCompletedTasks,
-		{ refreshInterval: 0 },
-	);
+	const [completedPage, setCompletedPage] = useState(1);
+	const [allCompletedTasks, setAllCompletedTasks] = useState<Task[]>([]);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
+	const [hasMoreCompleted, setHasMoreCompleted] = useState(true);
+
+	const { data: initialCompletedTasks = [], mutate: mutateCompleted } = useSWR<
+		Task[]
+	>("completed-tasks", () => getCompletedTasks(1), {
+		refreshInterval: 0,
+		onSuccess: (data) => {
+			setAllCompletedTasks(data);
+			setHasMoreCompleted(data.length === 50);
+			setCompletedPage(1);
+		},
+	});
 
 	// Fetch app state
 	const { data: appState, mutate: mutateAppState } = useSWR<AppState>(
@@ -243,7 +253,7 @@ export function AutofocusApp() {
 
 	const displayedActiveTasks = optimisticState?.activeTasks ?? activeTasks;
 	const displayedCompletedTasks =
-		optimisticState?.completedTasks ?? completedTasks;
+		optimisticState?.completedTasks ?? allCompletedTasks;
 	const displayedAppState = optimisticState?.appState ?? appState;
 	const displayedTotalPages = optimisticState?.totalPages ?? totalPages;
 
@@ -365,6 +375,8 @@ export function AutofocusApp() {
 
 	// Refresh all data
 	const refreshAll = useCallback(async () => {
+		setCompletedPage(1);
+		setHasMoreCompleted(true);
 		await Promise.all([
 			mutateActive(),
 			mutateCompleted(),
@@ -1642,12 +1654,38 @@ export function AutofocusApp() {
 		],
 	);
 
-	// Auto-navigate to the page with the working task
+	// Handle load more completed tasks
+	const handleLoadMoreCompleted = useCallback(async () => {
+		if (isLoadingMore || !hasMoreCompleted) return;
+		setIsLoadingMore(true);
+		try {
+			const nextPage = completedPage + 1;
+			const moreTasks = await getCompletedTasks(nextPage);
+			setAllCompletedTasks((prev) => [...prev, ...moreTasks]);
+			setCompletedPage(nextPage);
+			setHasMoreCompleted(moreTasks.length === 50);
+		} finally {
+			setIsLoadingMore(false);
+		}
+	}, [isLoadingMore, hasMoreCompleted, completedPage]);
+
+	// Auto-navigate to the working task's page only when it first becomes active
+	const prevWorkingTaskIdRef = useRef<string | null>(null);
+
 	useEffect(() => {
-		if (workingTask && workingTask.page_number !== currentPage) {
+		const currentWorkingId = displayedAppState?.working_on_task_id ?? null;
+
+		// Only navigate when working task changes to a new task (not on every render)
+		if (
+			currentWorkingId &&
+			currentWorkingId !== prevWorkingTaskIdRef.current &&
+			workingTask
+		) {
 			setCurrentPage(workingTask.page_number);
 		}
-	}, [workingTask, currentPage]);
+
+		prevWorkingTaskIdRef.current = currentWorkingId;
+	}, [displayedAppState?.working_on_task_id, workingTask]);
 
 	// Ensure current page is valid
 	useEffect(() => {
@@ -1770,6 +1808,9 @@ export function AutofocusApp() {
 						tasks={displayedCompletedTasks}
 						selectedTags={selectedTags}
 						completedSort={completedSort}
+						hasMore={hasMoreCompleted}
+						isLoadingMore={isLoadingMore}
+						onLoadMore={handleLoadMoreCompleted}
 						onRefresh={refreshAll}
 						onDeleteTask={handleDeleteTask}
 					/>

@@ -42,16 +42,33 @@ export async function getActiveTasks(): Promise<Task[]> {
 	return data || [];
 }
 
-export async function getCompletedTasks(): Promise<Task[]> {
+const COMPLETED_PAGE_SIZE = 50;
+
+export async function getCompletedTasks(page: number = 1): Promise<Task[]> {
 	const supabase = createClient();
+	const from = (page - 1) * COMPLETED_PAGE_SIZE;
+	const to = from + COMPLETED_PAGE_SIZE - 1;
+
 	const { data, error } = await supabase
 		.from("tasks")
 		.select("*")
 		.eq("status", "completed")
-		.order("completed_at", { ascending: false });
+		.order("completed_at", { ascending: false })
+		.range(from, to);
 
 	if (error) throw error;
 	return data || [];
+}
+
+export async function getCompletedTasksCount(): Promise<number> {
+	const supabase = createClient();
+	const { count, error } = await supabase
+		.from("tasks")
+		.select("*", { count: "exact", head: true })
+		.eq("status", "completed");
+
+	if (error) throw error;
+	return count || 0;
 }
 
 export async function getTasksForPage(pageNumber: number): Promise<Task[]> {
