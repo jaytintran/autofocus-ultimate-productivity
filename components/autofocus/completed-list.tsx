@@ -2,12 +2,14 @@
 
 import { useState, useMemo, useCallback, useRef } from "react";
 import { RotateCcw, Trash2, Sunrise, CloudSun, Moon } from "lucide-react";
-import type { Task } from "@/lib/types";
 import { revertTask } from "@/lib/store";
 import { formatTimeCompact } from "./timer-bar";
 import { TagFilter } from "./tag-filter";
 import { TagPill } from "./tag-pill";
+import type { Task } from "@/lib/types";
 import type { TagId } from "@/lib/tags";
+import type { CompletedSortKey } from "./view-tabs";
+
 import {
 	Dialog,
 	DialogContent,
@@ -18,6 +20,7 @@ import {
 interface CompletedListProps {
 	tasks: Task[];
 	selectedTags: Set<TagId | "none">;
+	completedSort: CompletedSortKey;
 	onRefresh: () => Promise<void>;
 	onDeleteTask: (taskId: string) => Promise<void>;
 }
@@ -114,11 +117,11 @@ function getTimePeriodColor(
 ): string {
 	switch (period) {
 		case "morning":
-			return "bg-blue-500/5";
+			return "bg-sky-100/80 dark:bg-sky-950/70";
 		case "afternoon":
-			return "bg-amber-500/5";
+			return "bg-amber-100/80 dark:bg-amber-950/40";
 		case "evening":
-			return "bg-indigo-500/5";
+			return "bg-blue-100/80 dark:bg-blue-950/20";
 	}
 }
 
@@ -127,17 +130,18 @@ function getTimePeriodIconColor(
 ): string {
 	switch (period) {
 		case "morning":
-			return "text-blue-500/60";
+			return "text-sky-500";
 		case "afternoon":
-			return "text-amber-500/60";
+			return "text-amber-500";
 		case "evening":
-			return "text-indigo-500/60";
+			return "text-indigo-400";
 	}
 }
 
 export function CompletedList({
 	tasks,
 	selectedTags,
+	completedSort,
 	onRefresh,
 	onDeleteTask,
 }: CompletedListProps) {
@@ -166,10 +170,29 @@ export function CompletedList({
 
 		// Sort tasks by completion time descending
 		const sortedTasks = [...filteredTasks].sort((a, b) => {
-			if (!a.completed_at || !b.completed_at) return 0;
-			return (
-				new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
-			);
+			switch (completedSort) {
+				case "default":
+					if (!a.completed_at || !b.completed_at) return 0;
+					return (
+						new Date(b.completed_at).getTime() -
+						new Date(a.completed_at).getTime()
+					);
+				case "completed_asc":
+					if (!a.completed_at || !b.completed_at) return 0;
+					return (
+						new Date(a.completed_at).getTime() -
+						new Date(b.completed_at).getTime()
+					);
+				case "time_spent_desc":
+					return b.total_time_ms - a.total_time_ms;
+				case "completed_desc":
+				default:
+					if (!a.completed_at || !b.completed_at) return 0;
+					return (
+						new Date(b.completed_at).getTime() -
+						new Date(a.completed_at).getTime()
+					);
+			}
 		});
 
 		sortedTasks.forEach((task) => {
@@ -198,7 +221,13 @@ export function CompletedList({
 				});
 
 				// Convert to array and sort by time period (morning -> afternoon -> evening)
-				const periodOrder = ["morning", "afternoon", "evening"];
+				const periodOrder =
+					completedSort === "completed_asc"
+						? ["morning", "afternoon", "evening"]
+						: completedSort === "default"
+							? ["morning", "afternoon", "evening"]
+							: ["evening", "afternoon", "morning"];
+
 				const timeBlocks: TimeBlock[] = periodOrder
 					.filter((period) => timeBlocksMap.has(period))
 					.map((period) => ({
@@ -222,7 +251,7 @@ export function CompletedList({
 		});
 
 		return result;
-	}, [filteredTasks]);
+	}, [filteredTasks, completedSort]);
 
 	const handleRevert = useCallback(
 		async (task: Task) => {

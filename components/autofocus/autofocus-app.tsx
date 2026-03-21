@@ -32,6 +32,7 @@ import {
 	updateTask,
 } from "@/lib/store";
 import type { Task, AppState } from "@/lib/types";
+import { type CompletedSortKey } from "./view-tabs";
 
 const DEFAULT_TASK_CAPACITY = 12;
 const FALLBACK_TASK_ROW_HEIGHT = 48;
@@ -199,6 +200,8 @@ export function AutofocusApp() {
 		new Map(),
 	);
 	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
+	const [completedSort, setCompletedSort] =
+		useState<CompletedSortKey>("default");
 
 	// Fetch active tasks
 	const { data: activeTasks = [], mutate: mutateActive } = useSWR<Task[]>(
@@ -1733,6 +1736,8 @@ export function AutofocusApp() {
 				selectedTags={selectedTags}
 				onToggleTag={handleToggleTag}
 				onAddTasks={handleAddTasks}
+				completedSort={completedSort}
+				onCompletedSortChange={setCompletedSort}
 			/>
 
 			{activeView === "tasks" && (
@@ -1764,6 +1769,7 @@ export function AutofocusApp() {
 					<CompletedList
 						tasks={displayedCompletedTasks}
 						selectedTags={selectedTags}
+						completedSort={completedSort}
 						onRefresh={refreshAll}
 						onDeleteTask={handleDeleteTask}
 					/>

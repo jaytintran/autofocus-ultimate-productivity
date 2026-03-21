@@ -11,11 +11,18 @@ import {
 	FolderKanban,
 	Lightbulb,
 	NotebookPen,
+	Inbox,
 } from "lucide-react";
 import Link from "next/link";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 const NOTION_PAGES = [
+	{
+		label: "Received Thoughts",
+		description: "Capturing thoughts & flashes",
+		icon: Inbox,
+		href: "notion://www.notion.so/32aa0f71b1028092ba0dc76db7752f9d?v=32aa0f71b1028009a540000cff473e9e&source=copy_link",
+	},
 	{
 		label: "Books",
 		description: "Reading list & notes",
@@ -48,6 +55,9 @@ const NOTION_PAGES = [
 	},
 ];
 
+// Thoughts Capturer is always the first entry
+const THOUGHTS_CAPTURER = NOTION_PAGES[0];
+
 function SecondBrainButton() {
 	const [open, setOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -68,78 +78,102 @@ function SecondBrainButton() {
 	}, [open]);
 
 	return (
-		<div ref={containerRef} className="relative">
-			{/* Picker panel — anchored bottom-left of the button */}
-			{open && (
-				<div className="absolute right-10 -bottom-[calc(100%+200px)] w-64 bg-card border border-border rounded-2xl shadow-xl p-4 z-50">
-					{/* Description */}
-					<p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-						Not sure what to work on? Browse your Second Brain for inspiration.
-					</p>
+		<Tooltip.Provider>
+			<div ref={containerRef} className="relative">
+				{/* Picker Panel */}
+				{open && (
+					<div className="absolute right-10 -bottom-[calc(100%+200px)] mb-2 w-64 bg-card border border-border rounded-2xl shadow-xl p-4 z-50">
+						{/* Description */}
+						<p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+							Not sure what to work on? Browse your Second Brain for
+							inspiration.
+						</p>
 
-					{/* Divider */}
-					<div className="border-t border-border mb-3" />
+						{/* Divider */}
+						<div className="border-t border-border mb-3" />
 
-					{/* Notion page links */}
-					<div className="flex flex-col gap-1">
-						{NOTION_PAGES.map((page) => {
-							const Icon = page.icon;
-							return (
-								<Link
-									key={page.label}
-									href={page.href}
-									onClick={() => setOpen(false)}
-									className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors group"
-								>
-									<div className="p-1.5 rounded-md bg-[#8b9a6b]/10 group-hover:bg-[#8b9a6b]/20 transition-colors flex-shrink-0">
-										<Icon className="w-3.5 h-3.5 text-[#8b9a6b]" />
-									</div>
-									<div className="min-w-0">
-										<p className="text-sm font-medium text-foreground leading-none mb-0.5">
-											{page.label}
-										</p>
-										<p className="text-[11px] text-muted-foreground truncate">
-											{page.description}
-										</p>
-									</div>
-								</Link>
-							);
-						})}
+						{/* Notion page links */}
+						<div className="flex flex-col gap-1">
+							{NOTION_PAGES.map((page) => {
+								const Icon = page.icon;
+								return (
+									<Link
+										key={page.label}
+										href={page.href}
+										onClick={() => setOpen(false)}
+										className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors group"
+									>
+										<div className="p-1.5 rounded-md bg-[#8b9a6b]/10 group-hover:bg-[#8b9a6b]/20 transition-colors flex-shrink-0">
+											<Icon className="w-3.5 h-3.5 text-[#8b9a6b]" />
+										</div>
+										<div className="min-w-0">
+											<p className="text-sm font-medium text-foreground leading-none mb-0.5">
+												{page.label}
+											</p>
+											<p className="text-[11px] text-muted-foreground truncate">
+												{page.description}
+											</p>
+										</div>
+									</Link>
+								);
+							})}
+						</div>
 					</div>
-				</div>
-			)}
+				)}
 
-			{/* Trigger button */}
-			<Tooltip.Provider>
-				<Tooltip.Root>
-					<Tooltip.Trigger asChild>
-						<button
-							type="button"
-							onClick={() => setOpen((prev) => !prev)}
-							className={`
-								text-xs border border-border rounded-full p-1.75 transition-colors
-								${
-									open
-										? "text-[#8b9a6b] bg-[#8b9a6b]/10 border-[#8b9a6b]/40"
-										: "text-muted-foreground hover:text-foreground hover:bg-accent"
-								}
-							`}
-						>
-							<LibraryBig className="w-4 h-4" />
-						</button>
-					</Tooltip.Trigger>
-					<Tooltip.Portal>
-						<Tooltip.Content
-							side="top"
-							className="bg-foreground text-background text-xs px-2 py-1 rounded-md shadow-md"
-						>
-							Open Second Brain
-							<Tooltip.Arrow className="fill-foreground" />
-						</Tooltip.Content>
-					</Tooltip.Portal>
-				</Tooltip.Root>
-			</Tooltip.Provider>
-		</div>
+				{/* Buttons row */}
+				<div className="flex gap-2">
+					{/* Thoughts Capturer — sourced from NOTION_PAGES[0] */}
+					<Tooltip.Root>
+						<Tooltip.Trigger asChild>
+							<Link href={THOUGHTS_CAPTURER.href}>
+								<button className="text-xs border border-border rounded-full p-1.75 transition-colors text-muted-foreground hover:text-foreground hover:bg-accent">
+									<Inbox className="w-4 h-4" />
+								</button>
+							</Link>
+						</Tooltip.Trigger>
+						<Tooltip.Portal>
+							<Tooltip.Content
+								side="top"
+								className="bg-foreground text-background text-xs px-2 py-1 rounded-md shadow-md"
+							>
+								Open Thoughts Capturer
+								<Tooltip.Arrow className="fill-foreground" />
+							</Tooltip.Content>
+						</Tooltip.Portal>
+					</Tooltip.Root>
+
+					{/* Second Brain Picker */}
+					<Tooltip.Root>
+						<Tooltip.Trigger asChild>
+							<button
+								type="button"
+								onClick={() => setOpen((prev) => !prev)}
+								className={`
+									text-xs border border-border rounded-full p-1.75 transition-colors
+									${
+										open
+											? "text-[#8b9a6b] bg-[#8b9a6b]/10 border-[#8b9a6b]/40"
+											: "text-muted-foreground hover:text-foreground hover:bg-accent"
+									}
+								`}
+							>
+								<LibraryBig className="w-4 h-4" />
+							</button>
+						</Tooltip.Trigger>
+						<Tooltip.Portal>
+							<Tooltip.Content
+								side="top"
+								className="bg-foreground text-background text-xs px-2 py-1 rounded-md shadow-md"
+							>
+								Open Second Brain
+								<Tooltip.Arrow className="fill-foreground" />
+							</Tooltip.Content>
+						</Tooltip.Portal>
+					</Tooltip.Root>
+				</div>
+			</div>
+		</Tooltip.Provider>
 	);
 }
 

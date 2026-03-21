@@ -1,8 +1,83 @@
 "use client";
 
+import { useState } from "react";
 import type { TagId } from "@/lib/tags";
 import { TagFilter } from "./tag-filter";
 import { BacklogDump } from "./backlog-dump";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import {
+	ArrowDownUp,
+	Clock,
+	AlarmClock,
+	ArrowUpDown,
+	LayoutList,
+} from "lucide-react";
+
+export type CompletedSortKey =
+	| "default"
+	| "completed_desc"
+	| "completed_asc"
+	| "time_spent_desc";
+
+const SORT_OPTIONS: {
+	key: CompletedSortKey;
+	label: string;
+	icon: React.ElementType;
+}[] = [
+	{ key: "completed_desc", label: "Newest", icon: Clock },
+	{ key: "completed_asc", label: "Oldest", icon: AlarmClock },
+	{ key: "time_spent_desc", label: "Most Time", icon: ArrowDownUp },
+	{ key: "default", label: "Default", icon: LayoutList },
+];
+
+interface SortSelectorProps {
+	value: CompletedSortKey;
+	onChange: (sort: CompletedSortKey) => void;
+}
+
+function SortSelector({ value, onChange }: SortSelectorProps) {
+	const [open, setOpen] = useState(false);
+	const current = SORT_OPTIONS.find((o) => o.key === value) ?? SORT_OPTIONS[0];
+	const Icon = current.icon;
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button variant="outline" size="sm" className="h-8 rounded">
+					<span className="text-sm">{current.label}</span>
+					<ArrowUpDown className="w-3 h-3 opacity-50 -mr-1" />
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent className="w-48 p-2" align="end">
+				<div className="flex flex-col gap-1">
+					{SORT_OPTIONS.map((option) => {
+						return (
+							<button
+								key={option.key}
+								onClick={() => {
+									onChange(option.key);
+									setOpen(false);
+								}}
+								className={`flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors text-left ${
+									value === option.key
+										? "bg-[#8b9a6b] text-white"
+										: "hover:bg-accent"
+								}`}
+							>
+								<span>{option.label}</span>
+							</button>
+						);
+					})}
+				</div>
+			</PopoverContent>
+		</Popover>
+	);
+}
 
 interface ViewTabsProps {
 	activeView: "tasks" | "completed";
@@ -10,6 +85,8 @@ interface ViewTabsProps {
 	selectedTags: Set<TagId | "none">;
 	onToggleTag: (tag: TagId | "none" | "all") => void;
 	onAddTasks: (tasks: string[], tag?: TagId | null) => Promise<void>;
+	completedSort: CompletedSortKey;
+	onCompletedSortChange: (sort: CompletedSortKey) => void;
 }
 
 export function ViewTabs({
@@ -18,6 +95,8 @@ export function ViewTabs({
 	selectedTags,
 	onToggleTag,
 	onAddTasks,
+	completedSort,
+	onCompletedSortChange,
 }: ViewTabsProps) {
 	return (
 		<div className="flex flex-row justify-between sm:flex-row sm:items-center sm:justify-between px-4 py-3">
@@ -45,7 +124,19 @@ export function ViewTabs({
 			</div>
 
 			<div className="flex items-center gap-2">
-				<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />
+				{/* Bulk add — tasks view only */}
+				{activeView === "tasks" && (
+					<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />
+				)}
+
+				{/* Sort selector — completed view only */}
+				{activeView === "completed" && (
+					<SortSelector
+						value={completedSort}
+						onChange={onCompletedSortChange}
+					/>
+				)}
+
 				<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
 			</div>
 		</div>
