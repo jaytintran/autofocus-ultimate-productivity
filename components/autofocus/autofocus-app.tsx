@@ -674,7 +674,7 @@ export function AutofocusApp() {
 		],
 	);
 
-	const handleDeleteTask = useCallback(
+	const handleDeleteTaskOld = useCallback(
 		async (taskId: string) => {
 			if (!displayedAppState) return;
 
@@ -761,6 +761,88 @@ export function AutofocusApp() {
 			displayedAppState,
 			displayedCompletedTasks,
 			refreshAll,
+		],
+	);
+
+	const handleDeleteTask = useCallback(
+		async (taskId: string) => {
+			if (!displayedAppState) return;
+
+			const deletedActiveTask = displayedActiveTasks.find(
+				(t) => t.id === taskId,
+			);
+			const deletingCompletedTask = displayedCompletedTasks.some(
+				(task) => task.id === taskId,
+			);
+
+			if (!deletedActiveTask && !deletingCompletedTask) return;
+
+			const optimisticActiveTasks = deletedActiveTask
+				? [
+						...displayedActiveTasks
+							.filter((task) => task.id !== taskId)
+							.filter(
+								(task) => task.page_number >= deletedActiveTask.page_number,
+							)
+							.sort(
+								(a, b) =>
+									a.page_number - b.page_number || a.position - b.position,
+							)
+							.map((task, index) => ({
+								...task,
+								page_number:
+									Math.floor(index / 12) + deletedActiveTask.page_number,
+								position: index % 12,
+							})),
+						...displayedActiveTasks.filter(
+							(task) => task.page_number < deletedActiveTask.page_number,
+						),
+					].sort(
+						(a, b) => a.page_number - b.page_number || a.position - b.position,
+					)
+				: displayedActiveTasks;
+
+			const optimisticCompletedTasks = displayedCompletedTasks.filter(
+				(task) => task.id !== taskId,
+			);
+
+			const deletingWorkingTask =
+				displayedAppState.working_on_task_id === taskId;
+			const now = new Date().toISOString();
+
+			if (deletedActiveTask) {
+				setPrefetchedTasks(new Map());
+			}
+
+			await runOptimisticUpdate(
+				{
+					activeTasks: optimisticActiveTasks,
+					completedTasks: optimisticCompletedTasks,
+					appState: deletingWorkingTask
+						? {
+								...displayedAppState,
+								working_on_task_id: null,
+								timer_state: "idle",
+								current_session_ms: 0,
+								session_start_time: null,
+								updated_at: now,
+							}
+						: displayedAppState,
+					totalPages: getVisibleTotalPages(optimisticActiveTasks),
+				},
+				async () => {
+					if (deletingWorkingTask) {
+						await stopWorkingOnTask();
+					}
+					await deleteTask(taskId);
+				},
+			);
+		},
+		[
+			displayedActiveTasks,
+			displayedAppState,
+			displayedCompletedTasks,
+			runOptimisticUpdate,
 		],
 	);
 
