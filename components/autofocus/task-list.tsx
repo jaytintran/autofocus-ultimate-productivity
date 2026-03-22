@@ -747,7 +747,7 @@ export function TaskList({
 
 	const activeTask = activeId ? allTasks.find((t) => t.id === activeId) : null;
 	const workingTask = workingTaskId
-		? allTasks.find((t) => t.id === workingTaskId)
+		? (allTasks.find((t) => t.id === workingTaskId) ?? null)
 		: null;
 
 	useEffect(() => {

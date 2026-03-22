@@ -1,3 +1,5 @@
+import { TagId } from "./tags";
+
 export type TaskStatus = "active" | "in-progress" | "completed";
 export type TimerState = "idle" | "running" | "paused" | "stopped";
 export type DefaultFilter = "all" | "none";
@@ -12,7 +14,7 @@ export interface Task {
 	completed_at: string | null;
 	total_time_ms: number;
 	re_entered_from: string | null;
-	tag: "read" | "learn" | "finish" | null;
+	tag: TagId | null;
 	created_at: string;
 	updated_at: string;
 }

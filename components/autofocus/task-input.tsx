@@ -73,7 +73,18 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		const trimmed = text.trim();
 		if (!trimmed) return;
 
-		const EXEMPT_WORDS = new Set(["a", "an", "and", "of", "the", "và"]);
+		const EXEMPT_WORDS = new Set([
+			"a",
+			"an",
+			"and",
+			"of",
+			"the",
+			"và",
+			"on",
+			"to",
+			"at",
+			"by",
+		]);
 
 		const capitalized = trimmed
 			.split(" ")
