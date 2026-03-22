@@ -31,8 +31,9 @@ import {
 	stopWorkingOnTask,
 	updateTask,
 } from "@/lib/store";
-import type { Task, AppState } from "@/lib/types";
+import type { Task, AppState, TaskStatus } from "@/lib/types";
 import { type CompletedSortKey } from "./view-tabs";
+import { TagId } from "@/lib/tags";
 
 const DEFAULT_TASK_CAPACITY = 12;
 const FALLBACK_TASK_ROW_HEIGHT = 48;
@@ -68,13 +69,14 @@ function createOptimisticTask(
 	return {
 		id: crypto.randomUUID(),
 		text,
-		status: "active",
+		status: "active" as TaskStatus,
 		page_number: placement.pageNumber,
 		position: placement.position,
 		added_at: now,
 		completed_at: null,
 		total_time_ms: 0,
 		re_entered_from: null,
+		tag: null,
 		created_at: now,
 		updated_at: now,
 	};
@@ -418,7 +420,7 @@ export function AutofocusApp() {
 			const optimisticTask = {
 				id: crypto.randomUUID(),
 				text: trimmedText,
-				status: "active" as const,
+				status: "active" as TaskStatus,
 				page_number: 1,
 				position: 0,
 				added_at: now,
@@ -491,7 +493,7 @@ export function AutofocusApp() {
 			const newTasks = trimmedTaskTexts.map((taskText, index) => ({
 				id: crypto.randomUUID(),
 				text: taskText,
-				status: "active" as const,
+				status: "active" as TaskStatus,
 				page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
 				position: index % DEFAULT_TASK_CAPACITY,
 				added_at: now,
@@ -565,7 +567,11 @@ export function AutofocusApp() {
 			const now = new Date().toISOString();
 			const optimisticActiveTasks = displayedActiveTasks.map((activeTask) =>
 				activeTask.id === task.id
-					? { ...activeTask, status: "in-progress", updated_at: now }
+					? {
+							...activeTask,
+							status: "in-progress" as TaskStatus,
+							updated_at: now,
+						}
 					: activeTask,
 			);
 
@@ -638,12 +644,15 @@ export function AutofocusApp() {
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
 				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
+				.map(
+					(t, index) =>
+						({
+							...t,
+							page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+							position: index % DEFAULT_TASK_CAPACITY,
+							updated_at: now,
+						}) as Task,
+				);
 
 			const completedTask: Task = {
 				...task,
@@ -887,7 +896,7 @@ export function AutofocusApp() {
 				id: crypto.randomUUID(),
 				page_number: placement.pageNumber,
 				position: placement.position,
-				status: "active",
+				status: "active" as TaskStatus,
 				re_entered_from: task.id,
 				added_at: now,
 				completed_at: null,
@@ -955,7 +964,7 @@ export function AutofocusApp() {
 				id: crypto.randomUUID(),
 				page_number: placement.pageNumber,
 				position: placement.position,
-				status: "active",
+				status: "active" as TaskStatus,
 				re_entered_from: task.id,
 				added_at: now,
 				completed_at: null,
@@ -974,12 +983,15 @@ export function AutofocusApp() {
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
 				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
+				.map(
+					(t, index) =>
+						({
+							...t,
+							page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+							position: index % DEFAULT_TASK_CAPACITY,
+							updated_at: now,
+						}) as Task,
+				);
 
 			// Recompute placement based on re-indexed remaining tasks
 			const reindexedPlacement = getNextTaskPlacement(
@@ -1186,12 +1198,15 @@ export function AutofocusApp() {
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
 				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
+				.map(
+					(t, index) =>
+						({
+							...t,
+							page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+							position: index % DEFAULT_TASK_CAPACITY,
+							updated_at: now,
+						}) as Task,
+				);
 
 			const completedTask: Task = {
 				...task,
@@ -1243,7 +1258,7 @@ export function AutofocusApp() {
 				activeTask.id === task.id
 					? {
 							...activeTask,
-							status: "active",
+							status: "active" as TaskStatus,
 							total_time_ms:
 								activeTask.total_time_ms +
 								(shouldPersistSession ? sessionMs : 0),
@@ -1271,7 +1286,7 @@ export function AutofocusApp() {
 						await stopTimer(task.id, sessionMs);
 					}
 
-					await updateTask(task.id, { status: "active" });
+					await updateTask(task.id, { status: "active" as TaskStatus });
 					await stopWorkingOnTask();
 				},
 			);
@@ -1375,12 +1390,15 @@ export function AutofocusApp() {
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
 				)
-				.map((t, index) => ({
-					...t,
-					page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-					position: index % DEFAULT_TASK_CAPACITY,
-					updated_at: now,
-				}));
+				.map(
+					(t, index) =>
+						({
+							...t,
+							page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+							position: index % DEFAULT_TASK_CAPACITY,
+							updated_at: now,
+						}) as Task,
+				);
 
 			// Compute placement from re-indexed list
 			const placement = getNextTaskPlacement(
@@ -1393,7 +1411,7 @@ export function AutofocusApp() {
 				id: crypto.randomUUID(),
 				page_number: placement.pageNumber,
 				position: placement.position,
-				status: "active",
+				status: "active" as TaskStatus,
 				re_entered_from: task.id,
 				added_at: now,
 				completed_at: null,
@@ -1607,16 +1625,19 @@ export function AutofocusApp() {
 					.sort(
 						(a, b) => a.page_number - b.page_number || a.position - b.position,
 					)
-					.map((t, index) => ({
-						...t,
-						page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-						position: index % DEFAULT_TASK_CAPACITY,
-						updated_at: now,
-					}));
+					.map(
+						(t, index) =>
+							({
+								...t,
+								page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+								position: index % DEFAULT_TASK_CAPACITY,
+								updated_at: now,
+							}) as Task,
+					);
 
 				const optimisticActiveTasks = reindexedRemaining.map((t) =>
 					t.id === newTask.id
-						? { ...t, status: "in-progress", updated_at: now }
+						? { ...t, status: "in-progress" as TaskStatus, updated_at: now }
 						: t,
 				);
 
@@ -1656,12 +1677,15 @@ export function AutofocusApp() {
 					.sort(
 						(a, b) => a.page_number - b.page_number || a.position - b.position,
 					)
-					.map((t, index) => ({
-						...t,
-						page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-						position: index % DEFAULT_TASK_CAPACITY,
-						updated_at: now,
-					}));
+					.map(
+						(t, index) =>
+							({
+								...t,
+								page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+								position: index % DEFAULT_TASK_CAPACITY,
+								updated_at: now,
+							}) as Task,
+					);
 
 				const placement = getNextTaskPlacement(
 					reindexedRemaining,
@@ -1673,7 +1697,7 @@ export function AutofocusApp() {
 					id: crypto.randomUUID(),
 					page_number: placement.pageNumber,
 					position: placement.position,
-					status: "active",
+					status: "active" as TaskStatus,
 					total_time_ms: totalTime,
 					re_entered_from: workingTask.id,
 					added_at: now,
@@ -1684,7 +1708,7 @@ export function AutofocusApp() {
 				const optimisticActiveTasks = [
 					...reindexedRemaining.map((t) =>
 						t.id === newTask.id
-							? { ...t, status: "in-progress", updated_at: now }
+							? { ...t, status: "in-progress" as TaskStatus, updated_at: now }
 							: t,
 					),
 					reenteredTask,
@@ -1803,8 +1827,11 @@ export function AutofocusApp() {
 		}
 	}, [isFilterActive, filteredCurrentPage, filteredTotalPages]);
 
-	const handleToggleTag = useCallback((tagId: TagId | "none") => {
+	const handleToggleTag = useCallback((tagId: TagId | "none" | "all") => {
 		setSelectedTags((prev) => {
+			if (tagId === "all") {
+				return new Set();
+			}
 			const next = new Set(prev);
 			if (next.has(tagId)) {
 				next.delete(tagId);

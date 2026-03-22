@@ -5,6 +5,7 @@ import { getTagDefinition, type TagId } from "@/lib/tags";
 interface TagPillProps {
 	tagId: TagId;
 	onClick?: () => void;
+	className?: string;
 }
 
 export function TagPill({ tagId, onClick }: TagPillProps) {
