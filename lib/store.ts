@@ -270,6 +270,7 @@ export async function reenterTask(
 	pageNumber: number,
 	position: number,
 	totalTimeMs?: number,
+	tag?: TagId | null,
 ): Promise<Task> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -281,6 +282,7 @@ export async function reenterTask(
 			status: "active",
 			total_time_ms: totalTimeMs || 0,
 			re_entered_from: originalTaskId,
+			tag: tag ?? null,
 		})
 		.select()
 		.single();

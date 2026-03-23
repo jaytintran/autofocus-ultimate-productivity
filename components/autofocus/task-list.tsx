@@ -434,7 +434,7 @@ function TaskRow({
 					<div className="flex items-center gap-1.5 flex-shrink-0">
 						{task.re_entered_from && !isEditing && (
 							<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
-								re-entered
+								<RefreshCw className="w-2.5 h-2.5" />
 							</span>
 						)}
 						{task.total_time_ms > 0 && !isEditing && (
@@ -447,10 +447,12 @@ function TaskRow({
 								{getTaskAge(task.added_at)}
 							</span>
 						)}
+
 						{task.tag && !isEditing && (
 							<TagPill
 								tagId={task.tag}
 								onClick={() => !disabled && !isMobile && setShowModal(true)}
+								className=""
 							/>
 						)}
 

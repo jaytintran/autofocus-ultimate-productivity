@@ -1104,6 +1104,7 @@ export function AutofocusApp() {
 						reindexedPlacement.pageNumber,
 						reindexedPlacement.position,
 						task.total_time_ms,
+						task.tag,
 					);
 					await markTaskDone(task.id, task.total_time_ms);
 				},
@@ -1608,6 +1609,7 @@ export function AutofocusApp() {
 						placement.pageNumber,
 						placement.position,
 						task.total_time_ms,
+						task.tag,
 					);
 					await markTaskDone(task.id, task.total_time_ms);
 					await stopWorkingOnTask();
@@ -1903,6 +1905,7 @@ export function AutofocusApp() {
 							placement.pageNumber,
 							placement.position,
 							totalTime,
+							workingTask.tag,
 						);
 						await markTaskDone(workingTask.id, totalTime);
 						await startTask(newTask.id);
