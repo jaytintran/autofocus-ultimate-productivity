@@ -47,60 +47,78 @@ function useIsMobile() {
 }
 
 function useSwipeReveal() {
-	const [swiped, setSwiped] = useState(false);
+	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
+		null,
+	);
 	const [dragOffset, setDragOffset] = useState(0);
 	const startXRef = useRef<number | null>(null);
-	const TRAY_WIDTH = 240;
+	const LEFT_TRAY_WIDTH = 192; // 3 buttons × 48px (re-enter, tag, delete)
+	const RIGHT_TRAY_WIDTH = 96; // 2 buttons × 48px (start, complete)
 
 	const onTouchStart = useCallback(
 		(e: React.TouchEvent) => {
 			startXRef.current = e.touches[0].clientX;
-			setDragOffset(swiped ? -TRAY_WIDTH : 0);
+			if (swipeDirection === "left") setDragOffset(-LEFT_TRAY_WIDTH);
+			else if (swipeDirection === "right") setDragOffset(RIGHT_TRAY_WIDTH);
+			else setDragOffset(0);
 		},
-		[swiped],
+		[swipeDirection],
 	);
 
 	const onTouchMove = useCallback(
 		(e: React.TouchEvent) => {
 			if (startXRef.current === null) return;
 			const diff = startXRef.current - e.touches[0].clientX;
-			const base = swiped ? -TRAY_WIDTH : 0;
-			// Clamp between fully closed (0) and fully open (-TRAY_WIDTH)
-			const next = Math.min(0, Math.max(-TRAY_WIDTH, base - diff));
-			setDragOffset(next);
+
+			if (swipeDirection === "left") {
+				const base = -LEFT_TRAY_WIDTH;
+				setDragOffset(Math.min(0, Math.max(-LEFT_TRAY_WIDTH, base - diff)));
+			} else if (swipeDirection === "right") {
+				const base = RIGHT_TRAY_WIDTH;
+				setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, base - diff)));
+			} else {
+				// Not yet committed to a direction
+				if (diff > 5) {
+					// Swiping left — clamp to left tray
+					setDragOffset(Math.min(0, Math.max(-LEFT_TRAY_WIDTH, -diff)));
+				} else if (diff < -5) {
+					// Swiping right — clamp to right tray
+					setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, -diff)));
+				}
+			}
 		},
-		[swiped],
+		[swipeDirection],
 	);
 
-	const onTouchEnd = useCallback(
-		(e: React.TouchEvent) => {
-			if (startXRef.current === null) return;
-			const diff = startXRef.current - e.changedTouches[0].clientX;
-			// Snap open if dragged more than 40px left, snap closed if dragged more than 40px right
-			if (diff > 40) {
-				setSwiped(true);
-				setDragOffset(-TRAY_WIDTH);
-			} else if (diff < -40) {
-				setSwiped(false);
-				setDragOffset(0);
-			} else {
-				// Snap back to current state
-				setDragOffset(swiped ? -TRAY_WIDTH : 0);
-			}
-			startXRef.current = null;
-		},
-		[swiped],
-	);
+	const onTouchEnd = useCallback((e: React.TouchEvent) => {
+		if (startXRef.current === null) return;
+		const diff = startXRef.current - e.changedTouches[0].clientX;
+
+		if (diff > 40) {
+			setSwipeDirection("left");
+			setDragOffset(-LEFT_TRAY_WIDTH);
+		} else if (diff < -40) {
+			setSwipeDirection("right");
+			setDragOffset(RIGHT_TRAY_WIDTH);
+		} else {
+			setSwipeDirection(null);
+			setDragOffset(0);
+		}
+		startXRef.current = null;
+	}, []);
 
 	const close = useCallback(() => {
-		setSwiped(false);
+		setSwipeDirection(null);
 		setDragOffset(0);
 	}, []);
 
 	const isDragging = startXRef.current !== null;
+	const swipedLeft = swipeDirection === "left";
+	const swipedRight = swipeDirection === "right";
 
 	return {
-		swiped,
+		swipedLeft,
+		swipedRight,
 		dragOffset,
 		isDragging,
 		onTouchStart,
@@ -222,7 +240,8 @@ function TaskRow({
 
 	const isMobile = useIsMobile();
 	const {
-		swiped,
+		swipedLeft,
+		swipedRight,
 		dragOffset,
 		isDragging: isSwipeDragging,
 		onTouchStart,
@@ -363,7 +382,7 @@ function TaskRow({
 						zIndex: 1,
 					}}
 					onTouchEnd={
-						isMobile && swiped
+						isMobile && (swipedLeft || swipedRight)
 							? (e) => {
 									e.stopPropagation();
 									close();
@@ -492,31 +511,12 @@ function TaskRow({
 				</div>
 
 				{/* Mobile action buttons — rendered BEHIND the sliding content, fixed to right edge */}
+				{/* Mobile LEFT tray — re-enter, tag, delete (swipe left to reveal) */}
 				{isMobile && !isWorking && !isEditing && (
 					<div
 						className="absolute right-0 top-0 h-full flex items-stretch"
 						style={{ zIndex: 0 }}
 					>
-						<button
-							onTouchEnd={(e) => {
-								e.stopPropagation();
-								close();
-								handleStartClick(e as any);
-							}}
-							className="w-12 flex items-center justify-center bg-[#8b9a6b] active:opacity-80"
-						>
-							<Play className="w-4 h-4 text-white" />
-						</button>
-						<button
-							onTouchEnd={(e) => {
-								e.stopPropagation();
-								close();
-								onDone(task);
-							}}
-							className="w-12 flex items-center justify-center bg-[#7a9e7e] active:opacity-80"
-						>
-							<Check className="w-4 h-4 text-white" />
-						</button>
 						<button
 							onTouchEnd={(e) => {
 								e.stopPropagation();
@@ -555,6 +555,35 @@ function TaskRow({
 							) : (
 								<Trash2 className="w-4 h-4 text-white" />
 							)}
+						</button>
+					</div>
+				)}
+
+				{/* Mobile RIGHT tray — start, complete (swipe right to reveal) */}
+				{isMobile && !isWorking && !isEditing && (
+					<div
+						className="absolute left-0 top-0 h-full flex items-stretch"
+						style={{ zIndex: 0 }}
+					>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								close();
+								handleStartClick(e as any);
+							}}
+							className="w-12 flex items-center justify-center bg-[#8b9a6b] active:opacity-80"
+						>
+							<Play className="w-4 h-4 text-white" />
+						</button>
+						<button
+							onTouchEnd={(e) => {
+								e.stopPropagation();
+								close();
+								onDone(task);
+							}}
+							className="w-12 flex items-center justify-center bg-[#7a9e7e] active:opacity-80"
+						>
+							<Check className="w-4 h-4 text-white" />
 						</button>
 					</div>
 				)}
