@@ -709,7 +709,7 @@ export function AutofocusApp() {
 			});
 
 			setPrefetchedTasks(new Map());
-			setCurrentPage(1);
+			// setCurrentPage(1);
 
 			await runOptimisticUpdate(
 				{
@@ -768,17 +768,17 @@ export function AutofocusApp() {
 			setPrefetchedTasks(new Map());
 
 			// ⚠️ Key difference: go to LAST page, not first
-			const lastPage = getVisibleTotalPages(optimisticActiveTasks);
-			setCurrentPage(lastPage);
+			// const lastPage = getVisibleTotalPages(optimisticActiveTasks);
 
 			await runOptimisticUpdate(
 				{
 					activeTasks: optimisticActiveTasks,
 					completedTasks: displayedCompletedTasks,
 					appState: displayedAppState,
-					totalPages: lastPage,
+					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
+					// setCurrentPage(lastPage);
 					await reorderTasks(updates);
 				},
 			);
@@ -1572,9 +1572,10 @@ export function AutofocusApp() {
 	const commitCompleteWorkingTask = useCallback(
 		async (task: Task, sessionMs: number, note: string) => {
 			if (!displayedAppState) return;
+
 			const now = new Date().toISOString();
 			const totalTime = task.total_time_ms + sessionMs;
-			if (note.trim()) await updateTask(task.id, { note: note.trim() });
+
 			const optimisticActiveTasks = displayedActiveTasks
 				.filter((t) => t.id !== task.id)
 				.sort(
@@ -1589,6 +1590,7 @@ export function AutofocusApp() {
 							updated_at: now,
 						}) as Task,
 				);
+
 			const completedTask: Task = {
 				...task,
 				status: "completed",
@@ -1597,7 +1599,9 @@ export function AutofocusApp() {
 				updated_at: now,
 				note: note.trim() || task.note,
 			};
+
 			setPrefetchedTasks(new Map());
+
 			await runOptimisticUpdate(
 				{
 					activeTasks: optimisticActiveTasks,
@@ -1613,6 +1617,11 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
+					// 👇 ALL async goes here
+					if (note.trim()) {
+						await updateTask(task.id, { note: note.trim() });
+					}
+
 					await completeTask(task.id, totalTime);
 					await stopWorkingOnTask();
 				},

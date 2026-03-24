@@ -374,7 +374,7 @@ function TaskRow({
 				style={style}
 				data-task-id={task.id}
 				className={`
-                group relative flex items-stretch
+                group relative flex ${isMobile ? "h-[50px]" : null}
                 ${isWorking ? "bg-[#8b9a6b]/5" : ""}
                 ${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
                 transition-colors overflow-hidden
