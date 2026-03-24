@@ -19,6 +19,65 @@ import {
 } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const TAG_GUIDE = [
+	{
+		emoji: "🎯",
+		label: "Finish",
+		description:
+			'Outcome-driven work with a clear completion state. You know exactly what "done" looks like before you start. These re-enter perfectly because the intent survives every cycle.',
+		examples: [
+			"Finish the book Psycho-Cybernetics",
+			"Finish the homepage of the portfolio",
+			"Finish Module 3 of the negotiation course",
+			"Finish the Q3 section of the quarterly report",
+			"Finish the first draft of the investor proposal",
+		],
+		note: null,
+	},
+	{
+		emoji: "🧭",
+		label: "Explore",
+		description:
+			"Intentionally open-ended work where the output is clarity, not a deliverable. You go in not knowing what you'll find. The task is to emerge with something more concrete — which then becomes the next 🎯 Finish task.",
+		examples: [
+			"Explore ideas for the new app feature",
+			"Research standing desk options",
+			"Work on the content strategy direction",
+			"Look into visa requirements for Japan",
+			"Browse reference designs for the landing page",
+		],
+		note: "These don't have a fixed end state — and that's intentional. Once you've explored, you'll know what to Finish next.",
+	},
+	{
+		emoji: "⚡",
+		label: "Quick",
+		description:
+			"Single-shot tasks that take one sitting, have no re-entry scenario, and don't need to survive multiple cycles. Low friction, high throughput. If it takes under 15 minutes and you'll never need to re-enter it, it's a Quick.",
+		examples: [
+			"Read the Stratechery piece on Apple",
+			"Reply to Marco's email about the meeting",
+			"Pay the electricity bill",
+			"Watch the 8-minute video on cold outreach",
+			"Book the airport transfer for Friday",
+		],
+		note: null,
+	},
+	{
+		emoji: "🔧",
+		label: "Handle",
+		description:
+			"Quick is frictionless and immediate, Handle is still one-shot but has more administrative weight to it. 'Wash the dishes' is Quick. 'Renew the car insurance' looks quick but often has steps, waiting, and follow-up — that's Handle territory. Re-enters because of waiting periods and external dependencies — the insurance form needs a document you don't have yet, the repair needs a part to arrive. Unlike Quick, this is expected. Unlike Finish, there's no creative output — just resolution. Keep re-entering until it closes.",
+		examples: [
+			"Handle passport renewal",
+			"Handle the car insurance renewal",
+			"Handle the broken kitchen drawer",
+			"Handle the Supabase billing issue",
+			"Handle the visa application documents",
+		],
+		note: "If you find yourself thinking 'this should be quick but keeps not getting done' — it's probably a Handle, not a Quick.",
+	},
+];
+
 export function AboutSection() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState("philosophy");
@@ -50,38 +109,37 @@ export function AboutSection() {
 						onValueChange={setActiveTab}
 						className="flex flex-col min-h-0 pt-4"
 					>
-						{isMobile ? (
-							<Select value={activeTab} onValueChange={setActiveTab}>
-								<SelectTrigger className="w-full mb-4 flex-shrink-0">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="philosophy">The Philosophy</SelectItem>
-									<SelectItem value="how">How It Works</SelectItem>
-									<SelectItem value="steps">The Steps</SelectItem>
-									<SelectItem value="dismissal">Why No Dismissal</SelectItem>
-									<SelectItem value="writing">Writing Tasks</SelectItem>
-								</SelectContent>
-							</Select>
-						) : (
-							<TabsList className="w-full grid grid-cols-5 flex-shrink-0">
-								<TabsTrigger value="philosophy" className="flex-1">
-									The Philosophy
-								</TabsTrigger>
-								<TabsTrigger value="how" className="flex-1">
-									How It Works
-								</TabsTrigger>
-								<TabsTrigger value="steps" className="flex-1">
-									The Steps
-								</TabsTrigger>
-								<TabsTrigger value="dismissal" className="flex-1">
-									Why No Dismissal
-								</TabsTrigger>
-								<TabsTrigger value="writing" className="flex-1">
-									Writing Tasks
-								</TabsTrigger>
-							</TabsList>
-						)}
+						<Select value={activeTab} onValueChange={setActiveTab}>
+							<SelectTrigger className="w-full mb-4 flex-shrink-0">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="philosophy">The Philosophy</SelectItem>
+								<SelectItem value="how">How It Works</SelectItem>
+								<SelectItem value="steps">The Steps</SelectItem>
+								<SelectItem value="dismissal">Why No Dismissal</SelectItem>
+								<SelectItem value="writing">Writing Tasks</SelectItem>
+								<SelectItem value="tagging">How to Tag</SelectItem>
+							</SelectContent>
+						</Select>
+
+						{/* <TabsList className="w-full grid grid-cols-5 flex-shrink-0">
+							// 	<TabsTrigger value="philosophy" className="flex-1">
+							// 		The Philosophy
+							// 	</TabsTrigger>
+							// 	<TabsTrigger value="how" className="flex-1">
+							// 		How It Works
+							// 	</TabsTrigger>
+							// 	<TabsTrigger value="steps" className="flex-1">
+							// 		The Steps
+							// 	</TabsTrigger>
+							// 	<TabsTrigger value="dismissal" className="flex-1">
+							// 		Why No Dismissal
+							// 	</TabsTrigger>
+							// 	<TabsTrigger value="writing" className="flex-1">
+							// 		Writing Tasks
+							// 	</TabsTrigger>
+							</TabsList> */}
 
 						<div
 							className="flex-1 min-h-0 overflow-y-auto mt-4 pr-1"
@@ -165,33 +223,6 @@ export function AboutSection() {
 									delete it honestly.
 								</p>
 							</TabsContent>
-							{/* <TabsContent
-								value="steps"
-								className="text-sm text-muted-foreground space-y-4 mt-4"
-							>
-								<ol className="list-decimal list-inside space-y-1.5 ml-2">
-									<li>Write down everything you need to do in one long list</li>
-									<li>Work through the list page by page</li>
-									<li>
-										On each page, scan the tasks and ask yourself:{" "}
-										<em className="text-af4-warn">
-											&quot;What do I want to do?&quot;
-										</em>
-									</li>
-									<li>
-										When a task stands out, work on it until you want to stop
-									</li>
-									<li>
-										If the task is done, cross it off. If not, re-enter it at
-										the end of the list
-									</li>
-									<li>Continue scanning from where you left off</li>
-									<li>
-										When you reach the end of the page with no task standing
-										out, move to the next page
-									</li>
-								</ol>
-							</TabsContent> */}
 							<TabsContent
 								value="steps"
 								className="text-sm text-muted-foreground space-y-6 mt-4"
@@ -423,229 +454,6 @@ export function AboutSection() {
 									list, it's more honest.
 								</p>
 							</TabsContent>
-							{/* <TabsContent
-								value="writing"
-								className="text-sm text-muted-foreground space-y-4 mt-4"
-							>
-								<div className="space-y-4">
-									<h4 className="text-foreground font-medium mb-2">
-										Introduction
-									</h4>
-									<p>
-										AF4 is <strong>outcome-oriented</strong>, not
-										process-oriented. "Finish" signals a clear completion state
-										— either you did or you didn't. "Read 10 pages" and "Read
-										the book" are both activity descriptions that leave the done
-										state ambiguous.
-									</p>
-									<p>
-										"Read 10 pages" has a hidden problem in AF4 specifically.If
-										you write "Read 10 pages" and complete it, you've finished
-										that task — but the actual goal (finishing the book) is gone
-										from the list. You'd have to manually re-add "Read next 10
-										pages", "Read next 10 pages again", etc.
-									</p>
-									<p>
-										That's the friction the system is designed to eliminate.
-										"Read the book Psycho Cybernetics" is better than the 10
-										pages version but still describes an activity. It also
-										doesn't map cleanly to the 📋 to Finish tag you have in the
-										app — you'd have to mentally translate "Read = Finish".
-									</p>
-								</div>
-
-								<div className="space-y-4">
-									<h4 className="text-foreground font-medium mb-2">
-										The Why Behind It
-									</h4>
-									<p>
-										How you write a task changes how your brain responds to it.
-										The same piece of work written two different ways produces
-										two different levels of resistance — and two different
-										completion rates.
-									</p>
-									<p>
-										The core principle: describe the <strong>outcome</strong>,
-										not the activity. Your brain responds to clear end states. A
-										task that tells you what the world looks like when it&apos;s
-										done is easier to start, easier to finish, and easier to
-										re-enter when it&apos;s incomplete.
-									</p>
-									<p>
-										The classic test comes from David Allen: can you picture
-										what &quot;done&quot; looks like? With{" "}
-										<em>Finish the book Psycho-Cybernetics</em> you can — the
-										book is closed, it&apos;s on the shelf, you&apos;re moving
-										on. With <em>Read the book Psycho-Cybernetics</em> the image
-										is fuzzier — reading when, reading how much, reading
-										actively or passively?
-									</p>
-								</div>
-
-								<div className="space-y-4">
-									<h4 className="text-foreground font-medium mb-2">
-										Prefer &quot;Finish&quot; over &quot;Read&quot; or
-										&quot;Watch&quot;:
-									</h4>
-									<p className="mt-4">
-										<span className="ml-2 text-xs text-foreground px-3 py-2 rounded bg-secondary font-mono">
-											Finish + [specific deliverable] + [enough context to be
-											unambiguous]
-										</span>
-									</p>
-									<ul className="list-disc list-inside space-y-1.5 ml-2">
-										<li>
-											<span className="line-through opacity-50">
-												Read the book Psycho-Cybernetics
-											</span>{" "}
-											→{" "}
-											<strong className="text-foreground">
-												Finish the book Psycho-Cybernetics
-											</strong>
-										</li>
-										<li>
-											<span className="line-through opacity-50">
-												Watch the negotiation course
-											</span>{" "}
-											→{" "}
-											<strong className="text-foreground">
-												Finish Module 2 of the negotiation course
-											</strong>
-										</li>
-										<li>
-											<span className="line-through opacity-50">
-												Work on the portfolio website
-											</span>{" "}
-											→{" "}
-											<strong className="text-foreground">
-												Finish the homepage of the portfolio
-											</strong>
-										</li>
-										<li>
-											<span className="line-through opacity-50">
-												Do the quarterly report
-											</span>{" "}
-											→{" "}
-											<strong className="text-foreground">
-												Finish the Q3 section of the quarterly report
-											</strong>
-										</li>
-									</ul>
-								</div>
-
-								<p>
-									&quot;Read&quot; and &quot;Watch&quot; describe what your body
-									is doing. &quot;Finish&quot; describes what the world looks
-									like when you&apos;re done. AF4 re-enters incomplete tasks — a
-									&quot;Finish&quot; framing carries its intent perfectly
-									through every re-entry. &quot;Read 10 pages&quot; does not:
-									once completed, the real goal disappears from your list and
-									you have to manually reconstruct it.
-								</p>
-
-								<div className="space-y-4">
-									<h4 className="text-foreground font-medium mb-2">
-										Apply This to Long-form Work
-									</h4>
-									<p>
-										The granularity depends on how big the course is. A 2-hour
-										course is one "Finish" task. A 40-hour course should be
-										broken into modules, each its own "Finish" task that
-										re-enters naturally when incomplete.
-									</p>
-									<p>
-										For projects it's the same principle but the outcome framing
-										matters even more because projects are inherently vague:
-									</p>
-								</div>
-								<ul className="list-disc list-inside space-y-1.5 ml-2">
-									<li>
-										<strong>Books</strong> — one &quot;Finish&quot; task per
-										book. Re-enters naturally when incomplete.
-									</li>
-									<li>
-										<strong>Courses</strong> — break by module, not by hour.
-										&quot;Finish Module 3 of the negotiation course&quot; is the
-										right grain size. A 2-hour course is one task; a 40-hour
-										course is one task per module.
-									</li>
-									<li>
-										<strong>Projects</strong> — break by deliverable, not by
-										activity. &quot;Finish the first draft of the proposal&quot;
-										not &quot;Work on the proposal.&quot;
-									</li>
-								</ul>
-
-								<div></div>
-
-								<div>
-									<h4 className="text-foreground font-medium mb-2">
-										Exceptions
-									</h4>
-
-									<p>
-										Purely exploratory action or single-shot tasks with no fixed
-										endpoint — articles, newsletters, research rabbit holes,
-										traveling, adventuring. Here "Research about OpenClaw" is
-										fine because there's no re-entry scenario, it's a one-shot
-										task. But for anything with a completion arc — books,
-										courses, projects — &quot;Finish&quot; is always the
-										stronger frame.
-									</p>
-								</div>
-
-								<div>
-									<h4 className="text-foreground font-medium mb-2">
-										When Open Ended Framing is Excellent
-									</h4>
-									<p className="mb-3">
-										Two situations where &quot;Finish&quot; is the wrong frame
-										and you should embrace the open-ended form:
-									</p>
-									<ul className="list-disc list-inside space-y-3 ml-2">
-										<li>
-											<strong>Exploratory Work</strong> — when the output of
-											doing the task is the discovery of what to do next.
-											&quot;Work on project X&quot; is valid when you genuinely
-											don&apos;t know what the next concrete deliverable is yet.
-											The task is to go in, gain clarity, and emerge with
-											something more specific. Once you do — that new insight
-											becomes the next &quot;Finish&quot; task. Use open-ended
-											framing as a bridge, not a permanent home.
-										</li>
-										<li>
-											<strong>Experience-Driven Tasks</strong> — travel,
-											exploration, serendipity. &quot;Wander Taipei&apos;s old
-											quarter&quot; is a better task than &quot;Visit X
-											restaurant&quot; when the point is to be surprised. Over-
-											specifying kills the experience you were trying to have.
-											Here the outcome <em>is</em> the openness — and
-											that&apos;s worth protecting.
-										</li>
-									</ul>
-									<p className="mt-3">
-										The underlying principle holds in both cases: write the task
-										in the way that most honestly reflects what you&apos;re
-										actually trying to do. &quot;Finish&quot; is a tool for
-										clarity, not a rule to follow blindly. When the work is
-										genuinely open-ended, say so — just make sure it&apos;s
-										intentional openness, not vagueness covering up a task you
-										haven&apos;t thought through yet.
-									</p>
-								</div>
-								<div>
-									<h4 className="text-foreground font-medium mb-2">
-										What If a Task Keeps Getting Re-entered & Never Gets Done?
-									</h4>
-									<p>
-										That&apos;s a signal, not a failure. Either the task is too
-										vague — break it into a smaller, more concrete
-										&quot;Finish&quot; — or it no longer matters. Delete it
-										honestly. A task you keep avoiding is the system telling you
-										something worth listening to.
-									</p>
-								</div>
-							</TabsContent> */}
 							<TabsContent
 								value="writing"
 								className="text-sm text-muted-foreground space-y-6 mt-4"
@@ -814,6 +622,198 @@ export function AboutSection() {
 										&quot;Finish&quot; — or it no longer matters. Delete it
 										honestly. A task you keep avoiding is the system telling you
 										something worth listening to.
+									</p>
+								</div>
+							</TabsContent>
+							<TabsContent
+								value="tagging"
+								className="text-sm text-muted-foreground space-y-6 mt-4"
+							>
+								{/* Intro */}
+								<div className="space-y-3">
+									<p>
+										Tags aren't just labels — they tell you how to{" "}
+										<em>approach</em> a task before you even start it. Each tag
+										carries a different question:
+									</p>
+
+									<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+										{[
+											{ emoji: "🎯", q: "What does done look like?" },
+											{ emoji: "🧭", q: "What will I learn?" },
+											{ emoji: "⚡", q: "Can I knock this out now?" },
+											{ emoji: "🔧", q: "Looks quick but has steps?" },
+										].map(({ emoji, q }) => (
+											<div
+												key={emoji}
+												className="bg-secondary rounded-lg px-3 py-2 text-center space-y-1"
+											>
+												<div className="text-lg">{emoji}</div>
+												<p className="text-xs leading-snug">{q}</p>
+											</div>
+										))}
+									</div>
+								</div>
+
+								{/* Tag definitions */}
+								{TAG_GUIDE.map((tag) => (
+									<div key={tag.label} className="space-y-2">
+										<h4 className="text-foreground font-medium flex items-center gap-2">
+											<span>{tag.emoji}</span>
+											<span>{tag.label}</span>
+										</h4>
+										<p>{tag.description}</p>
+										<ul className="space-y-1 ml-1">
+											{tag.examples.map((example) => (
+												<li
+													key={example}
+													className="flex items-start gap-2 text-xs"
+												>
+													<span className="opacity-40 mt-0.5">—</span>
+													<span className="italic">{example}</span>
+												</li>
+											))}
+										</ul>
+										{tag.note && (
+											<p className="text-xs bg-secondary px-3 py-2 rounded">
+												{tag.note}
+											</p>
+										)}
+									</div>
+								))}
+
+								{/* How tags flow */}
+								<div className="space-y-3 border-t border-border pt-4">
+									<h4 className="text-foreground font-medium">
+										How Tags Flow in Practice
+									</h4>
+									<p>A task often moves through types as it matures:</p>
+									<div className="bg-secondary rounded-lg px-4 py-3 space-y-1 font-mono text-xs">
+										<p>🧭 Explore content strategy direction</p>
+										<p className="opacity-50 pl-4">↓ you emerge with clarity</p>
+										<p>🎯 Finish the three-pillar content framework doc</p>
+										<p className="opacity-50 pl-4">
+											↓ along the way you need to
+										</p>
+										<p>⚡ Read the Wes Kao newsletter on positioning</p>
+									</div>
+								</div>
+
+								{/* No tag */}
+								<div className="space-y-2 border-t border-border pt-4">
+									<h4 className="text-foreground font-medium">No tag?</h4>
+									<p>
+										That's fine too. Untagged tasks are honest — it means you
+										haven't decided how to approach it yet. Use the{" "}
+										<strong className="text-foreground">No 🏷️</strong> filter to
+										surface them and tag in bulk when you're ready.
+									</p>
+								</div>
+
+								{/* Re-entry table */}
+								<div className="space-y-3 border-t border-border pt-4">
+									<h4 className="text-foreground font-medium">
+										Which tasks get re-entered most?
+									</h4>
+									<p>
+										Re-entry is a signal, not a failure. Different tag types
+										have different re-entry patterns — understanding yours helps
+										you write better tasks from the start.
+									</p>
+
+									<div className="overflow-x-auto">
+										<table className="w-full text-xs border-collapse">
+											<thead>
+												<tr className="border-b border-border">
+													<th className="text-left py-2 pr-4 text-foreground font-medium">
+														Tag
+													</th>
+													<th className="text-left py-2 pr-4 text-foreground font-medium">
+														Re-entry rate
+													</th>
+													<th className="text-left py-2 text-foreground font-medium">
+														Why it happens
+													</th>
+												</tr>
+											</thead>
+											<tbody className="divide-y divide-border/50">
+												<tr>
+													<td className="py-2.5 pr-4 whitespace-nowrap">
+														🎯 Finish
+													</td>
+													<td className="py-2.5 pr-4 whitespace-nowrap text-amber-500">
+														Medium
+													</td>
+													<td className="py-2.5 text-muted-foreground">
+														Deliverable was too large. A "Finish" that keeps
+														coming back usually needs to be broken into smaller
+														pieces.
+													</td>
+												</tr>
+												<tr>
+													<td className="py-2.5 pr-4 whitespace-nowrap">
+														🧭 Explore
+													</td>
+													<td className="py-2.5 pr-4 whitespace-nowrap text-amber-500">
+														Medium–High
+													</td>
+													<td className="py-2.5 text-muted-foreground">
+														Scope-dependent. A narrow Explore closes in 1–2
+														sessions. A wide one can cycle indefinitely — that's
+														not failure, it's the nature of open terrain. Each
+														re-entry should produce a more specific Finish task
+														as a byproduct.
+													</td>
+												</tr>
+												<tr>
+													<td className="py-2.5 pr-4 whitespace-nowrap">
+														⚡ Quick
+													</td>
+													<td className="py-2.5 pr-4 whitespace-nowrap text-green-500">
+														Very low
+													</td>
+													<td className="py-2.5 text-muted-foreground">
+														By definition, Quick tasks are one-shot. If a Quick
+														gets re-entered, it was misclassified — it's either
+														blocked by something external, or it's actually a
+														Handle in disguise.
+													</td>
+												</tr>
+												<tr>
+													<td className="py-2.5 pr-4 whitespace-nowrap">
+														🔧 Handle
+													</td>
+													<td className="py-2.5 pr-4 whitespace-nowrap text-amber-500">
+														Medium
+													</td>
+													<td className="py-2.5 text-muted-foreground">
+														Re-enters because of waiting periods and external
+														dependencies. Each re-entry is expected. Keep going
+														until it closes.
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+
+									<p className="text-xs bg-secondary px-3 py-2.5 rounded">
+										<span className="block">
+											<strong className="text-foreground">
+												Rule of thumb:
+											</strong>{" "}
+											if a task has been re-entered more than 3 times, stop and
+											ask — is it blocked, too big, or no longer relevant?
+										</span>
+										<span className="block mt-1">
+											<strong className="text-foreground">
+												Exception for Explore:
+											</strong>{" "}
+											wide exploration tasks are supposed to recycle. The signal
+											to watch isn't re-entry count — it's whether each session
+											is still producing new clarity or new Finish tasks. If it
+											stops yielding anything concrete, the topic may have run
+											its course.
+										</span>
 									</p>
 								</div>
 							</TabsContent>
