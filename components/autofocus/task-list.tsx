@@ -46,7 +46,7 @@ function useIsMobile() {
 	return isMobile;
 }
 
-function useSwipeRevealOld(isFirst: boolean, isLast: boolean) {
+/* function useSwipeRevealOldV1(isFirst: boolean, isLast: boolean) {
 	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
 		null,
 	);
@@ -128,7 +128,7 @@ function useSwipeRevealOld(isFirst: boolean, isLast: boolean) {
 	};
 }
 
-function useSwipeReveal(isFirst: boolean, isLast: boolean) {
+function useSwipeRevealOldV2(isFirst: boolean, isLast: boolean) {
 	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
 		null,
 	);
@@ -197,6 +197,135 @@ function useSwipeReveal(isFirst: boolean, isLast: boolean) {
 
 		startXRef.current = null;
 		startYRef.current = null;
+	}, []);
+
+	const close = useCallback(() => {
+		setSwipeDirection(null);
+		setDragOffset(0);
+	}, []);
+
+	const isDragging = startXRef.current !== null;
+	const swipedLeft = swipeDirection === "left";
+	const swipedRight = swipeDirection === "right";
+
+	return {
+		swipedLeft,
+		swipedRight,
+		dragOffset,
+		isDragging,
+		onTouchStart,
+		onTouchMove,
+		onTouchEnd,
+		close,
+	};
+} */
+
+function useSwipeReveal(isFirst: boolean, isLast: boolean) {
+	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
+		null,
+	);
+	const [dragOffset, setDragOffset] = useState(0);
+
+	const startXRef = useRef<number | null>(null);
+	const startYRef = useRef<number | null>(null);
+	const isEdgeSwipeRef = useRef(false); // ← NEW: tracks if swipe started on edge
+
+	const LEFT_TRAY_WIDTH = isFirst ? 96 : 144;
+	const RIGHT_TRAY_WIDTH = isLast ? 96 : 144;
+
+	// Edge threshold — adjust this (30–50px works well on mobile)
+	const EDGE_THRESHOLD = 40; // px from left or right edge
+
+	const onTouchStart = useCallback(
+		(e: React.TouchEvent) => {
+			const touch = e.touches[0];
+			const rect = e.currentTarget.getBoundingClientRect(); // the <li> element
+
+			const touchXRelative = touch.clientX - rect.left;
+
+			// Only allow swipe if touch started near left OR right edge
+			isEdgeSwipeRef.current =
+				touchXRelative < EDGE_THRESHOLD ||
+				touchXRelative > rect.width - EDGE_THRESHOLD;
+
+			if (!isEdgeSwipeRef.current) {
+				// Not on edge → do nothing (middle is unswipable)
+				startXRef.current = null;
+				startYRef.current = null;
+				return;
+			}
+
+			startXRef.current = touch.clientX;
+			startYRef.current = touch.clientY;
+
+			if (swipeDirection === "left") setDragOffset(-LEFT_TRAY_WIDTH);
+			else if (swipeDirection === "right") setDragOffset(RIGHT_TRAY_WIDTH);
+			else setDragOffset(0);
+		},
+		[swipeDirection],
+	);
+
+	const onTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			if (
+				!isEdgeSwipeRef.current ||
+				startXRef.current === null ||
+				startYRef.current === null
+			) {
+				return;
+			}
+
+			const diffX = startXRef.current - e.touches[0].clientX;
+			const diffY = Math.abs(startYRef.current - e.touches[0].clientY);
+
+			const isMostlyHorizontal = Math.abs(diffX) > diffY + 10;
+
+			if (swipeDirection === "left") {
+				const base = -LEFT_TRAY_WIDTH;
+				setDragOffset(Math.min(0, Math.max(-LEFT_TRAY_WIDTH, base - diffX)));
+			} else if (swipeDirection === "right") {
+				const base = RIGHT_TRAY_WIDTH;
+				setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, base - diffX)));
+			} else if (isMostlyHorizontal) {
+				if (diffX > 15) {
+					setDragOffset(Math.min(0, Math.max(-LEFT_TRAY_WIDTH, -diffX)));
+				} else if (diffX < -15) {
+					setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, -diffX)));
+				}
+			}
+		},
+		[swipeDirection],
+	);
+
+	const onTouchEnd = useCallback((e: React.TouchEvent) => {
+		if (
+			!isEdgeSwipeRef.current ||
+			startXRef.current === null ||
+			startYRef.current === null
+		) {
+			isEdgeSwipeRef.current = false;
+			return;
+		}
+
+		const diffX = startXRef.current - e.changedTouches[0].clientX;
+		const diffY = Math.abs(startYRef.current - e.changedTouches[0].clientY);
+
+		const isMostlyHorizontal = Math.abs(diffX) > diffY + 20;
+
+		if (isMostlyHorizontal && diffX > 50) {
+			setSwipeDirection("left");
+			setDragOffset(-LEFT_TRAY_WIDTH);
+		} else if (isMostlyHorizontal && diffX < -50) {
+			setSwipeDirection("right");
+			setDragOffset(RIGHT_TRAY_WIDTH);
+		} else {
+			setSwipeDirection(null);
+			setDragOffset(0);
+		}
+
+		startXRef.current = null;
+		startYRef.current = null;
+		isEdgeSwipeRef.current = false;
 	}, []);
 
 	const close = useCallback(() => {
