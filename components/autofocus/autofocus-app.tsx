@@ -329,8 +329,12 @@ export function AutofocusApp() {
 		);
 	}, [filteredActiveTasks, debouncedSearchQuery]);
 
+	const contentFilteredActiveTasks = useMemo(() => {
+		return applyContentFilter(searchFilteredActiveTasks, contentFilter);
+	}, [searchFilteredActiveTasks, contentFilter]);
+
 	// Calculate filtered total pages
-	const filteredTotalPages = useMemo(() => {
+	const filteredTotalPagesOld = useMemo(() => {
 		if (!isFilterActive && !searchQuery.trim()) return displayedTotalPages;
 		return Math.max(
 			1,
@@ -341,6 +345,20 @@ export function AutofocusApp() {
 		debouncedSearchQuery,
 		searchFilteredActiveTasks.length,
 		displayedTotalPages,
+	]);
+
+	const filteredTotalPages = useMemo(() => {
+		const baseTasks =
+			isFilterActive || debouncedSearchQuery.trim()
+				? contentFilteredActiveTasks
+				: displayedActiveTasks;
+
+		return Math.max(1, Math.ceil(baseTasks.length / DEFAULT_TASK_CAPACITY));
+	}, [
+		isFilterActive,
+		debouncedSearchQuery,
+		contentFilteredActiveTasks,
+		displayedActiveTasks,
 	]);
 
 	// Use filtered page and total when filter is active
@@ -421,7 +439,7 @@ export function AutofocusApp() {
 		prefetchedTasks,
 	]);
 
-	const tasksForCurrentPage = useMemo(() => {
+	const tasksForCurrentPageOldV2 = useMemo(() => {
 		const pageNum = effectiveCurrentPage;
 
 		let pageTasks: Task[];
@@ -463,6 +481,53 @@ export function AutofocusApp() {
 		optimisticState,
 		prefetchedTasks,
 		contentFilter, // ← NEW dependency
+	]);
+
+	const tasksForCurrentPage = useMemo(() => {
+		const pageNum = effectiveCurrentPage;
+		const isAnyFilterActive =
+			isSearchOrFilterActive || contentFilter !== "default";
+
+		let sourceTasks: Task[];
+
+		if (isAnyFilterActive) {
+			// When content filter OR tag filter OR search is active → use the virtual flat list
+			sourceTasks = contentFilteredActiveTasks;
+		} else {
+			// Normal paged mode (no filters)
+			if (optimisticState) {
+				sourceTasks = optimisticState.activeTasks
+					.filter((task) => task.page_number === pageNum)
+					.sort((a, b) => a.position - b.position);
+			} else {
+				const currentPageTasks = displayedActiveTasks
+					.filter((task) => task.page_number === pageNum)
+					.sort((a, b) => a.position - b.position);
+
+				const prefetched = prefetchedTasks.get(pageNum);
+				sourceTasks =
+					prefetched && prefetched.length > 0
+						? [...prefetched].sort((a, b) => a.position - b.position)
+						: currentPageTasks;
+			}
+		}
+
+		// Slice for current page (only when filtering)
+		if (isAnyFilterActive) {
+			const startIndex = (pageNum - 1) * DEFAULT_TASK_CAPACITY;
+			const endIndex = startIndex + DEFAULT_TASK_CAPACITY;
+			return sourceTasks.slice(startIndex, endIndex);
+		}
+
+		return sourceTasks;
+	}, [
+		effectiveCurrentPage,
+		contentFilteredActiveTasks,
+		isSearchOrFilterActive,
+		contentFilter,
+		optimisticState,
+		displayedActiveTasks,
+		prefetchedTasks,
 	]);
 
 	// Get the working task
@@ -1791,6 +1856,11 @@ export function AutofocusApp() {
 	useEffect(() => {
 		setFilteredCurrentPage(1);
 	}, [selectedTags, searchQuery]);
+
+	// Reset filtered page when content filter changes
+	useEffect(() => {
+		setFilteredCurrentPage(1);
+	}, [contentFilter]);
 
 	// Ensure filtered current page is valid
 	useEffect(() => {

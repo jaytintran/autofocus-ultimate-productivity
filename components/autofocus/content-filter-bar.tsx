@@ -11,6 +11,7 @@ const OPTIONS: { label: string; value: ContentFilterOption }[] = [
 	{ label: "Default", value: "default" },
 	{ label: "Courses", value: "courses" },
 	{ label: "Projects", value: "projects" },
+	{ label: "Books", value: "books" },
 	{ label: "Both", value: "both" },
 	{ label: "Hide Both", value: "hide-both" },
 ];

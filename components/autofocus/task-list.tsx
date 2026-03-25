@@ -220,7 +220,7 @@ function useSwipeRevealOldV2(isFirst: boolean, isLast: boolean) {
 	};
 } */
 
-function useSwipeReveal(isFirst: boolean, isLast: boolean) {
+function useSwipeRevealOldV3(isFirst: boolean, isLast: boolean) {
 	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
 		null,
 	);
@@ -346,6 +346,169 @@ function useSwipeReveal(isFirst: boolean, isLast: boolean) {
 		onTouchMove,
 		onTouchEnd,
 		close,
+	};
+}
+
+function useSwipeReveal(isFirst: boolean, isLast: boolean) {
+	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
+		null,
+	);
+	const [committedOffset, setCommittedOffset] = useState(0); // final snapped position
+
+	const startXRef = useRef<number | null>(null);
+	const startYRef = useRef<number | null>(null);
+	const isEdgeSwipeRef = useRef(false);
+	const currentOffsetRef = useRef(0); // ← live offset (smooth)
+	const slidingRef = useRef<HTMLDivElement | null>(null); // we'll attach this later
+
+	const LEFT_TRAY_WIDTH = isFirst ? 96 : 144;
+	const RIGHT_TRAY_WIDTH = isLast ? 96 : 144;
+	const EDGE_THRESHOLD = 180; // feel free to tune
+
+	// Live smooth dragging using direct style update
+	const updateLivePosition = useCallback((offset: number) => {
+		currentOffsetRef.current = offset;
+		if (slidingRef.current) {
+			slidingRef.current.style.transform = `translateX(${offset}px)`;
+			slidingRef.current.style.transition = "none"; // no transition while dragging
+		}
+	}, []);
+
+	const onTouchStart = useCallback(
+		(e: React.TouchEvent) => {
+			const touch = e.touches[0];
+			const rect = e.currentTarget.getBoundingClientRect();
+
+			const touchXRelative = touch.clientX - rect.left;
+
+			isEdgeSwipeRef.current =
+				touchXRelative < EDGE_THRESHOLD ||
+				touchXRelative > rect.width - EDGE_THRESHOLD;
+
+			if (!isEdgeSwipeRef.current) {
+				startXRef.current = null;
+				startYRef.current = null;
+				return;
+			}
+
+			startXRef.current = touch.clientX;
+			startYRef.current = touch.clientY;
+
+			// Reset to committed position
+			currentOffsetRef.current = committedOffset;
+			updateLivePosition(committedOffset);
+		},
+		[committedOffset, updateLivePosition],
+	);
+
+	const onTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			if (
+				!isEdgeSwipeRef.current ||
+				startXRef.current === null ||
+				startYRef.current === null
+			) {
+				return;
+			}
+
+			const diffX = startXRef.current - e.touches[0].clientX;
+			const diffY = Math.abs(startYRef.current - e.touches[0].clientY);
+
+			// Strong directional lock
+			if (Math.abs(diffX) < diffY + 15) return;
+
+			let newOffset = -diffX;
+
+			// Clamp to tray widths
+			if (swipeDirection === "left" || (!swipeDirection && newOffset < 0)) {
+				newOffset = Math.max(-LEFT_TRAY_WIDTH, Math.min(0, newOffset));
+			} else if (
+				swipeDirection === "right" ||
+				(!swipeDirection && newOffset > 0)
+			) {
+				newOffset = Math.min(RIGHT_TRAY_WIDTH, Math.max(0, newOffset));
+			}
+
+			updateLivePosition(newOffset);
+		},
+		[swipeDirection, LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH, updateLivePosition],
+	);
+
+	const onTouchEnd = useCallback(
+		(e: React.TouchEvent) => {
+			if (!isEdgeSwipeRef.current || startXRef.current === null) {
+				isEdgeSwipeRef.current = false;
+				return;
+			}
+
+			const diffX = startXRef.current - e.changedTouches[0].clientX;
+			const diffY = Math.abs(startYRef.current! - e.changedTouches[0].clientY);
+
+			const isMostlyHorizontal = Math.abs(diffX) > diffY + 25;
+
+			let finalDirection: "left" | "right" | null = null;
+			let finalOffset = 0;
+
+			if (isMostlyHorizontal) {
+				if (diffX > 55) {
+					finalDirection = "left";
+					finalOffset = -LEFT_TRAY_WIDTH;
+				} else if (diffX < -55) {
+					finalDirection = "right";
+					finalOffset = RIGHT_TRAY_WIDTH;
+				}
+			}
+
+			// Snap with smooth transition
+			setSwipeDirection(finalDirection);
+			setCommittedOffset(finalOffset);
+
+			// Let React control the final snap
+			if (slidingRef.current) {
+				slidingRef.current.style.transition =
+					"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
+				slidingRef.current.style.transform = `translateX(${finalOffset}px)`;
+			}
+
+			startXRef.current = null;
+			startYRef.current = null;
+			isEdgeSwipeRef.current = false;
+		},
+		[LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH],
+	);
+
+	const close = useCallback(() => {
+		setSwipeDirection(null);
+		setCommittedOffset(0);
+		if (slidingRef.current) {
+			slidingRef.current.style.transition =
+				"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
+			slidingRef.current.style.transform = "translateX(0px)";
+		}
+	}, []);
+
+	// Expose the ref so the sliding div can attach itself
+	const registerSlidingElement = useCallback(
+		(el: HTMLDivElement | null) => {
+			slidingRef.current = el;
+			// Initialize position
+			if (el) {
+				el.style.transform = `translateX(${committedOffset}px)`;
+			}
+		},
+		[committedOffset],
+	);
+
+	return {
+		swipedLeft: swipeDirection === "left",
+		swipedRight: swipeDirection === "right",
+		dragOffset: committedOffset, // still return for compatibility
+		isDragging: startXRef.current !== null,
+		onTouchStart,
+		onTouchMove,
+		onTouchEnd,
+		close,
+		registerSlidingElement, // ← NEW: important!
 	};
 }
 
@@ -483,6 +646,7 @@ function TaskRow({
 		onTouchMove,
 		onTouchEnd,
 		close,
+		registerSlidingElement,
 	} = useSwipeReveal(isFirst, isLast);
 
 	const {
@@ -612,12 +776,29 @@ function TaskRow({
 				onTouchEnd={isMobile && !shouldDisableSwipe ? onTouchEnd : undefined}
 			>
 				{/* Sliding wrapper — this moves left to reveal buttons behind it */}
-				<div
-					className="relative flex items-center gap-2 px-3 py-2.5 w-full bg-background touch-pan-y"
+				{/* <div
+					className="relative flex items-center gap-2 px-3 py-2.5 w-full bg-background"
 					style={{
 						transform: isMobile ? `translateX(${dragOffset}px)` : undefined,
 						// Only use CSS transition when finger is lifted (snapping), not while dragging
 						transition: isSwipeDragging ? "none" : "transform 120ms ease-out",
+						zIndex: 1,
+					}}
+					onTouchEnd={
+						isMobile && (swipedLeft || swipedRight)
+							? (e) => {
+									if (e.cancelable) e.preventDefault();
+									e.stopPropagation();
+									close();
+								}
+							: undefined
+					}
+				> */}
+				<div
+					ref={registerSlidingElement} // ← ADD THIS
+					className="relative flex items-center gap-2 px-3 py-2.5 w-full bg-background touch-pan-y"
+					style={{
+						// We no longer need inline transform — the hook manages it directly
 						zIndex: 1,
 					}}
 					onTouchEnd={
