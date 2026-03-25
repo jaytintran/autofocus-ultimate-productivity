@@ -96,7 +96,7 @@ function ViewTypeToggle({ value, onChange }: ViewTypeToggleProps) {
 				onClick={() => onChange("default")}
 				className={`h-8 rounded text-xs transition-colors ${
 					value === "default"
-						? "!bg-accent text-foreground"
+						? "bg-accent! text-foreground"
 						: "text-muted-foreground hover:text-foreground"
 				}`}
 				title="Default view"
@@ -109,7 +109,7 @@ function ViewTypeToggle({ value, onChange }: ViewTypeToggleProps) {
 				onClick={() => onChange("7days")}
 				className={`h-8 rounded text-xs transition-colors ${
 					value === "7days"
-						? "!bg-accent text-foreground"
+						? "bg-accent! text-foreground"
 						: "text-muted-foreground hover:text-foreground"
 				}`}
 				title="7 days view"

@@ -38,6 +38,12 @@ import { type CompletedSortKey, type CompletedViewType } from "./view-tabs";
 import { TAG_DEFINITIONS, TagId } from "@/lib/tags";
 import { revertTask } from "@/lib/store";
 
+import { ContentFilterBar } from "./content-filter-bar";
+import {
+	applyContentFilter,
+	type ContentFilterOption,
+} from "@/lib/content-filter";
+
 const DEFAULT_TASK_CAPACITY = 12;
 
 const ACHIEVEMENT_PLACEHOLDERS = [
@@ -218,6 +224,9 @@ export function AutofocusApp() {
 	const [completedViewType, setCompletedViewType] =
 		useState<CompletedViewType>("default");
 
+	const [contentFilter, setContentFilter] =
+		useState<ContentFilterOption>("default");
+
 	// Achievement toast state
 	const [achievementPending, setAchievementPending] = useState<{
 		task: Task;
@@ -374,7 +383,7 @@ export function AutofocusApp() {
 	}, [currentPage, displayedTotalPages]);
 
 	// Get tasks for current page with prefetch fallback
-	const tasksForCurrentPage = useMemo(() => {
+	const tasksForCurrentPageOld = useMemo(() => {
 		const pageNum = effectiveCurrentPage;
 
 		if (optimisticState && !isSearchOrFilterActive) {
@@ -410,6 +419,50 @@ export function AutofocusApp() {
 		isSearchOrFilterActive,
 		optimisticState,
 		prefetchedTasks,
+	]);
+
+	const tasksForCurrentPage = useMemo(() => {
+		const pageNum = effectiveCurrentPage;
+
+		let pageTasks: Task[];
+
+		if (optimisticState && !isSearchOrFilterActive) {
+			pageTasks = optimisticState.activeTasks
+				.filter((task) => task.page_number === pageNum)
+				.sort((a, b) => a.position - b.position);
+		} else if (isSearchOrFilterActive) {
+			const startIndex = (pageNum - 1) * DEFAULT_TASK_CAPACITY;
+			const endIndex = startIndex + DEFAULT_TASK_CAPACITY;
+			pageTasks = searchFilteredActiveTasks.slice(startIndex, endIndex);
+		} else {
+			const currentPageTasks = displayedActiveTasks
+				.filter((task) => task.page_number === pageNum)
+				.sort((a, b) => a.position - b.position);
+
+			if (optimisticState) {
+				pageTasks = currentPageTasks;
+			} else if (activeTasks.length > 0) {
+				pageTasks = currentPageTasks;
+			} else {
+				const prefetched = prefetchedTasks.get(pageNum);
+				pageTasks =
+					prefetched && prefetched.length > 0
+						? [...prefetched].sort((a, b) => a.position - b.position)
+						: currentPageTasks;
+			}
+		}
+
+		// ← NEW: apply keyword-based content filter as a final pass
+		return applyContentFilter(pageTasks, contentFilter);
+	}, [
+		activeTasks.length,
+		effectiveCurrentPage,
+		displayedActiveTasks,
+		searchFilteredActiveTasks,
+		isSearchOrFilterActive,
+		optimisticState,
+		prefetchedTasks,
+		contentFilter, // ← NEW dependency
 	]);
 
 	// Get the working task
@@ -1891,6 +1944,10 @@ export function AutofocusApp() {
 					completedTasksWithNotes={completedTasksWithNotes}
 					onRefreshAchievements={mutateAchievements}
 				/>
+			)}
+
+			{activeView === "tasks" && (
+				<ContentFilterBar value={contentFilter} onChange={setContentFilter} />
 			)}
 
 			<main className="flex-1 flex flex-col min-h-0 pb-24">
