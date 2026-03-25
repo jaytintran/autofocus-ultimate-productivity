@@ -31,6 +31,7 @@ import {
 	stopTimer,
 	stopWorkingOnTask,
 	updateTask,
+	updateTaskTag,
 } from "@/lib/store";
 import type { Task, AppState, TaskStatus } from "@/lib/types";
 import { type CompletedSortKey, type CompletedViewType } from "./view-tabs";
@@ -1650,6 +1651,33 @@ export function AutofocusApp() {
 		commitCompleteWorkingTask,
 	]);
 
+	// Handle update completed task tag
+	const handleUpdateCompletedTaskTag = useCallback(
+		async (taskId: string, tag: TagId | null) => {
+			await updateTaskTag(taskId, tag);
+			await mutateCompleted(); // Refresh completed tasks
+		},
+		[mutateCompleted],
+	);
+
+	// Handle update completed task note
+	const handleUpdateCompletedTaskNote = useCallback(
+		async (taskId: string, note: string | null) => {
+			await updateTask(taskId, { note });
+			await mutateCompleted();
+		},
+		[mutateCompleted],
+	);
+
+	// Handle update completed task text/title
+	const handleUpdateCompletedTaskText = useCallback(
+		async (taskId: string, text: string) => {
+			await updateTask(taskId, { text });
+			await mutateCompleted();
+		},
+		[mutateCompleted],
+	);
+
 	//  Add a resetAchievementTimer ref and auto-dismiss logic
 	const achievementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
@@ -1896,6 +1924,9 @@ export function AutofocusApp() {
 						onRefresh={refreshAll}
 						onDeleteTask={handleDeleteTask}
 						onRevertTask={handleRevertTask}
+						onUpdateTaskTag={handleUpdateCompletedTaskTag}
+						onUpdateTaskNote={handleUpdateCompletedTaskNote}
+						onUpdateTaskText={handleUpdateCompletedTaskText}
 					/>
 				)}
 			</main>

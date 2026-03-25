@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
 	RotateCcw,
 	Trash2,
@@ -11,7 +11,7 @@ import {
 	Check,
 	MessageSquareMore,
 } from "lucide-react";
-import { revertTask } from "@/lib/store";
+import { revertTask, updateTask } from "@/lib/store";
 import { formatTimeCompact } from "./timer-bar";
 import { TagFilter } from "./tag-filter";
 import { TagPill } from "./tag-pill";
@@ -27,6 +27,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface CompletedListProps {
 	tasks: Task[];
@@ -39,6 +40,9 @@ interface CompletedListProps {
 	onLoadMore: () => void;
 	completedViewType: CompletedViewType;
 	onRevertTask: (task: Task) => Promise<void>;
+	onUpdateTaskTag?: (taskId: string, tag: TagId | null) => Promise<void>;
+	onUpdateTaskNote?: (taskId: string, note: string | null) => Promise<void>;
+	onUpdateTaskText?: (taskId: string, text: string) => Promise<void>;
 }
 
 function formatCompletionTime(dateString: string): string {
@@ -165,13 +169,26 @@ export function CompletedList({
 	onRefresh,
 	onDeleteTask,
 	onRevertTask,
+	onUpdateTaskTag,
+	onUpdateTaskNote,
+	onUpdateTaskText,
 }: CompletedListProps) {
 	const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
 		null,
 	);
 	const [showTaskModal, setShowTaskModal] = useState<string | null>(null);
+	const [editingNote, setEditingNote] = useState("");
+	const [isEditing, setIsEditing] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+
+	const [editingTitle, setEditingTitle] = useState("");
+	const [editMode, setEditMode] = useState<"none" | "title" | "note">("none");
+
 	const textRefs = useRef<{ [key: string]: HTMLSpanElement }>({});
+
+	// Add loading state for tag updates (similar to TaskList's loadingTaskIds)
+	const [loadingTagTaskId, setLoadingTagTaskId] = useState<string | null>(null);
 
 	// Filter tasks by selected tags
 	const filteredTasks = useMemo(() => {
@@ -335,6 +352,131 @@ export function CompletedList({
 		[loadingTaskId, showDeleteConfirm, onDeleteTask],
 	);
 
+	// Add tag update handler (similar to TaskList's handleUpdateTag)
+	const handleUpdateTag = useCallback(
+		async (taskId: string, tag: TagId | null) => {
+			if (loadingTagTaskId === taskId) return;
+			if (!onUpdateTaskTag) return; // Optional prop check
+
+			setLoadingTagTaskId(taskId);
+			try {
+				await onUpdateTaskTag(taskId, tag);
+				await onRefresh();
+			} finally {
+				setLoadingTagTaskId(null);
+			}
+		},
+		[loadingTagTaskId, onUpdateTaskTag, onRefresh],
+	);
+
+	const handleStartEdit = useCallback(() => {
+		const task = tasks.find((t) => t.id === showTaskModal);
+		if (task) {
+			setEditingNote(task.note || "");
+			setIsEditing(true);
+		}
+	}, [tasks, showTaskModal]);
+
+	const handleCancelEditOld = useCallback(() => {
+		setIsEditing(false);
+		setEditingNote("");
+	}, []);
+
+	const handleSaveNoteOld = useCallback(async () => {
+		if (!showTaskModal || !onUpdateTaskNote) return;
+
+		setIsSaving(true);
+		try {
+			await onUpdateTaskNote(showTaskModal, editingNote.trim() || null);
+			await onRefresh();
+			setIsEditing(false);
+			setEditingNote("");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [showTaskModal, editingNote, onUpdateTaskNote, onRefresh]);
+
+	const handleDeleteNoteOld = useCallback(async () => {
+		if (!showTaskModal || !onUpdateTaskNote) return;
+
+		setIsSaving(true);
+		try {
+			await onUpdateTaskNote(showTaskModal, null);
+			await onRefresh();
+			setIsEditing(false);
+			setEditingNote("");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [showTaskModal, onUpdateTaskNote, onRefresh]);
+
+	const handleStartEditNote = useCallback(() => {
+		const task = tasks.find((t) => t.id === showTaskModal);
+		if (task) {
+			setEditingNote(task.note || "");
+			setEditMode("note");
+		}
+	}, [tasks, showTaskModal]);
+
+	const handleStartEditTitle = useCallback(() => {
+		const task = tasks.find((t) => t.id === showTaskModal);
+		if (task) {
+			setEditingTitle(task.text);
+			setEditMode("title");
+		}
+	}, [tasks, showTaskModal]);
+
+	const handleCancelEdit = useCallback(() => {
+		setEditMode("none");
+		setEditingNote("");
+		setEditingTitle("");
+	}, []);
+
+	const handleSaveNote = useCallback(async () => {
+		if (!showTaskModal || !onUpdateTaskNote) return;
+
+		setIsSaving(true);
+		try {
+			await onUpdateTaskNote(showTaskModal, editingNote.trim() || null);
+			await onRefresh();
+			setEditMode("none");
+			setEditingNote("");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [showTaskModal, editingNote, onUpdateTaskNote, onRefresh]);
+
+	const handleSaveTitle = useCallback(async () => {
+		if (!showTaskModal || !onUpdateTaskText) return;
+
+		const trimmed = editingTitle.trim();
+		if (!trimmed) return; // Don't save empty title
+
+		setIsSaving(true);
+		try {
+			await onUpdateTaskText(showTaskModal, trimmed);
+			await onRefresh();
+			setEditMode("none");
+			setEditingTitle("");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [showTaskModal, editingTitle, onUpdateTaskText, onRefresh]);
+
+	const handleDeleteNote = useCallback(async () => {
+		if (!showTaskModal || !onUpdateTaskNote) return;
+
+		setIsSaving(true);
+		try {
+			await onUpdateTaskNote(showTaskModal, null);
+			await onRefresh();
+			setEditMode("none");
+			setEditingNote("");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [showTaskModal, onUpdateTaskNote, onRefresh]);
+
 	if (tasks.length === 0) {
 		return (
 			<div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
@@ -412,13 +554,18 @@ export function CompletedList({
 																{formatTimeCompact(task.total_time_ms)}
 															</span>
 														)}
-														{task.tag && (
-															<TagPill
-																tagId={task.tag}
-																className="scale-90 origin-left"
-															/>
-														)}
+														<TagPill
+															tagId={task.tag}
+															onSelectTag={(tag) =>
+																handleUpdateTag(task.id, tag)
+															}
+															disabled={
+																loadingTagTaskId === task.id || isLoading
+															}
+															className="scale-90 origin-left"
+														/>
 													</div>
+
 													<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 														<button
 															type="button"
@@ -517,21 +664,27 @@ export function CompletedList({
 																	</span>
 																</div>
 
+																<TagPill
+																	tagId={task.tag}
+																	onSelectTag={(tag) =>
+																		handleUpdateTag(task.id, tag)
+																	}
+																	disabled={
+																		loadingTagTaskId === task.id || isLoading
+																	}
+																	className="scale-90 origin-left"
+																/>
+
 																{task.total_time_ms > 0 && (
 																	<span className="text-xs text-[#8b9a6b] flex-shrink-0">
 																		{formatTimeCompact(task.total_time_ms)}
 																	</span>
 																)}
+
 																{task.completed_at && (
 																	<span className="text-xs text-muted-foreground flex-shrink-0">
 																		{formatCompletionTime(task.completed_at)}
 																	</span>
-																)}
-																{task.tag && (
-																	<TagPill
-																		tagId={task.tag}
-																		className="flex-shrink-0"
-																	/>
 																)}
 
 																<div className="flex items-center gap-1 flex-shrink-0">
@@ -608,28 +761,182 @@ export function CompletedList({
 			{showTaskModal && (
 				<Dialog
 					open={!!showTaskModal}
-					onOpenChange={() => setShowTaskModal(null)}
+					onOpenChange={() => {
+						setShowTaskModal(null);
+						setEditMode("none");
+						setEditingNote("");
+						setEditingTitle("");
+					}}
 				>
 					<DialogContent className="sm:max-w-[500px] max-w-[calc(100vw-2rem)] overflow-hidden p-0">
 						<div className="px-6 pt-6 pb-1">
 							<DialogHeader>
 								<DialogTitle>Completed Task</DialogTitle>
 							</DialogHeader>
-							<p className="text-sm text-muted-foreground line-through break-words overflow-wrap-anywhere mt-3">
-								{tasks.find((t) => t.id === showTaskModal)?.text}
-							</p>
+
+							{/* Title section - editable */}
+							<div className="mt-3">
+								{editMode === "title" ? (
+									<div className="space-y-3">
+										<input
+											type="text"
+											value={editingTitle}
+											onChange={(e) => setEditingTitle(e.target.value)}
+											className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+											disabled={isSaving}
+											autoFocus
+										/>
+										<div className="flex gap-2 justify-end">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={handleCancelEdit}
+												disabled={isSaving}
+											>
+												Cancel
+											</Button>
+											<Button
+												size="sm"
+												onClick={handleSaveTitle}
+												disabled={isSaving || !editingTitle.trim()}
+											>
+												{isSaving ? "Saving..." : "Save"}
+											</Button>
+										</div>
+									</div>
+								) : (
+									<div className="group flex items-start gap-2">
+										<p
+											className="text-sm text-muted-foreground line-through break-words overflow-wrap-anywhere flex-1 cursor-pointer hover:text-foreground/70 transition-colors"
+											onClick={handleStartEditTitle}
+											title="Click to edit"
+										>
+											{tasks.find((t) => t.id === showTaskModal)?.text}
+										</p>
+										<button
+											onClick={handleStartEditTitle}
+											className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded"
+											title="Edit title"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												width="14"
+												height="14"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												className="text-muted-foreground"
+											>
+												<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+											</svg>
+										</button>
+									</div>
+								)}
+							</div>
 						</div>
 
-						{tasks.find((t) => t.id === showTaskModal)?.note && (
-							<div className="flex items-start gap-3 bg-amber-100/80 dark:bg-amber-950/40 border-t border-amber-300/50 dark:border-amber-700/40 px-6 py-4">
-								<span className="text-base leading-none mt-0.5 flex-shrink-0">
-									🏆
-								</span>
-								<p className="text-sm text-amber-800 dark:text-amber-300 break-words">
-									{tasks.find((t) => t.id === showTaskModal)?.note}
-								</p>
-							</div>
-						)}
+						{/* Note section - editable */}
+						<div className="border-t border-border px-6 py-4">
+							{editMode === "note" ? (
+								<div className="space-y-3">
+									<div className="flex items-start gap-3">
+										<span className="text-base leading-none mt-2 flex-shrink-0">
+											🏆
+										</span>
+										<textarea
+											value={editingNote}
+											onChange={(e) => setEditingNote(e.target.value)}
+											placeholder="Add a note about this achievement..."
+											className="flex-1 min-h-[80px] bg-background border border-input rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+											disabled={isSaving}
+										/>
+									</div>
+									<div className="flex gap-2 justify-end">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={handleCancelEdit}
+											disabled={isSaving}
+										>
+											Cancel
+										</Button>
+										<Button
+											size="sm"
+											onClick={handleSaveNote}
+											disabled={isSaving}
+										>
+											{isSaving ? "Saving..." : "Save"}
+										</Button>
+									</div>
+								</div>
+							) : (
+								<div className="space-y-3">
+									{tasks.find((t) => t.id === showTaskModal)?.note ? (
+										<div className="group flex items-start gap-3 bg-amber-100/80 dark:bg-amber-950/40 border border-amber-300/50 dark:border-amber-700/40 rounded-lg px-4 py-3">
+											<span className="text-base leading-none mt-0.5 flex-shrink-0">
+												🏆
+											</span>
+											<p
+												className="text-sm text-amber-800 dark:text-amber-300 break-words flex-1 cursor-pointer"
+												onClick={handleStartEditNote}
+												title="Click to edit"
+											>
+												{tasks.find((t) => t.id === showTaskModal)?.note}
+											</p>
+											<button
+												onClick={handleStartEditNote}
+												className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-amber-200/50 dark:hover:bg-amber-900/50 rounded flex-shrink-0"
+												title="Edit note"
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													width="14"
+													height="14"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth="2"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													className="text-amber-700 dark:text-amber-400"
+												>
+													<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+												</svg>
+											</button>
+										</div>
+									) : (
+										<p className="text-sm text-muted-foreground italic">
+											No note added.
+										</p>
+									)}
+									<div className="flex gap-2 justify-end">
+										{tasks.find((t) => t.id === showTaskModal)?.note && (
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={handleDeleteNote}
+												disabled={isSaving || !onUpdateTaskNote}
+												className="text-destructive hover:text-destructive hover:bg-destructive/10"
+											>
+												Delete Note
+											</Button>
+										)}
+										<Button
+											size="sm"
+											onClick={handleStartEditNote}
+											disabled={!onUpdateTaskNote}
+										>
+											{tasks.find((t) => t.id === showTaskModal)?.note
+												? "Edit Note"
+												: "Add Note"}
+										</Button>
+									</div>
+								</div>
+							)}
+						</div>
 					</DialogContent>
 				</Dialog>
 			)}
