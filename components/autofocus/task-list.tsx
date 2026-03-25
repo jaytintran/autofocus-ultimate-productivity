@@ -668,6 +668,11 @@ function TaskRow({
 	};
 
 	useEffect(() => {
+		setEditText(task.text);
+		setModalEditText(task.text);
+	}, [task.text]);
+
+	useEffect(() => {
 		if (isEditing && inputRef.current) {
 			inputRef.current.focus();
 			inputRef.current.select();
@@ -1218,6 +1223,11 @@ export function TaskList({
 	// const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null); (Old)
 
 	const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
+	const [localTasks, setLocalTasks] = useState(tasks);
+
+	useEffect(() => {
+		setLocalTasks(tasks);
+	}, [tasks]);
 
 	const addLoading = (id: string) =>
 		setLoadingTaskIds((prev) => new Set(prev).add(id));
@@ -1245,7 +1255,7 @@ export function TaskList({
 
 	// Filter tasks by selected tags
 	const filteredTasks = useMemo(() => {
-		if (selectedTags.size === 0) return tasks;
+		if (selectedTags.size === 0) return localTasks;
 
 		return tasks.filter((task) => {
 			if (selectedTags.has("none")) {
@@ -1253,7 +1263,7 @@ export function TaskList({
 			}
 			return task.tag && selectedTags.has(task.tag);
 		});
-	}, [tasks, selectedTags]);
+	}, [localTasks, selectedTags]);
 
 	/* handleUpdateTagOld
 	const handleUpdateTagOld = useCallback(
@@ -1490,16 +1500,23 @@ export function TaskList({
 
 	const handleUpdateText = useCallback(
 		async (taskId: string, newText: string) => {
+			// 🔥 1. Optimistically update UI
+			setLocalTasks((prev) =>
+				prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t)),
+			);
+
 			try {
+				// 🔥 2. Fire backend
 				await updateTask(taskId, { text: newText });
-				onRefresh();
 			} catch (error) {
 				console.error("Failed to update task text:", error);
+
+				// 🔥 3. Rollback if needed
+				onRefresh();
 			}
 		},
-		[onRefresh],
+		[],
 	);
-
 	/* handleSwitchTaskOld
 	const handleSwitchTask = useCallback(
 		async (newTask: Task, action: "complete" | "reenter") => {

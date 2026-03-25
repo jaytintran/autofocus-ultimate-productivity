@@ -1769,6 +1769,42 @@ export function AutofocusApp() {
 		commitCompleteWorkingTask,
 	]);
 
+	// Handle task text update OPTIMISTIC
+	const handleUpdateTaskText = useCallback(
+		async (taskId: string, text: string, isCompleted: boolean) => {
+			if (!displayedAppState) return;
+
+			const now = new Date().toISOString();
+
+			const optimisticActiveTasks = displayedActiveTasks.map((task) =>
+				task.id === taskId ? { ...task, text, updated_at: now } : task,
+			);
+
+			const optimisticCompletedTasks = displayedCompletedTasks.map((task) =>
+				task.id === taskId ? { ...task, text, updated_at: now } : task,
+			);
+
+			await runOptimisticUpdate(
+				{
+					activeTasks: optimisticActiveTasks,
+					completedTasks: optimisticCompletedTasks,
+					appState: displayedAppState,
+					totalPages: displayedTotalPages,
+				},
+				async () => {
+					await updateTask(taskId, { text });
+				},
+			);
+		},
+		[
+			displayedActiveTasks,
+			displayedCompletedTasks,
+			displayedAppState,
+			displayedTotalPages,
+			runOptimisticUpdate,
+		],
+	);
+
 	// Handle update completed task tag
 	const handleUpdateCompletedTaskTag = useCallback(
 		async (taskId: string, tag: TagId | null) => {
@@ -1788,12 +1824,18 @@ export function AutofocusApp() {
 	);
 
 	// Handle update completed task text/title
-	const handleUpdateCompletedTaskText = useCallback(
+	const handleUpdateCompletedTaskTextOld = useCallback(
 		async (taskId: string, text: string) => {
 			await updateTask(taskId, { text });
 			await mutateCompleted();
 		},
 		[mutateCompleted],
+	);
+	const handleUpdateCompletedTaskText = useCallback(
+		async (taskId: string, text: string) => {
+			await handleUpdateTaskText(taskId, text, true);
+		},
+		[handleUpdateTaskText],
 	);
 
 	//  Add a resetAchievementTimer ref and auto-dismiss logic
