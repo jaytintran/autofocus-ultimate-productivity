@@ -78,10 +78,10 @@ function useSwipeReveal(isFirst: boolean, isLast: boolean) {
 				setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, base - diff)));
 			} else {
 				// Not yet committed to a direction
-				if (diff > 5) {
+				if (diff > 15) {
 					// Swiping left — clamp to left tray
 					setDragOffset(Math.min(0, Math.max(-LEFT_TRAY_WIDTH, -diff)));
-				} else if (diff < -5) {
+				} else if (diff < -15) {
 					// Swiping right — clamp to right tray
 					setDragOffset(Math.max(0, Math.min(RIGHT_TRAY_WIDTH, -diff)));
 				}
@@ -94,10 +94,10 @@ function useSwipeReveal(isFirst: boolean, isLast: boolean) {
 		if (startXRef.current === null) return;
 		const diff = startXRef.current - e.changedTouches[0].clientX;
 
-		if (diff > 40) {
+		if (diff > 60) {
 			setSwipeDirection("left");
 			setDragOffset(-LEFT_TRAY_WIDTH);
-		} else if (diff < -40) {
+		} else if (diff < -60) {
 			setSwipeDirection("right");
 			setDragOffset(RIGHT_TRAY_WIDTH);
 		} else {

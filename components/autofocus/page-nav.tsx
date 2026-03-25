@@ -100,7 +100,7 @@ function SecondBrainButton() {
 										onClick={() => setOpen(false)}
 										className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors group"
 									>
-										<div className="p-1.5 rounded-md bg-[#8b9a6b]/10 group-hover:bg-[#8b9a6b]/20 transition-colors flex-shrink-0">
+										<div className="p-1.5 rounded-md bg-[#8b9a6b]/10 group-hover:bg-[#8b9a6b]/20 transition-colors shrink-0">
 											<Icon className="w-3.5 h-3.5 text-[#8b9a6b]" />
 										</div>
 										<div className="min-w-0">
@@ -243,25 +243,25 @@ export function PageNav({
 
 					{/* Stats — inline on desktop, hidden here on mobile (shown below) */}
 					<div className="hidden sm:flex items-center gap-3">
-						<div className="w-px h-3 bg-border flex-shrink-0" />
-						<span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+						<div className="w-px h-3 bg-border shrink-0" />
+						<span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
 							{totalActiveTasks} tasks
 						</span>
-						<div className="w-px h-3 bg-border flex-shrink-0" />
+						<div className="w-px h-3 bg-border shrink-0" />
 						{TAG_DEFINITIONS.map((tag) => {
 							const count = taskTagCounts[tag.id] ?? 0;
 							return (
 								<span
 									key={tag.id}
-									className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0 flex items-center gap-1"
+									className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 flex items-center gap-1"
 								>
 									<span>{tag.emoji}</span>
 									<span>{count}</span>
 								</span>
 							);
 						})}
-						<div className="w-px h-3 bg-border flex-shrink-0" />
-						<span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+						<div className="w-px h-3 bg-border shrink-0" />
+						<span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
 							🏷️ {taskTagCounts.none ?? 0} untagged
 						</span>
 					</div>
@@ -271,7 +271,7 @@ export function PageNav({
 				<div className="flex items-center gap-2">
 					{searchOpen ? (
 						<div className="flex items-center gap-1 bg-secondary rounded-full px-3 py-1">
-							<Search className="w-3 h-3 mr-1 text-muted-foreground flex-shrink-0" />
+							<Search className="w-3 h-3 mr-1 text-muted-foreground shrink-0" />
 							<input
 								ref={searchInputRef}
 								type="text"
@@ -326,24 +326,24 @@ export function PageNav({
 
 			{/* Stats row — mobile only */}
 			<div className="flex sm:hidden ml-1 items-center justify-left gap-3 px-4 py-1.5 overflow-x-auto border-border/50">
-				<span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+				<span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
 					{totalActiveTasks} tasks
 				</span>
-				<div className="w-px h-3 bg-border flex-shrink-0" />
+				<div className="w-px h-3 bg-border shrink-0" />
 				{TAG_DEFINITIONS.map((tag) => {
 					const count = taskTagCounts[tag.id] ?? 0;
 					return (
 						<span
 							key={tag.id}
-							className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0 flex items-center gap-1"
+							className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 flex items-center gap-1"
 						>
 							<span>{tag.emoji}</span>
 							<span>{count}</span>
 						</span>
 					);
 				})}
-				<div className="w-px h-3 bg-border flex-shrink-0" />
-				<span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+				<div className="w-px h-3 bg-border shrink-0" />
+				<span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
 					🏷️ {taskTagCounts.none ?? 0} untagged
 				</span>
 			</div>
@@ -360,7 +360,7 @@ export function PageNav({
 							onClick={(e) => e.stopPropagation()}
 						>
 							{/* Header */}
-							<div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+							<div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
 								<div>
 									<h2 className="text-sm font-semibold text-foreground">
 										Your Achievements 🏆
