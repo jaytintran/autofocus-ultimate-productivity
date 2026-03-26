@@ -450,7 +450,7 @@ export function AutofocusApp() {
 	// Callbacks - Task Operations
 	// -------------------------------------------------------------------------
 	const handleAddTask = useCallback(
-		async (text: string, tag?: TagId | null) => {
+		async (text: string, tag?: TagId | null, dueDate?: string | null) => {
 			const trimmedText = text.trim();
 			if (!trimmedText || !displayedAppState) return null;
 
@@ -468,6 +468,7 @@ export function AutofocusApp() {
 				created_at: now,
 				updated_at: now,
 				tag: tag ?? null,
+				due_date: dueDate ?? null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -489,7 +490,13 @@ export function AutofocusApp() {
 			});
 
 			try {
-				const createdTask = await addTask(trimmedText, 1, 0, tag ?? null);
+				const createdTask = await addTask(
+					trimmedText,
+					1,
+					0,
+					tag ?? null,
+					dueDate ?? null,
+				);
 				await mutateActive();
 				await mutateTotalPages();
 				setOptimisticState(null);
@@ -536,6 +543,7 @@ export function AutofocusApp() {
 				created_at: now,
 				updated_at: now,
 				tag: tag ?? null,
+				due_date: null,
 			}));
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
@@ -1089,7 +1097,11 @@ export function AutofocusApp() {
 	// Callbacks - Combined Operations
 	// -------------------------------------------------------------------------
 	const handleAddTaskAndStart = useCallback(
-		async (text: string, tag?: TagId | null): Promise<Task | null> => {
+		async (
+			text: string,
+			tag?: TagId | null,
+			dueDate?: string | null,
+		): Promise<Task | null> => {
 			const trimmedText = text.trim();
 			if (!trimmedText || !displayedAppState) return null;
 
@@ -1109,6 +1121,7 @@ export function AutofocusApp() {
 				created_at: now,
 				updated_at: now,
 				tag: tag ?? null,
+				due_date: dueDate ?? null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -1137,7 +1150,13 @@ export function AutofocusApp() {
 			});
 
 			try {
-				const createdTask = await addTask(trimmedText, 1, 0, tag ?? null);
+				const createdTask = await addTask(
+					trimmedText,
+					1,
+					0,
+					tag ?? null,
+					dueDate ?? null,
+				);
 				await startTask(createdTask.id);
 				await mutateActive();
 				await mutateAppState();

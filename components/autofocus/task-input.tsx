@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, KeyboardEvent, useEffect } from "react";
 import { Plus, Send } from "lucide-react";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
 import { Task } from "@/lib/types";
+import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
 
 const TEMPLATES = [
 	{ label: "Go", text: "🏍️ Go to " },
@@ -77,7 +78,11 @@ function TagMentionDropdown({ query, onSelect }: TagMentionDropdownProps) {
 }
 
 interface TaskInputProps {
-	onAddTask: (text: string, tag?: TagId | null) => Promise<Task | null>;
+	onAddTask: (
+		text: string,
+		tag?: TagId | null,
+		dueDate?: string | null,
+	) => Promise<Task | null>;
 	selectedTags?: Set<TagId | "none">;
 }
 
@@ -86,6 +91,9 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 	const [showTemplates, setShowTemplates] = useState(false);
 	const [inlineTag, setInlineTag] = useState<TagId | null>(null);
 	const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+	const [dueDate, setDueDate] = useState<Date | null>(null);
+	const [dueDateLabel, setDueDateLabel] = useState<string | null>(null);
+
 	const inputRef = useRef<HTMLInputElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -133,6 +141,12 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 			// Detect completed tag mention in text (e.g. "#finish " with trailing space)
 			const { tag } = parseTagMention(value);
 			setInlineTag(tag);
+
+			// Detect due date shortcut e.g. !2d, !1h30m
+			const { dueDate: parsedDueDate, dueDateLabel: parsedLabel } =
+				parseDueDateShortcut(value);
+			setDueDate(parsedDueDate);
+			setDueDateLabel(parsedLabel);
 		},
 		[],
 	);
@@ -164,9 +178,12 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		const trimmed = text.trim();
 		if (!trimmed) return;
 
-		// Strip any remaining # mention from submitted text
-		const { cleanText } = parseTagMention(trimmed);
-		const finalText = cleanText || trimmed;
+		// Strip any remaining # mention & ! due date from submitted text
+		const { cleanText: tagClean } = parseTagMention(trimmed);
+		const { cleanText: dueDateClean } = parseDueDateShortcut(
+			tagClean || trimmed,
+		);
+		const finalText = dueDateClean || tagClean || trimmed;
 
 		const EXEMPT_WORDS = new Set([
 			"a",
@@ -193,9 +210,15 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		setText("");
 		setInlineTag(null);
 		setMentionQuery(null);
+		setDueDate(null);
+		setDueDateLabel(null);
 		inputRef.current?.focus();
 
-		onAddTask(capitalized, resolvedTag).catch((error) => {
+		onAddTask(
+			capitalized,
+			resolvedTag,
+			dueDate ? dueDate.toISOString() : null,
+		).catch((error) => {
 			console.error("Failed to add task:", error);
 		});
 	}, [text, onAddTask, resolvedTag]);
@@ -305,9 +328,16 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 					value={text}
 					onChange={handleTextChange}
 					onKeyDown={handleKeyDown}
-					placeholder="Add a task... or type # to tag"
+					placeholder="Add a task... or type # to tag, ! for due date"
 					className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
 				/>
+
+				{dueDateLabel && (
+					<span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0">
+						⏰ {dueDateLabel}
+					</span>
+				)}
+
 				<button
 					onClick={handleSubmit}
 					disabled={!text.trim()}

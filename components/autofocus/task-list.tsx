@@ -4,7 +4,17 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { GripVertical, Play, Check, RefreshCw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { updateTask } from "@/lib/store";
-import { formatTimeCompact, getTaskAge } from "@/lib/utils/time-utils";
+import {
+	formatTimeCompact,
+	getTaskAge,
+	formatDueDateVerbose,
+} from "@/lib/utils/time-utils";
+
+import {
+	formatDueDate,
+	parseDueDateShortcut,
+} from "@/lib/utils/due-date-parser";
+
 import {
 	Dialog,
 	DialogContent,
@@ -573,7 +583,11 @@ interface TaskRowProps {
 	onDone: (task: Task) => void;
 	onReenter: (task: Task) => void;
 	onDelete: (taskId: string) => void;
-	onUpdateText: (taskId: string, newText: string) => void;
+	onUpdateText: (
+		taskId: string,
+		newText: string,
+		dueDate?: string | null,
+	) => void;
 	onUpdateTag: (taskId: string, tag: TagId | null) => void;
 	onSwitchTask: (
 		newTask: Task,
@@ -587,6 +601,13 @@ interface TaskRowProps {
 	isLast: boolean;
 	disableSwipe?: boolean;
 }
+
+const DUE_DATE_URGENCY_CLASSES: Record<string, string> = {
+	overdue: "border-red-500/40 bg-red-500/10 text-red-500",
+	soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+	normal: "border-muted-foreground/30 bg-muted/50 text-muted-foreground",
+	far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
+};
 
 function TaskRow({
 	task,
@@ -688,13 +709,37 @@ function TaskRow({
 
 	const handleModalSave = () => {
 		const trimmed = modalEditText.trim();
-		if (trimmed && trimmed !== task.text) onUpdateText(task.id, trimmed);
+		if (!trimmed) {
+			setShowModal(false);
+			return;
+		}
+		const { cleanText, dueDate } = parseDueDateShortcut(trimmed);
+		const finalText = cleanText || trimmed;
+		if (finalText !== task.text || dueDate !== null) {
+			onUpdateText(
+				task.id,
+				finalText,
+				dueDate ? dueDate.toISOString() : undefined,
+			);
+		}
 		setShowModal(false);
 	};
 
 	const handleSave = () => {
 		const trimmed = editText.trim();
-		if (trimmed && trimmed !== task.text) onUpdateText(task.id, trimmed);
+		if (!trimmed) {
+			setIsEditing(false);
+			return;
+		}
+		const { cleanText, dueDate } = parseDueDateShortcut(trimmed);
+		const finalText = cleanText || trimmed;
+		if (finalText !== task.text || dueDate !== null) {
+			onUpdateText(
+				task.id,
+				finalText,
+				dueDate ? dueDate.toISOString() : undefined,
+			);
+		}
 		setIsEditing(false);
 	};
 
@@ -815,16 +860,26 @@ function TaskRow({
 					{/* Task text */}
 					<div className="flex-1 min-w-0 flex items-center gap-2">
 						{isEditing ? (
-							<input
-								ref={inputRef}
-								type="text"
-								value={editText}
-								onChange={(e) => setEditText(e.target.value)}
-								onBlur={handleSave}
-								onKeyDown={handleKeyDown}
-								onClick={(e) => e.stopPropagation()}
-								className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
-							/>
+							<div className="flex-1 flex items-center gap-2 min-w-0">
+								<input
+									ref={inputRef}
+									type="text"
+									value={editText}
+									onChange={(e) => setEditText(e.target.value)}
+									onBlur={handleSave}
+									onKeyDown={handleKeyDown}
+									onClick={(e) => e.stopPropagation()}
+									className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground"
+								/>
+								{(() => {
+									const { dueDate } = parseDueDateShortcut(editText);
+									return dueDate ? (
+										<span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 flex-shrink-0">
+											⏰ {parseDueDateShortcut(editText).dueDateLabel}
+										</span>
+									) : null;
+								})()}
+							</div>
 						) : (
 							<span
 								ref={spanRef}
@@ -846,6 +901,19 @@ function TaskRow({
 								<RefreshCw className="w-2.5 h-2.5" />
 							</span>
 						)}
+						{task.due_date &&
+							!isEditing &&
+							(() => {
+								const { label, urgency } = formatDueDate(task.due_date);
+								return (
+									<span
+										className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${DUE_DATE_URGENCY_CLASSES[urgency]}`}
+										title={formatDueDateVerbose(task.due_date)}
+									>
+										⏰ {label}
+									</span>
+								);
+							})()}
 						{task.total_time_ms > 0 && !isEditing && (
 							<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
 								{formatTimeCompact(task.total_time_ms)}
@@ -1480,40 +1548,31 @@ export function TaskList({
 		},
 		[loadingTaskIds, onDeleteTask],
 	);
-
 	const handleUpdateText = useCallback(
-		async (taskId: string, newText: string) => {
-			// 🔥 1. Optimistically update UI
+		async (taskId: string, newText: string, dueDate?: string | null) => {
 			setLocalTasks((prev) =>
-				prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t)),
+				prev.map((t) =>
+					t.id === taskId
+						? {
+								...t,
+								text: newText,
+								...(dueDate !== undefined && { due_date: dueDate }),
+							}
+						: t,
+				),
 			);
-
 			try {
-				// 🔥 2. Fire backend
-				await updateTask(taskId, { text: newText });
+				await updateTask(taskId, {
+					text: newText,
+					...(dueDate !== undefined && { due_date: dueDate }),
+				});
 			} catch (error) {
 				console.error("Failed to update task text:", error);
-
-				// 🔥 3. Rollback if needed
 				onRefresh();
 			}
 		},
-		[],
+		[onRefresh],
 	);
-	/* handleSwitchTaskOld
-	const handleSwitchTask = useCallback(
-		async (newTask: Task, action: "complete" | "reenter") => {
-			if (loadingTaskId) return;
-			setLoadingTaskId(newTask.id);
-			try {
-				await onSwitchTask(newTask, action);
-			} finally {
-				setLoadingTaskId(null);
-			}
-		},
-		[loadingTaskId, onSwitchTask],
-	);
-	*/
 
 	const handleSwitchTask = useCallback(
 		async (newTask: Task, action: "complete" | "reenter") => {

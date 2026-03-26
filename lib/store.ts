@@ -111,6 +111,7 @@ export async function addTask(
 	pageNumber: number,
 	position: number,
 	tag?: TagId | null,
+	dueDate?: string | null,
 ): Promise<Task> {
 	const supabase = createClient();
 
@@ -149,6 +150,7 @@ export async function addTask(
 			position,
 			status: "active",
 			tag: tag ?? null,
+			due_date: dueDate ?? null,
 		})
 		.select()
 		.single();
@@ -166,6 +168,7 @@ export async function addMultipleTasks(
 		pageNumber: number;
 		position: number;
 		tag?: TagId | null;
+		dueDate?: string | null;
 	}>,
 ): Promise<Task[]> {
 	const supabase = createClient();
@@ -208,6 +211,7 @@ export async function addMultipleTasks(
 				position: t.position,
 				status: "active" as TaskStatus,
 				tag: t.tag ?? null,
+				due_date: t.dueDate ?? null,
 			})),
 		)
 		.select();

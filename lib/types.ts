@@ -18,6 +18,7 @@ export interface Task {
 	note?: string | null;
 	created_at: string;
 	updated_at: string;
+	due_date: string | null;
 }
 
 export interface AppState {

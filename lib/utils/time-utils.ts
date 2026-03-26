@@ -63,3 +63,31 @@ export function getTaskAge(addedAt: string): string {
 	if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
 	return `${Math.floor(diffDays / 365)}y ago`;
 }
+
+/**
+ * Format a due date ISO string into a precise countdown string.
+ * Used for tooltips and accessibility labels.
+ * e.g. "Due in 2 days, 4 hours" or "Overdue by 30 minutes"
+ */
+export function formatDueDateVerbose(
+	dueDateIso: string,
+	now: Date = new Date(),
+): string {
+	const due = new Date(dueDateIso);
+	const diffMs = due.getTime() - now.getTime();
+	const abs = Math.abs(diffMs);
+
+	const days = Math.floor(abs / (1000 * 60 * 60 * 24));
+	const hours = Math.floor((abs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+	const minutes = Math.floor((abs % (1000 * 60 * 60)) / (1000 * 60));
+
+	const parts: string[] = [];
+	if (days > 0) parts.push(`${days} day${days !== 1 ? "s" : ""}`);
+	if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+	if (minutes > 0 && days === 0)
+		parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
+	if (parts.length === 0) parts.push("less than a minute");
+
+	const joined = parts.join(", ");
+	return diffMs < 0 ? `Overdue by ${joined}` : `Due in ${joined}`;
+}
