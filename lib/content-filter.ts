@@ -4,9 +4,16 @@ export type ContentFilterOption =
 	| "default"
 	| "courses"
 	| "projects"
-	| "books"
-	| "both"
-	| "hide-both";
+	| "books";
+
+export type ContentFilterPreset =
+	| "exclude-all"
+	| "show-all";
+
+export interface ContentFilterState {
+	options: ContentFilterOption[];
+	preset?: ContentFilterPreset;
+}
 
 const COURSE_KEYWORDS = ["course", "courses"];
 const PROJECT_KEYWORDS = ["project", "projects"];
@@ -35,30 +42,35 @@ export function isBookTask(task: Task): boolean {
 
 export function applyContentFilter(
 	tasks: Task[],
-	filter: ContentFilterOption,
+	filter: ContentFilterState,
 ): Task[] {
-	switch (filter) {
-		case "default":
-			return tasks;
-
-		case "courses":
-			return tasks.filter(isCourseTask);
-
-		case "projects":
-			return tasks.filter(isProjectTask);
-
-		case "books":
-			return tasks.filter(isBookTask);
-
-		case "both":
-			return tasks.filter((t) => isCourseTask(t) || isProjectTask(t));
-
-		case "hide-both":
-			return tasks.filter(
-				(t) => !isCourseTask(t) && !isProjectTask(t) && !isBookTask(t),
-			);
-
-		default:
-			return tasks;
+	// Handle presets
+	if (filter.preset === "exclude-all") {
+		return tasks.filter(
+			(t) => !isCourseTask(t) && !isProjectTask(t) && !isBookTask(t),
+		);
 	}
+
+	if (filter.preset === "show-all") {
+		return tasks;
+	}
+
+	// If no options selected and no preset, show all
+	if (filter.options.length === 0) {
+		return tasks;
+	}
+
+	// Filter by selected options (OR logic - show tasks matching ANY selected option)
+	return tasks.filter((task) => {
+		const isCourse = isCourseTask(task);
+		const isProject = isProjectTask(task);
+		const isBook = isBookTask(task);
+
+		// Check if task matches any of the selected filters
+		if (filter.options.includes("courses") && isCourse) return true;
+		if (filter.options.includes("projects") && isProject) return true;
+		if (filter.options.includes("books") && isBook) return true;
+
+		return false;
+	});
 }

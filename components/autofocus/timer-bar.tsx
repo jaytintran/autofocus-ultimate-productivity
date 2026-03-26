@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Task, AppState } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
+import { formatTimeCompact } from "@/lib/utils/time-utils";
 
 interface TimerBarProps {
 	appState: AppState;
@@ -39,22 +40,6 @@ function formatTimerDisplay(ms: number): string {
 	const seconds = totalSeconds % 60;
 
 	return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-}
-
-// Format for task row display: 32m 10s or 1h 14m
-export function formatTimeCompact(ms: number): string {
-	if (ms === 0) return "";
-
-	const totalSeconds = Math.floor(ms / 1000);
-	const hours = Math.floor(totalSeconds / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
-
-	if (hours > 0) {
-		return `${hours}h ${minutes}m`;
-	}
-
-	return `${minutes}m ${seconds}s`;
 }
 
 export function TimerBar({

@@ -12,7 +12,7 @@ import {
 	MessageSquareMore,
 } from "lucide-react";
 import { revertTask, updateTask } from "@/lib/store";
-import { formatTimeCompact } from "./timer-bar";
+import { formatTimeCompact } from "@/lib/utils/time-utils";
 import { TagFilter } from "./tag-filter";
 import { TagPill } from "./tag-pill";
 import type { Task } from "@/lib/types";

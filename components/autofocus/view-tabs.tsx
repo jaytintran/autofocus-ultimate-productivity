@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { TagId } from "@/lib/tags";
+import type { ContentFilterState } from "@/lib/content-filter";
 import { TagFilter } from "./tag-filter";
 import { BacklogDump } from "./backlog-dump";
+import { ContentFilterBar } from "./content-filter-bar";
 import {
 	Popover,
 	PopoverContent,
@@ -130,6 +132,8 @@ interface ViewTabsProps {
 	onCompletedSortChange: (sort: CompletedSortKey) => void;
 	completedViewType: CompletedViewType;
 	onCompletedViewTypeChange: (view: CompletedViewType) => void;
+	contentFilter: ContentFilterState;
+	onChangeContentFilter: (filter: ContentFilterState) => void;
 }
 
 export function ViewTabsOld({
@@ -196,6 +200,8 @@ export function ViewTabs({
 	onCompletedSortChange,
 	completedViewType,
 	onCompletedViewTypeChange,
+	contentFilter,
+	onChangeContentFilter,
 }: ViewTabsProps) {
 	return (
 		<div className="flex flex-row justify-between sm:flex-row sm:items-center sm:justify-between px-4 py-3">
@@ -238,6 +244,11 @@ export function ViewTabs({
 						/>
 					</>
 				)}
+
+				<ContentFilterBar
+					value={contentFilter}
+					onChange={onChangeContentFilter}
+				/>
 				<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
 			</div>
 		</div>

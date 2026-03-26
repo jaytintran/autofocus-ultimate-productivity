@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { GripVertical, Play, Check, RefreshCw, Trash2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { updateTask } from "@/lib/store";
-import { formatTimeCompact } from "./timer-bar";
+import { formatTimeCompact, getTaskAge } from "@/lib/utils/time-utils";
 import {
 	Dialog,
 	DialogContent,
@@ -510,23 +510,6 @@ function useSwipeReveal(isFirst: boolean, isLast: boolean) {
 		close,
 		registerSlidingElement, // ← NEW: important!
 	};
-}
-
-function getTaskAge(addedAt: string): string {
-	const now = new Date();
-	const added = new Date(addedAt);
-	const diffMs = now.getTime() - added.getTime();
-	const diffMins = Math.floor(diffMs / (1000 * 60));
-	const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-	const diffWeeks = Math.floor(diffDays / 7);
-	const diffMonths = Math.floor(diffDays / 30);
-
-	if (diffMins < 60) return `${diffMins}m`;
-	if (diffHours < 24) return `${diffHours}h`;
-	if (diffDays < 7) return `${diffDays}d`;
-	if (diffWeeks < 5) return `${diffWeeks}w`;
-	return `${diffMonths}mo`;
 }
 
 function playCompletionSound() {

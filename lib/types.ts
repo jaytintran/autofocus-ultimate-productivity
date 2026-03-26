@@ -37,3 +37,36 @@ export interface AppState {
 export interface TaskWithTimer extends Task {
 	isWorking: boolean;
 }
+
+// =============================================================================
+// OPTIMISTIC UPDATE TYPES
+// =============================================================================
+
+export interface OptimisticStateSnapshot {
+	activeTasks: Task[];
+	completedTasks: Task[];
+	appState: AppState;
+	totalPages: number;
+}
+
+export interface PagedTaskLike {
+	page_number: number;
+	position: number;
+}
+
+export interface TaskPlacement {
+	pageNumber: number;
+	position: number;
+}
+
+export interface TaskReorderUpdate {
+	id: string;
+	page_number: number;
+	position: number;
+}
+
+export interface AchievementPending {
+	task: Task;
+	sessionMs: number;
+	type: "done" | "complete";
+}

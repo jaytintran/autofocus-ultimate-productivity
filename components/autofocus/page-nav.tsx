@@ -17,6 +17,14 @@ import {
 	Trophy,
 	RefreshCw,
 } from "lucide-react";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+} from "@/components/ui/dialog";
+
 import Link from "next/link";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { TAG_DEFINITIONS } from "@/lib/tags";
@@ -349,84 +357,68 @@ export function PageNav({
 			</div>
 
 			{achievementsOpen && (
-				<>
-					<div
-						className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
-						onClick={() => setAchievementsOpen(false)}
-					/>
-					<div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none">
-						<div
-							className="pointer-events-auto bg-card border border-border rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[70vh]"
-							onClick={(e) => e.stopPropagation()}
-						>
-							{/* Header */}
-							<div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-								<div>
-									<h2 className="text-sm font-semibold text-foreground">
-										Your Achievements 🏆
-									</h2>
-									<p className="text-[11px] text-muted-foreground mt-0.5">
-										Look how much you've done. Be proud.
-									</p>
-								</div>
-								<div className="flex items-center gap-1">
-									<button
-										onClick={onRefreshAchievements}
-										className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-accent"
-										title="Refresh"
-									>
-										<RefreshCw className="w-3.5 h-3.5" />
-									</button>
-									<button
-										onClick={() => setAchievementsOpen(false)}
-										className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-accent"
-									>
-										<X className="w-4 h-4" />
-									</button>
-								</div>
-							</div>
+				<Dialog open={achievementsOpen} onOpenChange={setAchievementsOpen}>
+					<DialogContent className="sm:max-w-[760px] h-[75vh] flex flex-col overflow-hidden">
+						<DialogHeader className="flex-shrink-0 border-b pb-4">
+							<DialogTitle>Your Achievements 🏆</DialogTitle>
+							<DialogDescription>
+								Look how much you've done. Be proud.
+							</DialogDescription>
+						</DialogHeader>
 
-							{/* List */}
-							<div className="overflow-y-auto flex-1 px-5 py-3 flex flex-col gap-3">
-								{completedTasksWithNotes.length === 0 ? (
-									<p className="text-sm text-muted-foreground text-center py-8">
-										No achievements yet. Complete a task and add a note!
-									</p>
-								) : (
-									completedTasksWithNotes.map((task, i) => {
-										const date = new Date(task.completed_at);
-										return (
-											<div
-												key={i}
-												className="flex flex-col gap-0.5 py-2 border-b border-border/50 last:border-0"
-											>
-												<p className="text-sm font-medium text-foreground leading-snug">
-													{task.note}
-												</p>
-												<p className="text-[11px] text-muted-foreground">
-													{task.text}
-												</p>
-												<p className="text-[11px] text-muted-foreground/60 mt-0.5">
-													{date.toLocaleDateString(undefined, {
-														weekday: "short",
-														year: "numeric",
-														month: "short",
-														day: "numeric",
-													})}
-													{" · "}
-													{date.toLocaleTimeString(undefined, {
-														hour: "2-digit",
-														minute: "2-digit",
-													})}
-												</p>
-											</div>
-										);
-									})
-								)}
-							</div>
+						{/* Refresh button — top right area, before DialogContent closes */}
+						<div className="absolute top-4 right-10">
+							<button
+								onClick={onRefreshAchievements}
+								className="absolute text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-accent top-[-2px] right-[1px]"
+								title="Refresh"
+							>
+								<RefreshCw className="w-3 h-3" />
+							</button>
 						</div>
-					</div>
-				</>
+
+						<div
+							className="flex-1 min-h-0 overflow-y-auto mt-4 pr-1 flex flex-col gap-3"
+							style={{ scrollbarWidth: "thin" }}
+						>
+							{completedTasksWithNotes.length === 0 ? (
+								<p className="text-sm text-muted-foreground text-center py-8">
+									No achievements yet. Complete a task and add a note!
+								</p>
+							) : (
+								completedTasksWithNotes.map((task, i) => {
+									const date = new Date(task.completed_at);
+									return (
+										<div
+											key={i}
+											className="flex flex-col gap-0.5 py-2 border-b border-border/50 last:border-0"
+										>
+											<p className="text-sm font-medium text-foreground leading-snug">
+												{task.note}
+											</p>
+											<p className="text-[11px] text-muted-foreground">
+												{task.text}
+											</p>
+											<p className="text-[11px] text-muted-foreground/60 mt-0.5">
+												{date.toLocaleDateString(undefined, {
+													weekday: "short",
+													year: "numeric",
+													month: "short",
+													day: "numeric",
+												})}
+												{" · "}
+												{date.toLocaleTimeString(undefined, {
+													hour: "2-digit",
+													minute: "2-digit",
+												})}
+											</p>
+										</div>
+									);
+								})
+							)}{" "}
+						</div>
+					</DialogContent>
+				</Dialog>
 			)}
 		</div>
 	);

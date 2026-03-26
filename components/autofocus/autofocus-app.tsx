@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+// =============================================================================
+// IMPORTS
+// =============================================================================
 
+// React & Core
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+// Third-party
+import { AnimatePresence, motion } from "framer-motion";
 import useSWR from "swr";
+
+// Components
 import { Header } from "./header";
 import { TimerBar } from "./timer-bar";
 import { ViewTabs } from "./view-tabs";
@@ -11,6 +19,8 @@ import { PageNav } from "./page-nav";
 import { TaskList } from "./task-list";
 import { CompletedList } from "./completed-list";
 import { TaskInput } from "./task-input";
+
+// Store & Types
 import {
 	addMultipleTasks,
 	addTask,
@@ -32,131 +42,66 @@ import {
 	stopWorkingOnTask,
 	updateTask,
 	updateTaskTag,
+	revertTask,
 } from "@/lib/store";
-import type { Task, AppState, TaskStatus } from "@/lib/types";
+
+import type {
+	Task,
+	AppState,
+	TaskStatus,
+	OptimisticStateSnapshot,
+	PagedTaskLike,
+	TaskPlacement,
+	TaskReorderUpdate,
+	AchievementPending,
+} from "@/lib/types";
 import { type CompletedSortKey, type CompletedViewType } from "./view-tabs";
 import { TAG_DEFINITIONS, TagId } from "@/lib/tags";
-import { revertTask } from "@/lib/store";
-
-import { ContentFilterBar } from "./content-filter-bar";
 import {
 	applyContentFilter,
-	type ContentFilterOption,
+	type ContentFilterState,
 } from "@/lib/content-filter";
+
+// Utilities & Hooks
+import {
+	calculateNextTaskPlacement,
+	calculateShiftedPositions,
+	calculateReindexedPositions,
+	getVisibleTotalPages,
+	getApproximateTaskCapacity,
+} from "@/lib/utils/task-utils";
+import {
+	getCurrentSessionMs,
+	formatTimerDisplay,
+	formatTimeCompact,
+	getTaskAge,
+} from "@/lib/utils/time-utils";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useAchievementTimer } from "@/hooks/use-achievement-timer";
+import {
+	useAchievementPlaceholder,
+	ACHIEVEMENT_PLACEHOLDERS,
+} from "@/hooks/use-achievement-placeholder";
+
+// =============================================================================
+// TYPES & INTERFACES
+// =============================================================================
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
 
 const DEFAULT_TASK_CAPACITY = 12;
 
-const ACHIEVEMENT_PLACEHOLDERS = [
-	"What went better than expected?",
-	"Any unexpected wins?",
-	"Anything worth noting?",
-	"A small win? Write it down.",
-	"Did anything surprise you?",
-	"The smallest step you achieved?",
-];
-
-interface OptimisticStateSnapshot {
-	activeTasks: Task[];
-	completedTasks: Task[];
-	appState: AppState;
-	totalPages: number;
-}
-
-interface PagedTaskLike {
-	page_number: number;
-	position: number;
-}
-
-interface TaskPlacement {
-	pageNumber: number;
-	position: number;
-}
-
-interface TaskReorderUpdate {
-	id: string;
-	page_number: number;
-	position: number;
-}
-
-function createOptimisticTask(
-	text: string,
-	placement: TaskPlacement,
-	now: string,
-): Task {
-	return {
-		id: crypto.randomUUID(),
-		text,
-		status: "active" as TaskStatus,
-		page_number: placement.pageNumber,
-		position: placement.position,
-		added_at: now,
-		completed_at: null,
-		total_time_ms: 0,
-		re_entered_from: null,
-		tag: null,
-		created_at: now,
-		updated_at: now,
-	};
-}
-
-function getVisibleTotalPages(tasks: Task[]): number {
-	return tasks.length > 0
-		? Math.max(...tasks.map((task) => task.page_number))
-		: 1;
-}
-
-function getApproximateTaskCapacity(): number {
-	return 12;
-}
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 function getNextTaskPlacement(
 	tasks: PagedTaskLike[],
 	pageCapacity: number,
 ): TaskPlacement {
-	const lastPageNumber =
-		tasks.length > 0 ? Math.max(...tasks.map((task) => task.page_number)) : 1;
-	const lastPageTasks = tasks.filter(
-		(task) => task.page_number === lastPageNumber,
-	);
-	const normalizedCapacity = Math.max(1, pageCapacity);
-
-	if (lastPageTasks.length >= normalizedCapacity) {
-		return {
-			pageNumber: lastPageNumber + 1,
-			position: 0,
-		};
-	}
-
-	return {
-		pageNumber: lastPageNumber,
-		position:
-			lastPageTasks.length > 0
-				? Math.max(...lastPageTasks.map((task) => task.position)) + 1
-				: 0,
-	};
-}
-
-function appendProjectedTask(
-	tasks: PagedTaskLike[],
-	pageCapacity: number,
-): TaskPlacement {
-	const placement = getNextTaskPlacement(tasks, pageCapacity);
-	tasks.push({
-		page_number: placement.pageNumber,
-		position: placement.position,
-	});
-	return placement;
-}
-
-function getCurrentSessionMs(appState: AppState, nowMs: number): number {
-	const baseSessionMs = appState.current_session_ms || 0;
-
-	if (appState.timer_state !== "running" || !appState.session_start_time) {
-		return baseSessionMs;
-	}
-
-	const sessionStartMs = new Date(appState.session_start_time).getTime();
-	return baseSessionMs + Math.max(nowMs - sessionStartMs, 0);
+	return calculateNextTaskPlacement(tasks, pageCapacity);
 }
 
 function buildReorderedActiveTasks(
@@ -205,63 +150,71 @@ function buildReorderedActiveTasks(
 	};
 }
 
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
 export function AutofocusApp() {
+	// -------------------------------------------------------------------------
+	// State - View & Filter
+	// -------------------------------------------------------------------------
 	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
 	const [selectedTags, setSelectedTags] = useState<Set<TagId | "none">>(
 		new Set(),
 	);
+	const [contentFilter, setContentFilter] = useState<ContentFilterState>({
+		options: [],
+		preset: "show-all",
+	});
+	const [searchQuery, setSearchQuery] = useState("");
+	const debouncedSearchQuery = useDebouncedValue(searchQuery, 2500);
+
+	// -------------------------------------------------------------------------
+	// State - Pagination
+	// -------------------------------------------------------------------------
 	const [currentPage, setCurrentPage] = useState(1);
 	const [filteredCurrentPage, setFilteredCurrentPage] = useState(1);
-	const [optimisticState, setOptimisticState] =
-		useState<OptimisticStateSnapshot | null>(null);
-	const [visibleTaskCapacity, setVisibleTaskCapacity] = useState(12);
-	const [prefetchedTasks, setPrefetchedTasks] = useState<Map<number, Task[]>>(
-		new Map(),
-	);
-	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
+
+	// -------------------------------------------------------------------------
+	// State - Completed Tasks
+	// -------------------------------------------------------------------------
+	const [completedPage, setCompletedPage] = useState(1);
+	const [allCompletedTasks, setAllCompletedTasks] = useState<Task[]>([]);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
+	const [hasMoreCompleted, setHasMoreCompleted] = useState(true);
 	const [completedSort, setCompletedSort] =
 		useState<CompletedSortKey>("default");
 	const [completedViewType, setCompletedViewType] =
 		useState<CompletedViewType>("default");
 
-	const [contentFilter, setContentFilter] =
-		useState<ContentFilterOption>("default");
+	// -------------------------------------------------------------------------
+	// State - UI & Optimistic Updates
+	// -------------------------------------------------------------------------
+	const [optimisticState, setOptimisticState] =
+		useState<OptimisticStateSnapshot | null>(null);
+	const [visibleTaskCapacity, setVisibleTaskCapacity] = useState(
+		DEFAULT_TASK_CAPACITY,
+	);
+	const [prefetchedTasks, setPrefetchedTasks] = useState<Map<number, Task[]>>(
+		new Map(),
+	);
+	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
 
-	// Achievement toast state
-	const [achievementPending, setAchievementPending] = useState<{
-		task: Task;
-		sessionMs: number;
-		type: "done" | "complete";
-	} | null>(null);
+	// -------------------------------------------------------------------------
+	// State - Achievement Toast
+	// -------------------------------------------------------------------------
+	const [achievementPending, setAchievementPending] =
+		useState<AchievementPending | null>(null);
 	const [achievementNote, setAchievementNote] = useState("");
+	const placeholderIndex = useAchievementPlaceholder(achievementPending);
 
-	// Search query with debounce
-	const [searchQuery, setSearchQuery] = useState("");
-	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-
-	useEffect(() => {
-		const timer = setTimeout(() => {
-			setDebouncedSearchQuery(searchQuery);
-		}, 2500);
-		return () => clearTimeout(timer);
-	}, [searchQuery]);
-
-	// Fetch active tasks
+	// -------------------------------------------------------------------------
+	// Data Fetching
+	// -------------------------------------------------------------------------
 	const { data: activeTasks = [], mutate: mutateActive } = useSWR<Task[]>(
 		"active-tasks",
 		getActiveTasks,
 		{ refreshInterval: 0 },
-	);
-
-	// Fetch completed tasks
-	const [completedPage, setCompletedPage] = useState(1);
-	const [allCompletedTasks, setAllCompletedTasks] = useState<Task[]>([]);
-	const [isLoadingMore, setIsLoadingMore] = useState(false);
-	const [hasMoreCompleted, setHasMoreCompleted] = useState(true);
-
-	const [placeholderIndex, setPlaceholderIndex] = useState(0);
-	const placeholderIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-		null,
 	);
 
 	const { data: initialCompletedTasks = [], mutate: mutateCompleted } = useSWR<
@@ -275,93 +228,47 @@ export function AutofocusApp() {
 		},
 	});
 
-	// Fetch app state
 	const { data: appState, mutate: mutateAppState } = useSWR<AppState>(
 		"app-state",
 		getAppState,
-		{ refreshInterval: 1000 }, // Poll for timer updates
+		{ refreshInterval: 1000 },
 	);
 
-	// Calculate total pages
 	const { data: totalPages = 1, mutate: mutateTotalPages } = useSWR<number>(
 		"total-pages",
 		getTotalPageCount,
 		{ refreshInterval: 0 },
 	);
 
-	// Initialize filter from default preference
-	useEffect(() => {
-		if (appState && !hasInitializedFilter) {
-			if (appState.default_filter === "none") {
-				setSelectedTags(new Set(["none"]));
-			}
-			setHasInitializedFilter(true);
-		}
-	}, [appState, hasInitializedFilter]);
+	const { data: achievementTasks = [], mutate: mutateAchievements } = useSWR<
+		Task[]
+	>("achievement-tasks", getTasksWithNotes, { refreshInterval: 0 });
 
+	// -------------------------------------------------------------------------
+	// Derived State
+	// -------------------------------------------------------------------------
 	const displayedActiveTasks = optimisticState?.activeTasks ?? activeTasks;
 	const displayedCompletedTasks =
 		optimisticState?.completedTasks ?? allCompletedTasks;
 	const displayedAppState = optimisticState?.appState ?? appState;
 	const displayedTotalPages = optimisticState?.totalPages ?? totalPages;
 
-	// Determine if filter is active
 	const isFilterActive = selectedTags.size > 0;
+	const isSearchOrFilterActive =
+		isFilterActive || !!debouncedSearchQuery.trim();
 
-	// Filter active tasks by selected tags
-	const filteredActiveTasks = useMemo(() => {
-		if (!isFilterActive) return displayedActiveTasks;
-
-		return displayedActiveTasks.filter((task) => {
-			if (selectedTags.has("none")) {
-				return task.tag === null;
-			}
-			return task.tag && selectedTags.has(task.tag);
-		});
-	}, [displayedActiveTasks, selectedTags, isFilterActive]);
-
-	// Search filtered tasks
-	const searchFilteredActiveTasks = useMemo(() => {
-		if (!searchQuery.trim()) return filteredActiveTasks;
-		const q = searchQuery.toLowerCase();
-		return filteredActiveTasks.filter((task) =>
-			task.text.toLowerCase().includes(q),
+	const workingTask = useMemo(() => {
+		if (!displayedAppState?.working_on_task_id) return null;
+		return (
+			displayedActiveTasks.find(
+				(t) => t.id === displayedAppState.working_on_task_id,
+			) || null
 		);
-	}, [filteredActiveTasks, debouncedSearchQuery]);
+	}, [displayedActiveTasks, displayedAppState?.working_on_task_id]);
 
-	const contentFilteredActiveTasks = useMemo(() => {
-		return applyContentFilter(searchFilteredActiveTasks, contentFilter);
-	}, [searchFilteredActiveTasks, contentFilter]);
-
-	// Calculate filtered total pages
-	const filteredTotalPagesOld = useMemo(() => {
-		if (!isFilterActive && !searchQuery.trim()) return displayedTotalPages;
-		return Math.max(
-			1,
-			Math.ceil(searchFilteredActiveTasks.length / DEFAULT_TASK_CAPACITY),
-		);
-	}, [
-		isFilterActive,
-		debouncedSearchQuery,
-		searchFilteredActiveTasks.length,
-		displayedTotalPages,
-	]);
-
-	const filteredTotalPages = useMemo(() => {
-		const baseTasks =
-			isFilterActive || debouncedSearchQuery.trim()
-				? contentFilteredActiveTasks
-				: displayedActiveTasks;
-
-		return Math.max(1, Math.ceil(baseTasks.length / DEFAULT_TASK_CAPACITY));
-	}, [
-		isFilterActive,
-		debouncedSearchQuery,
-		contentFilteredActiveTasks,
-		displayedActiveTasks,
-	]);
-
-	// FINAL FILTERED TASKS
+	// -------------------------------------------------------------------------
+	// Filtered Tasks Computation
+	// -------------------------------------------------------------------------
 	const finalFilteredTasks = useMemo(() => {
 		let tasks = displayedActiveTasks;
 
@@ -379,27 +286,18 @@ export function AutofocusApp() {
 			tasks = tasks.filter((task) => task.text.toLowerCase().includes(q));
 		}
 
-		// 3. Content filter (FINAL PASS)
+		// 3. Content filter
 		tasks = applyContentFilter(tasks, contentFilter);
 
 		return tasks;
 	}, [displayedActiveTasks, selectedTags, debouncedSearchQuery, contentFilter]);
 
-	// Use filtered page and total when filter is active
-	const isSearchOrFilterActive =
-		isFilterActive || !!debouncedSearchQuery.trim();
-
-	const effectiveCurrentPageOld = isSearchOrFilterActive
-		? filteredCurrentPage
-		: currentPage;
-	const effectiveTotalPagesOld = isSearchOrFilterActive
-		? filteredTotalPages
-		: displayedTotalPages;
-
-	const effectiveTotalPages = Math.max(
-		1,
-		Math.ceil(finalFilteredTasks.length / DEFAULT_TASK_CAPACITY),
+	const effectiveTotalPages = useMemo(
+		() =>
+			Math.max(1, Math.ceil(finalFilteredTasks.length / DEFAULT_TASK_CAPACITY)),
+		[finalFilteredTasks.length],
 	);
+
 	const effectiveCurrentPage = currentPage;
 
 	const tasksForCurrentPage = useMemo(() => {
@@ -408,7 +306,46 @@ export function AutofocusApp() {
 		return finalFilteredTasks.slice(start, end);
 	}, [finalFilteredTasks, effectiveCurrentPage]);
 
-	// Pre-fetch adjacent pages (current + next 2 pages)
+	const taskTagCounts = useMemo(() => {
+		const counts: Record<string, number> = { none: 0 };
+		for (const tag of TAG_DEFINITIONS) {
+			counts[tag.id] = 0;
+		}
+		for (const task of displayedActiveTasks) {
+			if (task.tag) {
+				counts[task.tag] = (counts[task.tag] ?? 0) + 1;
+			} else {
+				counts.none += 1;
+			}
+		}
+		return counts;
+	}, [displayedActiveTasks]);
+
+	const completedTasksWithNotes = useMemo(
+		() =>
+			(achievementTasks ?? []).map((t) => ({
+				text: t.text,
+				note: t.note!,
+				completed_at: t.completed_at!,
+			})),
+		[achievementTasks],
+	);
+
+	// -------------------------------------------------------------------------
+	// Effects
+	// -------------------------------------------------------------------------
+
+	// Initialize filter from default preference
+	useEffect(() => {
+		if (appState && !hasInitializedFilter) {
+			if (appState.default_filter === "none") {
+				setSelectedTags(new Set(["none"]));
+			}
+			setHasInitializedFilter(true);
+		}
+	}, [appState, hasInitializedFilter]);
+
+	// Pre-fetch adjacent pages
 	useEffect(() => {
 		const prefetchPages = async () => {
 			const pagesToPrefetch = [
@@ -436,144 +373,50 @@ export function AutofocusApp() {
 		prefetchPages();
 	}, [currentPage, displayedTotalPages]);
 
-	// Get tasks for current page with prefetch fallback
-	const tasksForCurrentPageOld = useMemo(() => {
-		const pageNum = effectiveCurrentPage;
-
-		if (optimisticState && !isSearchOrFilterActive) {
-			return optimisticState.activeTasks
-				.filter((task) => task.page_number === pageNum)
-				.sort((a, b) => a.position - b.position);
+	// Auto-navigate to working task's page
+	const prevWorkingTaskIdRef = useRef<string | null>(null);
+	useEffect(() => {
+		const currentWorkingId = displayedAppState?.working_on_task_id ?? null;
+		if (
+			currentWorkingId &&
+			currentWorkingId !== prevWorkingTaskIdRef.current &&
+			workingTask
+		) {
+			setCurrentPage(workingTask.page_number);
 		}
+		prevWorkingTaskIdRef.current = currentWorkingId;
+	}, [displayedAppState?.working_on_task_id, workingTask]);
 
-		if (isSearchOrFilterActive) {
-			const startIndex = (pageNum - 1) * DEFAULT_TASK_CAPACITY;
-			const endIndex = startIndex + DEFAULT_TASK_CAPACITY;
-			return searchFilteredActiveTasks.slice(startIndex, endIndex);
+	// Ensure current page is valid
+	useEffect(() => {
+		if (currentPage > displayedTotalPages && displayedTotalPages > 0) {
+			setCurrentPage(displayedTotalPages);
 		}
+	}, [currentPage, displayedTotalPages]);
 
-		const currentPageTasks = displayedActiveTasks
-			.filter((task) => task.page_number === pageNum)
-			.sort((a, b) => a.position - b.position);
+	// Reset pages when filters change
+	useEffect(() => {
+		setFilteredCurrentPage(1);
+	}, [selectedTags, searchQuery, contentFilter]);
 
-		if (optimisticState) return currentPageTasks;
-		if (activeTasks.length > 0) return currentPageTasks;
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [selectedTags, debouncedSearchQuery, contentFilter]);
 
-		const prefetched = prefetchedTasks.get(pageNum);
-		if (prefetched && prefetched.length > 0) {
-			return [...prefetched].sort((a, b) => a.position - b.position);
+	// Ensure filtered current page is valid
+	useEffect(() => {
+		if (
+			isFilterActive &&
+			filteredCurrentPage > effectiveTotalPages &&
+			effectiveTotalPages > 0
+		) {
+			setFilteredCurrentPage(effectiveTotalPages);
 		}
+	}, [isFilterActive, filteredCurrentPage, effectiveTotalPages]);
 
-		return currentPageTasks;
-	}, [
-		activeTasks.length,
-		effectiveCurrentPage,
-		displayedActiveTasks,
-		searchFilteredActiveTasks,
-		isSearchOrFilterActive,
-		optimisticState,
-		prefetchedTasks,
-	]);
-
-	const tasksForCurrentPageOldV2 = useMemo(() => {
-		const pageNum = effectiveCurrentPage;
-
-		let pageTasks: Task[];
-
-		if (optimisticState && !isSearchOrFilterActive) {
-			pageTasks = optimisticState.activeTasks
-				.filter((task) => task.page_number === pageNum)
-				.sort((a, b) => a.position - b.position);
-		} else if (isSearchOrFilterActive) {
-			const startIndex = (pageNum - 1) * DEFAULT_TASK_CAPACITY;
-			const endIndex = startIndex + DEFAULT_TASK_CAPACITY;
-			pageTasks = searchFilteredActiveTasks.slice(startIndex, endIndex);
-		} else {
-			const currentPageTasks = displayedActiveTasks
-				.filter((task) => task.page_number === pageNum)
-				.sort((a, b) => a.position - b.position);
-
-			if (optimisticState) {
-				pageTasks = currentPageTasks;
-			} else if (activeTasks.length > 0) {
-				pageTasks = currentPageTasks;
-			} else {
-				const prefetched = prefetchedTasks.get(pageNum);
-				pageTasks =
-					prefetched && prefetched.length > 0
-						? [...prefetched].sort((a, b) => a.position - b.position)
-						: currentPageTasks;
-			}
-		}
-
-		// ← NEW: apply keyword-based content filter as a final pass
-		return applyContentFilter(pageTasks, contentFilter);
-	}, [
-		activeTasks.length,
-		effectiveCurrentPage,
-		displayedActiveTasks,
-		searchFilteredActiveTasks,
-		isSearchOrFilterActive,
-		optimisticState,
-		prefetchedTasks,
-		contentFilter, // ← NEW dependency
-	]);
-
-	const tasksForCurrentPageOldV3 = useMemo(() => {
-		const pageNum = effectiveCurrentPage;
-		const isAnyFilterActive =
-			isSearchOrFilterActive || contentFilter !== "default";
-
-		let sourceTasks: Task[];
-
-		if (isAnyFilterActive) {
-			// When content filter OR tag filter OR search is active → use the virtual flat list
-			sourceTasks = contentFilteredActiveTasks;
-		} else {
-			// Normal paged mode (no filters)
-			if (optimisticState) {
-				sourceTasks = optimisticState.activeTasks
-					.filter((task) => task.page_number === pageNum)
-					.sort((a, b) => a.position - b.position);
-			} else {
-				const currentPageTasks = displayedActiveTasks
-					.filter((task) => task.page_number === pageNum)
-					.sort((a, b) => a.position - b.position);
-
-				const prefetched = prefetchedTasks.get(pageNum);
-				sourceTasks =
-					prefetched && prefetched.length > 0
-						? [...prefetched].sort((a, b) => a.position - b.position)
-						: currentPageTasks;
-			}
-		}
-
-		// Slice for current page (only when filtering)
-		if (isAnyFilterActive) {
-			const startIndex = (pageNum - 1) * DEFAULT_TASK_CAPACITY;
-			const endIndex = startIndex + DEFAULT_TASK_CAPACITY;
-			return sourceTasks.slice(startIndex, endIndex);
-		}
-
-		return sourceTasks;
-	}, [
-		effectiveCurrentPage,
-		contentFilteredActiveTasks,
-		isSearchOrFilterActive,
-		contentFilter,
-		optimisticState,
-		displayedActiveTasks,
-		prefetchedTasks,
-	]);
-
-	// Get the working task
-	const workingTask = displayedAppState?.working_on_task_id
-		? displayedActiveTasks.find(
-				(t) => t.id === displayedAppState.working_on_task_id,
-			) || null
-		: null;
-
-	// Refresh all data
+	// -------------------------------------------------------------------------
+	// Callbacks - Data Refresh
+	// -------------------------------------------------------------------------
 	const refreshAll = useCallback(async () => {
 		setCompletedPage(1);
 		setHasMoreCompleted(true);
@@ -603,12 +446,9 @@ export function AutofocusApp() {
 		[refreshAll],
 	);
 
-	const handleVisibleTaskCapacityChange = useCallback((capacity: number) => {
-		setVisibleTaskCapacity((currentCapacity) =>
-			currentCapacity === capacity ? currentCapacity : capacity,
-		);
-	}, []);
-
+	// -------------------------------------------------------------------------
+	// Callbacks - Task Operations
+	// -------------------------------------------------------------------------
 	const handleAddTask = useCallback(
 		async (text: string, tag?: TagId | null) => {
 			const trimmedText = text.trim();
@@ -630,7 +470,6 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 			};
 
-			// Shift all existing tasks down by 1 position
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
 				...task,
 				page_number: Math.floor((index + 1) / DEFAULT_TASK_CAPACITY) + 1,
@@ -642,8 +481,6 @@ export function AutofocusApp() {
 
 			setPrefetchedTasks(new Map());
 			setCurrentPage(1);
-
-			// Set optimistic state immediately
 			setOptimisticState({
 				activeTasks: optimisticActiveTasks,
 				completedTasks: displayedCompletedTasks,
@@ -686,7 +523,6 @@ export function AutofocusApp() {
 
 			const now = new Date().toISOString();
 
-			// Create new tasks at the top (positions 0, 1, 2, ...)
 			const newTasks = trimmedTaskTexts.map((taskText, index) => ({
 				id: crypto.randomUUID(),
 				text: taskText,
@@ -702,7 +538,6 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 			}));
 
-			// Shift all existing tasks down
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
 				const newIndex = index + trimmedTaskTexts.length;
 				return {
@@ -724,8 +559,6 @@ export function AutofocusApp() {
 
 			setPrefetchedTasks(new Map());
 			setCurrentPage(1);
-
-			// Set optimistic state immediately
 			setOptimisticState({
 				activeTasks: optimisticActiveTasks,
 				completedTasks: displayedCompletedTasks,
@@ -733,12 +566,10 @@ export function AutofocusApp() {
 				totalPages: getVisibleTotalPages(optimisticActiveTasks),
 			});
 
-			// Fire and forget - don't await
 			addMultipleTasks(tasksToAdd)
 				.then(async () => {
 					await mutateActive();
 					await mutateTotalPages();
-					// Clear optimistic state AFTER mutations complete
 					setOptimisticState(null);
 				})
 				.catch(async (error) => {
@@ -757,6 +588,9 @@ export function AutofocusApp() {
 		],
 	);
 
+	// -------------------------------------------------------------------------
+	// Callbacks - Task Actions
+	// -------------------------------------------------------------------------
 	const handleStartTask = useCallback(
 		async (task: Task) => {
 			if (!displayedAppState) return;
@@ -840,7 +674,6 @@ export function AutofocusApp() {
 				(a, b) => a.page_number - b.page_number || a.position - b.position,
 			);
 
-			// Move target to front, keep rest in order
 			const reordered = [
 				sorted.find((t) => t.id === taskId)!,
 				...sorted.filter((t) => t.id !== taskId),
@@ -864,7 +697,6 @@ export function AutofocusApp() {
 			});
 
 			setPrefetchedTasks(new Map());
-			// setCurrentPage(1);
 
 			await runOptimisticUpdate(
 				{
@@ -891,12 +723,10 @@ export function AutofocusApp() {
 			if (!displayedAppState) return;
 
 			const now = new Date().toISOString();
-
 			const sorted = [...displayedActiveTasks].sort(
 				(a, b) => a.page_number - b.page_number || a.position - b.position,
 			);
 
-			// Move target to end, keep rest in order
 			const reordered = [
 				...sorted.filter((t) => t.id !== taskId),
 				sorted.find((t) => t.id === taskId)!,
@@ -909,7 +739,6 @@ export function AutofocusApp() {
 			}));
 
 			const updatedMap = new Map(updates.map((u) => [u.id, u]));
-
 			const optimisticActiveTasks: Task[] = reordered.map((task) => {
 				const u = updatedMap.get(task.id)!;
 				return {
@@ -922,9 +751,6 @@ export function AutofocusApp() {
 
 			setPrefetchedTasks(new Map());
 
-			// ⚠️ Key difference: go to LAST page, not first
-			// const lastPage = getVisibleTotalPages(optimisticActiveTasks);
-
 			await runOptimisticUpdate(
 				{
 					activeTasks: optimisticActiveTasks,
@@ -933,7 +759,6 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					// setCurrentPage(lastPage);
 					await reorderTasks(updates);
 				},
 			);
@@ -992,7 +817,6 @@ export function AutofocusApp() {
 			const optimisticCompletedTasks = displayedCompletedTasks.filter(
 				(task) => task.id !== taskId,
 			);
-
 			const deletingWorkingTask =
 				displayedAppState.working_on_task_id === taskId;
 			const now = new Date().toISOString();
@@ -1041,31 +865,7 @@ export function AutofocusApp() {
 			const remainingActiveTasks = displayedActiveTasks.filter(
 				(activeTask) => activeTask.id !== task.id,
 			);
-			const placement = getNextTaskPlacement(
-				remainingActiveTasks,
-				DEFAULT_TASK_CAPACITY,
-			);
 
-			const reenteredTask: Task = {
-				...task,
-				id: crypto.randomUUID(),
-				page_number: placement.pageNumber,
-				position: placement.position,
-				status: "active" as TaskStatus,
-				re_entered_from: task.id,
-				added_at: now,
-				completed_at: null,
-				updated_at: now,
-			};
-
-			const completedTask: Task = {
-				...task,
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			};
-
-			// Re-index remaining tasks to close the gap, then append re-entered task at end
 			const reindexedRemaining = remainingActiveTasks
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
@@ -1080,16 +880,28 @@ export function AutofocusApp() {
 						}) as Task,
 				);
 
-			// Recompute placement based on re-indexed remaining tasks
 			const reindexedPlacement = getNextTaskPlacement(
 				reindexedRemaining,
 				DEFAULT_TASK_CAPACITY,
 			);
 
 			const reenteredTaskFinal: Task = {
-				...reenteredTask,
+				...task,
+				id: crypto.randomUUID(),
 				page_number: reindexedPlacement.pageNumber,
 				position: reindexedPlacement.position,
+				status: "active" as TaskStatus,
+				re_entered_from: task.id,
+				added_at: now,
+				completed_at: null,
+				updated_at: now,
+			};
+
+			const completedTask: Task = {
+				...task,
+				status: "completed",
+				completed_at: now,
+				updated_at: now,
 			};
 
 			const optimisticActiveTasks = [...reindexedRemaining, reenteredTaskFinal];
@@ -1130,13 +942,11 @@ export function AutofocusApp() {
 
 			const now = new Date().toISOString();
 
-			// Optimistically move task back to active
 			const revertedTask: Task = {
 				...task,
 				status: "active" as TaskStatus,
 				completed_at: null,
 				updated_at: now,
-				// Place at end of active list
 				page_number:
 					Math.floor(displayedActiveTasks.length / DEFAULT_TASK_CAPACITY) + 1,
 				position: displayedActiveTasks.length % DEFAULT_TASK_CAPACITY,
@@ -1169,6 +979,9 @@ export function AutofocusApp() {
 		],
 	);
 
+	// -------------------------------------------------------------------------
+	// Callbacks - Timer Operations
+	// -------------------------------------------------------------------------
 	const handleRunTimer = useCallback(async () => {
 		if (!displayedAppState) return;
 
@@ -1272,6 +1085,9 @@ export function AutofocusApp() {
 		],
 	);
 
+	// -------------------------------------------------------------------------
+	// Callbacks - Combined Operations
+	// -------------------------------------------------------------------------
 	const handleAddTaskAndStart = useCallback(
 		async (text: string, tag?: TagId | null): Promise<Task | null> => {
 			const trimmedText = text.trim();
@@ -1306,8 +1122,6 @@ export function AutofocusApp() {
 
 			setPrefetchedTasks(new Map());
 			setCurrentPage(1);
-
-			// Set optimistic state with working task immediately — zero flicker
 			setOptimisticState({
 				activeTasks: optimisticActiveTasks,
 				completedTasks: displayedCompletedTasks,
@@ -1323,7 +1137,6 @@ export function AutofocusApp() {
 			});
 
 			try {
-				// Create task then immediately start it — two calls but UI already shows result
 				const createdTask = await addTask(trimmedText, 1, 0, tag ?? null);
 				await startTask(createdTask.id);
 				await mutateActive();
@@ -1396,7 +1209,6 @@ export function AutofocusApp() {
 					if (shouldPersistSession && sessionMs > 0) {
 						await stopTimer(task.id, sessionMs);
 					}
-
 					await updateTask(task.id, { status: "active" as TaskStatus });
 					await stopWorkingOnTask();
 				},
@@ -1420,7 +1232,6 @@ export function AutofocusApp() {
 				(activeTask) => activeTask.id !== task.id,
 			);
 
-			// Re-index remaining to close the gap first
 			const reindexedRemaining = remainingActiveTasks
 				.sort(
 					(a, b) => a.page_number - b.page_number || a.position - b.position,
@@ -1435,7 +1246,6 @@ export function AutofocusApp() {
 						}) as Task,
 				);
 
-			// Compute placement from re-indexed list
 			const placement = getNextTaskPlacement(
 				reindexedRemaining,
 				DEFAULT_TASK_CAPACITY,
@@ -1517,23 +1327,22 @@ export function AutofocusApp() {
 			);
 			const totalTime = workingTask.total_time_ms + sessionMs;
 
-			if (action === "complete") {
-				// Re-index remaining after removing working task
-				const reindexedRemaining = displayedActiveTasks
-					.filter((t) => t.id !== workingTask.id)
-					.sort(
-						(a, b) => a.page_number - b.page_number || a.position - b.position,
-					)
-					.map(
-						(t, index) =>
-							({
-								...t,
-								page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-								position: index % DEFAULT_TASK_CAPACITY,
-								updated_at: now,
-							}) as Task,
-					);
+			const reindexedRemaining = displayedActiveTasks
+				.filter((t) => t.id !== workingTask.id)
+				.sort(
+					(a, b) => a.page_number - b.page_number || a.position - b.position,
+				)
+				.map(
+					(t, index) =>
+						({
+							...t,
+							page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
+							position: index % DEFAULT_TASK_CAPACITY,
+							updated_at: now,
+						}) as Task,
+				);
 
+			if (action === "complete") {
 				const optimisticActiveTasks = reindexedRemaining.map((t) =>
 					t.id === newTask.id
 						? { ...t, status: "in-progress" as TaskStatus, updated_at: now }
@@ -1570,22 +1379,6 @@ export function AutofocusApp() {
 					},
 				);
 			} else {
-				// Re-enter branch
-				const reindexedRemaining = displayedActiveTasks
-					.filter((t) => t.id !== workingTask.id)
-					.sort(
-						(a, b) => a.page_number - b.page_number || a.position - b.position,
-					)
-					.map(
-						(t, index) =>
-							({
-								...t,
-								page_number: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
-								position: index % DEFAULT_TASK_CAPACITY,
-								updated_at: now,
-							}) as Task,
-					);
-
 				const placement = getNextTaskPlacement(
 					reindexedRemaining,
 					DEFAULT_TASK_CAPACITY,
@@ -1660,7 +1453,9 @@ export function AutofocusApp() {
 		],
 	);
 
-	// Handle load more completed tasks
+	// -------------------------------------------------------------------------
+	// Callbacks - Completed Tasks
+	// -------------------------------------------------------------------------
 	const handleLoadMoreCompleted = useCallback(async () => {
 		if (isLoadingMore || !hasMoreCompleted) return;
 		setIsLoadingMore(true);
@@ -1675,12 +1470,15 @@ export function AutofocusApp() {
 		}
 	}, [isLoadingMore, hasMoreCompleted, completedPage]);
 
-	// Handle commit done task
+	// -------------------------------------------------------------------------
+	// Callbacks - Achievement Toast
+	// -------------------------------------------------------------------------
 	const commitDoneTask = useCallback(
 		async (task: Task, note: string) => {
 			if (!displayedAppState) return;
 			const now = new Date().toISOString();
 			if (note.trim()) await updateTask(task.id, { note: note.trim() });
+
 			const optimisticActiveTasks = displayedActiveTasks
 				.filter((t) => t.id !== task.id)
 				.sort(
@@ -1695,6 +1493,7 @@ export function AutofocusApp() {
 							updated_at: now,
 						}) as Task,
 				);
+
 			const completedTask: Task = {
 				...task,
 				status: "completed",
@@ -1702,7 +1501,9 @@ export function AutofocusApp() {
 				updated_at: now,
 				note: note.trim() || task.note,
 			};
+
 			setPrefetchedTasks(new Map());
+
 			await runOptimisticUpdate(
 				{
 					activeTasks: optimisticActiveTasks,
@@ -1723,7 +1524,6 @@ export function AutofocusApp() {
 		],
 	);
 
-	// Handle commit complete working task
 	const commitCompleteWorkingTask = useCallback(
 		async (task: Task, sessionMs: number, note: string) => {
 			if (!displayedAppState) return;
@@ -1772,11 +1572,9 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					// 👇 ALL async goes here
 					if (note.trim()) {
 						await updateTask(task.id, { note: note.trim() });
 					}
-
 					await completeTask(task.id, totalTime);
 					await stopWorkingOnTask();
 				},
@@ -1790,7 +1588,6 @@ export function AutofocusApp() {
 		],
 	);
 
-	// Handle achievement toast
 	const handleAchievementSubmit = useCallback(async () => {
 		if (!achievementPending) return;
 		const { task, sessionMs, type } = achievementPending;
@@ -1805,7 +1602,23 @@ export function AutofocusApp() {
 		commitCompleteWorkingTask,
 	]);
 
-	// Handle task text update OPTIMISTIC
+	// Achievement timer auto-dismiss
+	const handleAchievementTimeout = useCallback(() => {
+		setAchievementPending((pending) => {
+			if (!pending) return null;
+			const { task, sessionMs, type } = pending;
+			if (type === "done") commitDoneTask(task, "");
+			else commitCompleteWorkingTask(task, sessionMs, "");
+			return null;
+		});
+		setAchievementNote("");
+	}, [commitDoneTask, commitCompleteWorkingTask]);
+
+	useAchievementTimer(achievementPending, handleAchievementTimeout);
+
+	// -------------------------------------------------------------------------
+	// Callbacks - Task Updates
+	// -------------------------------------------------------------------------
 	const handleUpdateTaskText = useCallback(
 		async (taskId: string, text: string, isCompleted: boolean) => {
 			if (!displayedAppState) return;
@@ -1841,16 +1654,14 @@ export function AutofocusApp() {
 		],
 	);
 
-	// Handle update completed task tag
 	const handleUpdateCompletedTaskTag = useCallback(
 		async (taskId: string, tag: TagId | null) => {
 			await updateTaskTag(taskId, tag);
-			await mutateCompleted(); // Refresh completed tasks
+			await mutateCompleted();
 		},
 		[mutateCompleted],
 	);
 
-	// Handle update completed task note
 	const handleUpdateCompletedTaskNote = useCallback(
 		async (taskId: string, note: string | null) => {
 			await updateTask(taskId, { note });
@@ -1859,14 +1670,6 @@ export function AutofocusApp() {
 		[mutateCompleted],
 	);
 
-	// Handle update completed task text/title
-	const handleUpdateCompletedTaskTextOld = useCallback(
-		async (taskId: string, text: string) => {
-			await updateTask(taskId, { text });
-			await mutateCompleted();
-		},
-		[mutateCompleted],
-	);
 	const handleUpdateCompletedTaskText = useCallback(
 		async (taskId: string, text: string) => {
 			await handleUpdateTaskText(taskId, text, true);
@@ -1874,120 +1677,9 @@ export function AutofocusApp() {
 		[handleUpdateTaskText],
 	);
 
-	//  Add a resetAchievementTimer ref and auto-dismiss logic
-	const achievementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-		null,
-	);
-
-	const resetAchievementTimer = useCallback(() => {
-		if (achievementTimerRef.current) clearTimeout(achievementTimerRef.current);
-		achievementTimerRef.current = setTimeout(() => {
-			setAchievementPending((pending) => {
-				if (!pending) return null;
-				// Dismiss without note
-				const { task, sessionMs, type } = pending;
-				if (type === "done") commitDoneTask(task, "");
-				else commitCompleteWorkingTask(task, sessionMs, "");
-				return null;
-			});
-			setAchievementNote("");
-		}, 6000);
-	}, [commitDoneTask, commitCompleteWorkingTask]);
-
-	// Auto-navigate to the working task's page only when it first becomes active
-	const prevWorkingTaskIdRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		const currentWorkingId = displayedAppState?.working_on_task_id ?? null;
-
-		// Only navigate when working task changes to a new task (not on every render)
-		if (
-			currentWorkingId &&
-			currentWorkingId !== prevWorkingTaskIdRef.current &&
-			workingTask
-		) {
-			setCurrentPage(workingTask.page_number);
-		}
-
-		prevWorkingTaskIdRef.current = currentWorkingId;
-	}, [displayedAppState?.working_on_task_id, workingTask]);
-
-	// Ensure current page is valid
-	useEffect(() => {
-		if (currentPage > displayedTotalPages && displayedTotalPages > 0) {
-			setCurrentPage(displayedTotalPages);
-		}
-	}, [currentPage, displayedTotalPages]);
-
-	// Keep a fallback viewport estimate until the task list reports exact capacity.
-	useEffect(() => {
-		const handleResize = () => {
-			setVisibleTaskCapacity(12);
-		};
-
-		handleResize();
-		window.addEventListener("resize", handleResize);
-		return () => window.removeEventListener("resize", handleResize);
-	}, []);
-
-	// Reset filtered page to 1 when filter changes
-	useEffect(() => {
-		setFilteredCurrentPage(1);
-	}, [selectedTags, searchQuery]);
-
-	useEffect(() => {
-		setCurrentPage(1);
-	}, [selectedTags, debouncedSearchQuery, contentFilter]);
-
-	// Reset filtered page when content filter changes
-	useEffect(() => {
-		setFilteredCurrentPage(1);
-	}, [contentFilter]);
-
-	// Ensure filtered current page is valid
-	useEffect(() => {
-		if (
-			isFilterActive &&
-			filteredCurrentPage > filteredTotalPages &&
-			filteredTotalPages > 0
-		) {
-			setFilteredCurrentPage(filteredTotalPages);
-		}
-	}, [isFilterActive, filteredCurrentPage, filteredTotalPages]);
-
-	// Start the timer when achievementPending is set
-	useEffect(() => {
-		if (achievementPending) {
-			resetAchievementTimer();
-		} else {
-			if (achievementTimerRef.current)
-				clearTimeout(achievementTimerRef.current);
-		}
-		return () => {
-			if (achievementTimerRef.current)
-				clearTimeout(achievementTimerRef.current);
-		};
-	}, [achievementPending]); // intentionally omit resetAchievementTimer to avoid restart on re-render
-
-	// Rotate achievement toast placeholder text
-	useEffect(() => {
-		if (achievementPending) {
-			setPlaceholderIndex(() =>
-				Math.floor(Math.random() * ACHIEVEMENT_PLACEHOLDERS.length),
-			);
-			placeholderIntervalRef.current = setInterval(() => {
-				setPlaceholderIndex((i) => (i + 1) % ACHIEVEMENT_PLACEHOLDERS.length);
-			}, 5000);
-		} else {
-			if (placeholderIntervalRef.current)
-				clearInterval(placeholderIntervalRef.current);
-		}
-		return () => {
-			if (placeholderIntervalRef.current)
-				clearInterval(placeholderIntervalRef.current);
-		};
-	}, [achievementPending]);
-
+	// -------------------------------------------------------------------------
+	// Callbacks - UI Actions
+	// -------------------------------------------------------------------------
 	const handleToggleTag = useCallback((tagId: TagId | "none" | "all") => {
 		setSelectedTags((prev) => {
 			if (tagId === "all") {
@@ -2014,35 +1706,15 @@ export function AutofocusApp() {
 		[isSearchOrFilterActive],
 	);
 
-	const taskTagCounts = useMemo(() => {
-		const counts: Record<string, number> = { none: 0 };
-		for (const tag of TAG_DEFINITIONS) {
-			counts[tag.id] = 0;
-		}
-		for (const task of displayedActiveTasks) {
-			if (task.tag) {
-				counts[task.tag] = (counts[task.tag] ?? 0) + 1;
-			} else {
-				counts.none += 1;
-			}
-		}
-		return counts;
-	}, [displayedActiveTasks]);
+	const handleVisibleTaskCapacityChange = useCallback((capacity: number) => {
+		setVisibleTaskCapacity((currentCapacity) =>
+			currentCapacity === capacity ? currentCapacity : capacity,
+		);
+	}, []);
 
-	// Derive achievements from completed tasks
-	const { data: achievementTasks = [], mutate: mutateAchievements } = useSWR<
-		Task[]
-	>("achievement-tasks", getTasksWithNotes, { refreshInterval: 0 });
-	const completedTasksWithNotes = useMemo(
-		() =>
-			achievementTasks.map((t) => ({
-				text: t.text,
-				note: t.note!,
-				completed_at: t.completed_at!,
-			})),
-		[achievementTasks],
-	);
-
+	// -------------------------------------------------------------------------
+	// Render
+	// -------------------------------------------------------------------------
 	if (!displayedAppState) {
 		return (
 			<div className="min-h-screen bg-background flex items-center justify-center">
@@ -2081,6 +1753,8 @@ export function AutofocusApp() {
 				onCompletedSortChange={setCompletedSort}
 				completedViewType={completedViewType}
 				onCompletedViewTypeChange={setCompletedViewType}
+				contentFilter={contentFilter}
+				onChangeContentFilter={setContentFilter}
 			/>
 
 			{activeView === "tasks" && (
@@ -2096,10 +1770,6 @@ export function AutofocusApp() {
 					completedTasksWithNotes={completedTasksWithNotes}
 					onRefreshAchievements={mutateAchievements}
 				/>
-			)}
-
-			{activeView === "tasks" && (
-				<ContentFilterBar value={contentFilter} onChange={setContentFilter} />
 			)}
 
 			<main className="flex-1 flex flex-col min-h-0 pb-24">
@@ -2142,9 +1812,7 @@ export function AutofocusApp() {
 			</main>
 
 			{activeView === "tasks" && (
-				<>
-					<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />
-				</>
+				<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />
 			)}
 
 			<AnimatePresence>
@@ -2178,17 +1846,12 @@ export function AutofocusApp() {
 								<div className="text-sm uppercase font-medium text-foreground mb-1.5">
 									{ACHIEVEMENT_PLACEHOLDERS[placeholderIndex]}
 								</div>
-
-								{/* <div className="text-xs text-muted-foreground truncate">
-									{achievementPending.task.text}
-								</div> */}
 								<input
 									autoFocus
 									type="text"
 									value={achievementNote}
 									onChange={(e) => {
 										setAchievementNote(e.target.value);
-										resetAchievementTimer();
 									}}
 									onKeyDown={(e) => {
 										if (e.key === "Enter") handleAchievementSubmit();
