@@ -15,6 +15,10 @@ import {
 import type { Task, AppState } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
 import { formatTimeCompact } from "@/lib/utils/time-utils";
+import {
+	formatDueDate,
+	parseDueDateShortcut,
+} from "@/lib/utils/due-date-parser";
 
 interface TimerBarProps {
 	appState: AppState;
@@ -29,7 +33,11 @@ interface TimerBarProps {
 	onAddTask: (text: string, tag?: TagId | null) => Promise<Task | null>;
 	onStartTask: (task: Task) => Promise<void>;
 	activeTasks: Task[];
-	onAddTaskAndStart: (text: string, tag?: TagId | null) => Promise<Task | null>;
+	onAddTaskAndStart: (
+		text: string,
+		tag?: TagId | null,
+		dueDate?: string | null,
+	) => Promise<Task | null>;
 }
 
 // Format for active timer display: HH:MM:SS
@@ -244,9 +252,10 @@ export function TimerBar({
 			const trimmed = focusQuery.trim();
 			if (!trimmed) return;
 
-			const { tag, cleanText } = parseTagMention(trimmed);
+			const { tag, cleanText: tagClean } = parseTagMention(trimmed);
+			const { cleanText, dueDate } = parseDueDateShortcut(tagClean || trimmed);
 			const finalTag = focusInlineTag ?? tag;
-			const finalText = cleanText || trimmed;
+			const finalText = cleanText || tagClean || trimmed;
 
 			const EXEMPT = new Set([
 				"a",
@@ -272,7 +281,11 @@ export function TimerBar({
 			setFocusInlineTag(null);
 			setFocusMentionQuery(null);
 
-			await onAddTaskAndStart(capitalized, finalTag);
+			await onAddTaskAndStart(
+				capitalized,
+				finalTag,
+				dueDate ? dueDate.toISOString() : null,
+			);
 		};
 
 		const handleFocusSelectExisting = async (task: Task) => {
@@ -370,6 +383,16 @@ export function TimerBar({
 								autoFocus
 							/>
 
+							{(() => {
+								const { dueDate, dueDateLabel } =
+									parseDueDateShortcut(focusQuery);
+								return dueDate ? (
+									<span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-500 flex-shrink-0">
+										⏰ {dueDateLabel}
+									</span>
+								) : null;
+							})()}
+
 							{focusQuery.trim() && (
 								<button
 									type="button"
@@ -454,9 +477,32 @@ export function TimerBar({
 						<p className="truncate text-base font-semibold tracking-tight text-foreground md:text-3xl md:tracking-[0.04em]">
 							{workingTask.text}
 						</p>
-						<p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex-shrink-0">
-							{statusText}
-						</p>
+
+						<div className="flex items-center gap-2">
+							<p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex-shrink-0">
+								{statusText} | Due In:
+							</p>
+							{workingTask.due_date &&
+								(() => {
+									const { label, urgency } = formatDueDate(
+										workingTask.due_date,
+									);
+									const urgencyClasses: Record<string, string> = {
+										overdue: "border-red-500/40 bg-red-500/10 text-red-500",
+										soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+										normal:
+											"border-muted-foreground/30 bg-muted/50 text-muted-foreground",
+										far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
+									};
+									return (
+										<span
+											className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border flex-shrink-0 ${urgencyClasses[urgency]}`}
+										>
+											⏰ {label}
+										</span>
+									);
+								})()}
+						</div>
 					</div>
 
 					<button
