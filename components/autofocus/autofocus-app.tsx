@@ -20,6 +20,7 @@ import { TaskList } from "./task-list";
 import { CompletedList } from "./completed-list";
 import { TaskInput } from "./task-input";
 import { AchievementChip } from "./achievement-chip";
+import { PamphletSwitcher } from "./pamphlet-switcher";
 
 // Store & Types
 import {
@@ -77,6 +78,8 @@ import {
 	formatTimeCompact,
 	getTaskAge,
 } from "@/lib/utils/time-utils";
+
+import { usePamphlets } from "@/hooks/use-pamphlets";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 // =============================================================================
@@ -154,6 +157,21 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	// State - View & Filter
 	// -------------------------------------------------------------------------
+	const {
+		pamphlets,
+		activePamphlet,
+		activePamphletId,
+		activeTasks: pamphletActiveTasks,
+		isLoadingTasks,
+		switchPamphlet,
+		invalidateAndRefetch,
+		addPamphlet,
+		renamePamphlet,
+		removePamphlet,
+		fetchCompletedTasks,
+		fetchTotalPages,
+	} = usePamphlets();
+
 	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
 	const [selectedTags, setSelectedTags] = useState<Set<TagId | "none">>(
 		new Set(),
@@ -206,22 +224,28 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	// Data Fetching
 	// -------------------------------------------------------------------------
-	const { data: activeTasks = [], mutate: mutateActive } = useSWR<Task[]>(
-		"active-tasks",
-		getActiveTasks,
-		{ refreshInterval: 0 },
-	);
+	const [activeTasks, setActiveTasks] = useState<Task[]>(pamphletActiveTasks);
 
-	const { data: initialCompletedTasks = [], mutate: mutateCompleted } = useSWR<
-		Task[]
-	>("completed-tasks", () => getCompletedTasks(1), {
-		refreshInterval: 0,
-		onSuccess: (data) => {
-			setAllCompletedTasks(data);
-			setHasMoreCompleted(data.length === 50);
-			setCompletedPage(1);
-		},
-	});
+	useEffect(() => {
+		setActiveTasks(pamphletActiveTasks);
+	}, [pamphletActiveTasks]);
+
+	const mutateActive = useCallback(async () => {
+		await invalidateAndRefetch();
+	}, [invalidateAndRefetch]);
+
+	const mutateCompleted = useCallback(async () => {
+		if (!activePamphletId) return;
+		const data = await fetchCompletedTasks(activePamphletId, 1);
+		setAllCompletedTasks(data);
+		setHasMoreCompleted(data.length === 50);
+		setCompletedPage(1);
+	}, [activePamphletId, fetchCompletedTasks]);
+
+	// Initial load when pamphlet changes
+	useEffect(() => {
+		mutateCompleted();
+	}, [activePamphletId, mutateCompleted]);
 
 	const { data: appState, mutate: mutateAppState } = useSWR<AppState>(
 		"app-state",
@@ -229,11 +253,18 @@ export function AutofocusApp() {
 		{ refreshInterval: 1000 },
 	);
 
-	const { data: totalPages = 1, mutate: mutateTotalPages } = useSWR<number>(
-		"total-pages",
-		getTotalPageCount,
-		{ refreshInterval: 0 },
-	);
+	const [totalPages, setTotalPages] = useState(1);
+
+	useEffect(() => {
+		if (!activePamphletId) return;
+		fetchTotalPages(activePamphletId).then(setTotalPages);
+	}, [activePamphletId, activeTasks, fetchTotalPages]);
+
+	const mutateTotalPages = useCallback(async () => {
+		if (!activePamphletId) return;
+		const pages = await fetchTotalPages(activePamphletId);
+		setTotalPages(pages);
+	}, [activePamphletId, fetchTotalPages]);
 
 	const { data: achievementTasks = [], mutate: mutateAchievements } = useSWR<
 		Task[]
@@ -318,10 +349,11 @@ export function AutofocusApp() {
 
 	const completedTasksWithNotes = useMemo(
 		() =>
-			(achievementTasks ?? []).map((t) => ({
+			(Array.isArray(achievementTasks) ? achievementTasks : []).map((t) => ({
 				text: t.text,
 				note: t.note!,
 				completed_at: t.completed_at!,
+				pamphlet_id: t.pamphlet_id,
 			})),
 		[achievementTasks],
 	);
@@ -403,6 +435,15 @@ export function AutofocusApp() {
 		setCurrentPage(1);
 	}, [selectedTags, debouncedSearchQuery, contentFilter]);
 
+	// Reset pages when pamphlet changes
+	useEffect(() => {
+		setCurrentPage(1);
+		setFilteredCurrentPage(1);
+		setAllCompletedTasks([]);
+		setCompletedPage(1);
+		setHasMoreCompleted(true);
+	}, [activePamphletId]);
+
 	// Ensure filtered current page is valid
 	useEffect(() => {
 		if (
@@ -469,6 +510,7 @@ export function AutofocusApp() {
 				updated_at: now,
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
+				pamphlet_id: activePamphletId,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -496,6 +538,7 @@ export function AutofocusApp() {
 					0,
 					tag ?? null,
 					dueDate ?? null,
+					activePamphletId,
 				);
 				await mutateActive();
 				await mutateTotalPages();
@@ -544,6 +587,7 @@ export function AutofocusApp() {
 				updated_at: now,
 				tag: tag ?? null,
 				due_date: null,
+				pamphlet_id: activePamphletId,
 			}));
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
@@ -563,6 +607,7 @@ export function AutofocusApp() {
 				pageNumber: Math.floor(index / DEFAULT_TASK_CAPACITY) + 1,
 				position: index % DEFAULT_TASK_CAPACITY,
 				tag: tag ?? null,
+				pamphletId: activePamphletId,
 			}));
 
 			setPrefetchedTasks(new Map());
@@ -855,7 +900,7 @@ export function AutofocusApp() {
 					if (deletingWorkingTask) {
 						await stopWorkingOnTask();
 					}
-					await deleteTask(taskId);
+					await deleteTask(taskId, activePamphletId);
 				},
 			);
 		},
@@ -933,8 +978,9 @@ export function AutofocusApp() {
 						reindexedPlacement.position,
 						task.total_time_ms,
 						task.tag,
+						activePamphletId,
 					);
-					await markTaskDone(task.id, task.total_time_ms);
+					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
 				},
 			);
 		},
@@ -977,7 +1023,7 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					await revertTask(task.id);
+					await revertTask(task.id, activePamphletId);
 				},
 			);
 		},
@@ -1124,6 +1170,7 @@ export function AutofocusApp() {
 				updated_at: now,
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
+				pamphlet_id: activePamphletId,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -1319,8 +1366,9 @@ export function AutofocusApp() {
 						placement.position,
 						task.total_time_ms,
 						task.tag,
+						activePamphletId,
 					);
-					await markTaskDone(task.id, task.total_time_ms);
+					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
 					await stopWorkingOnTask();
 				},
 			);
@@ -1397,7 +1445,7 @@ export function AutofocusApp() {
 						totalPages: getVisibleTotalPages(optimisticActiveTasks),
 					},
 					async () => {
-						await markTaskDone(workingTask.id, totalTime);
+						await markTaskDone(workingTask.id, totalTime, activePamphletId);
 						await startTask(newTask.id);
 					},
 				);
@@ -1461,8 +1509,9 @@ export function AutofocusApp() {
 							placement.position,
 							totalTime,
 							workingTask.tag,
+							activePamphletId,
 						);
-						await markTaskDone(workingTask.id, totalTime);
+						await markTaskDone(workingTask.id, totalTime, activePamphletId);
 						await startTask(newTask.id);
 					},
 				);
@@ -1480,18 +1529,24 @@ export function AutofocusApp() {
 	// Callbacks - Completed Tasks
 	// -------------------------------------------------------------------------
 	const handleLoadMoreCompleted = useCallback(async () => {
-		if (isLoadingMore || !hasMoreCompleted) return;
+		if (isLoadingMore || !hasMoreCompleted || !activePamphletId) return;
 		setIsLoadingMore(true);
 		try {
 			const nextPage = completedPage + 1;
-			const moreTasks = await getCompletedTasks(nextPage);
+			const moreTasks = await fetchCompletedTasks(activePamphletId, nextPage);
 			setAllCompletedTasks((prev) => [...prev, ...moreTasks]);
 			setCompletedPage(nextPage);
 			setHasMoreCompleted(moreTasks.length === 50);
 		} finally {
 			setIsLoadingMore(false);
 		}
-	}, [isLoadingMore, hasMoreCompleted, completedPage]);
+	}, [
+		isLoadingMore,
+		hasMoreCompleted,
+		completedPage,
+		activePamphletId,
+		fetchCompletedTasks,
+	]);
 
 	// -------------------------------------------------------------------------
 	// Callbacks - Achievement Toast
@@ -1535,7 +1590,7 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					await markTaskDone(task.id, task.total_time_ms);
+					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
 				},
 			);
 		},
@@ -1744,6 +1799,15 @@ export function AutofocusApp() {
 		<div className="h-screen overflow-hidden bg-background text-foreground flex flex-col">
 			<Header />
 
+			<PamphletSwitcher
+				pamphlets={pamphlets}
+				activePamphlet={activePamphlet}
+				onSwitch={switchPamphlet}
+				onAdd={addPamphlet}
+				onRename={renamePamphlet}
+				onRemove={removePamphlet}
+			/>
+
 			<TimerBar
 				appState={displayedAppState}
 				workingTask={workingTask}
@@ -1786,6 +1850,7 @@ export function AutofocusApp() {
 					taskTagCounts={taskTagCounts}
 					completedTasksWithNotes={completedTasksWithNotes}
 					onRefreshAchievements={mutateAchievements}
+					pamphlets={pamphlets}
 				/>
 			)}
 
@@ -1835,6 +1900,7 @@ export function AutofocusApp() {
 						queue={achievementQueue}
 						onCommit={handleChipCommit}
 						onDismissAll={handleChipDismissAll}
+						pamphlets={pamphlets}
 					/>
 
 					<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />

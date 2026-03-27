@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { AchievementPending } from "@/lib/types";
+import type { AchievementPending, Pamphlet } from "@/lib/types";
+import { PAMPHLET_COLORS } from "@/lib/pamphlet-colors";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ interface AchievementChipProps {
 	queue: AchievementPending[];
 	onCommit: (item: AchievementPending, note: string) => Promise<void>;
 	onDismissAll: (queue: AchievementPending[]) => Promise<void>;
+	pamphlets: Pamphlet[];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ export function AchievementChip({
 	queue,
 	onCommit,
 	onDismissAll,
+	pamphlets,
 }: AchievementChipProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [note, setNote] = useState("");
@@ -144,6 +147,8 @@ export function AchievementChip({
 	if (count === 0) return null;
 
 	const taskLabel = current?.task.text ?? "";
+	const taskPamphlet =
+		pamphlets.find((p) => p.id === current?.task.pamphlet_id) ?? null;
 
 	// ── Render ────────────────────────────────────────────────────────────────
 	return (
@@ -183,9 +188,18 @@ export function AchievementChip({
 								// ── Collapsed ──────────────────────────────────────────────
 								<div className="flex items-center gap-2.5">
 									<CheckCircle />
-									<span className="flex-1 truncate text-[13px] text-foreground">
-										{taskLabel}
-									</span>
+									<div className="flex flex-col flex-1 min-w-0">
+										<span className="truncate text-[13px] text-foreground">
+											{taskLabel}
+										</span>
+										{taskPamphlet && (
+											<span
+												className={`text-[10px] font-medium ${PAMPHLET_COLORS[taskPamphlet.color].text}`}
+											>
+												{taskPamphlet.name}
+											</span>
+										)}
+									</div>
 									<button
 										onClick={handleExpandClick}
 										className="shrink-0 rounded-md border border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted hover:text-foreground"
@@ -198,9 +212,18 @@ export function AchievementChip({
 								<div className="flex flex-col gap-2">
 									<div className="flex items-center gap-2.5">
 										<CheckCircle />
-										<span className="flex-1 truncate text-[13px] text-foreground">
-											{taskLabel}
-										</span>
+										<div className="flex flex-col flex-1 min-w-0">
+											<span className="truncate text-[13px] text-foreground">
+												{taskLabel}
+											</span>
+											{taskPamphlet && (
+												<span
+													className={`text-[10px] font-medium ${PAMPHLET_COLORS[taskPamphlet.color].text}`}
+												>
+													{taskPamphlet.name}
+												</span>
+											)}
+										</div>
 									</div>
 									<input
 										autoFocus

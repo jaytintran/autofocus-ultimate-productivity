@@ -28,6 +28,8 @@ import {
 import Link from "next/link";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { TAG_DEFINITIONS } from "@/lib/tags";
+import type { Pamphlet } from "@/lib/types";
+import { PAMPHLET_COLORS } from "@/lib/pamphlet-colors";
 
 const NOTION_PAGES = [
 	{
@@ -189,8 +191,10 @@ interface PageNavProps {
 		text: string;
 		note: string;
 		completed_at: string;
+		pamphlet_id: string | null;
 	}>;
 	onRefreshAchievements: () => void;
+	pamphlets: Pamphlet[];
 }
 
 export function PageNav({
@@ -204,6 +208,7 @@ export function PageNav({
 	taskTagCounts,
 	completedTasksWithNotes,
 	onRefreshAchievements,
+	pamphlets,
 }: PageNavProps) {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -388,6 +393,8 @@ export function PageNav({
 							) : (
 								completedTasksWithNotes.map((task, i) => {
 									const date = new Date(task.completed_at);
+									const pamphlet =
+										pamphlets.find((p) => p.id === task.pamphlet_id) ?? null;
 									return (
 										<div
 											key={i}
@@ -399,19 +406,33 @@ export function PageNav({
 											<p className="text-[11px] text-muted-foreground">
 												{task.text}
 											</p>
-											<p className="text-[11px] text-muted-foreground/60 mt-0.5">
-												{date.toLocaleDateString(undefined, {
-													weekday: "short",
-													year: "numeric",
-													month: "short",
-													day: "numeric",
-												})}
-												{" · "}
-												{date.toLocaleTimeString(undefined, {
-													hour: "2-digit",
-													minute: "2-digit",
-												})}
-											</p>
+											<div className="flex items-center gap-2 mt-0.5">
+												<p className="text-[11px] text-muted-foreground/60">
+													{date.toLocaleDateString(undefined, {
+														weekday: "short",
+														year: "numeric",
+														month: "short",
+														day: "numeric",
+													})}
+													{" · "}
+													{date.toLocaleTimeString(undefined, {
+														hour: "2-digit",
+														minute: "2-digit",
+													})}
+												</p>
+												{pamphlet && (
+													<>
+														<span className="text-muted-foreground/40 text-[11px]">
+															·
+														</span>
+														<span
+															className={`text-[11px] font-medium ${PAMPHLET_COLORS[pamphlet.color].text}`}
+														>
+															{pamphlet.name}
+														</span>
+													</>
+												)}
+											</div>
 										</div>
 									);
 								})
