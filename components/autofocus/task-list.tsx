@@ -46,6 +46,7 @@ import { updateTaskTag } from "@/lib/store";
 import type { TagId } from "@/lib/tags";
 import { TaskContextMenu } from "./task-context-menu";
 import { useLongPress } from "@/hooks/use-long-press";
+import { DueDatePicker } from "./due-date-picker";
 
 function useIsMobile() {
 	const [isMobile, setIsMobile] = useState(false);
@@ -576,6 +577,7 @@ interface TaskListProps {
 	pamphlets: Pamphlet[];
 	activePamphletId: string | null;
 	onMoveTask: (taskId: string, toPamphletId: string) => void;
+	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
 }
 
 const FALLBACK_TASK_ROW_HEIGHT = 48;
@@ -608,6 +610,7 @@ interface TaskRowProps {
 	pamphlets: Pamphlet[];
 	activePamphletId: string | null;
 	onMoveTask: (taskId: string, toPamphletId: string) => void;
+	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
 }
 
 const DUE_DATE_URGENCY_CLASSES: Record<string, string> = {
@@ -638,6 +641,7 @@ function TaskRow({
 	pamphlets,
 	activePamphletId,
 	onMoveTask,
+	onUpdateDueDate,
 }: TaskRowProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState(task.text);
@@ -650,6 +654,7 @@ function TaskRow({
 		x: number;
 		y: number;
 	} | null>(null);
+	const [dueDatePickerOpen, setDueDatePickerOpen] = useState(false);
 
 	const spanRef = useRef<HTMLSpanElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -943,19 +948,44 @@ function TaskRow({
 								<RefreshCw className="w-2.5 h-2.5" />
 							</span>
 						)}
-						{task.due_date &&
-							!isEditing &&
-							(() => {
-								const { label, urgency } = formatDueDate(task.due_date);
-								return (
-									<span
-										className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${DUE_DATE_URGENCY_CLASSES[urgency]}`}
-										title={formatDueDateVerbose(task.due_date)}
-									>
-										⏰ {label}
-									</span>
-								);
-							})()}
+						{/* Due date badge — clickable to open picker, shows dashed outline if empty */}
+						{!isEditing && !isWorking && (
+							<div className="relative flex-shrink-0">
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										setDueDatePickerOpen((prev) => !prev);
+									}}
+									className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors flex-shrink-0
+        ${
+					task.due_date
+						? DUE_DATE_URGENCY_CLASSES[formatDueDate(task.due_date).urgency]
+						: "border-dashed border-muted-foreground/20 text-muted-foreground/30 hover:border-muted-foreground/50 hover:text-muted-foreground/60"
+				}`}
+									title={
+										task.due_date
+											? formatDueDateVerbose(task.due_date)
+											: "Set due date"
+									}
+								>
+									{task.due_date
+										? `⏰ ${formatDueDate(task.due_date).label}`
+										: "⏰"}
+								</button>
+
+								{/* Due date picker popup — reuses the same component as TimerBar */}
+								{dueDatePickerOpen && (
+									<DueDatePicker
+										currentDueDate={task.due_date}
+										onSet={(isoDate) => {
+											onUpdateDueDate(task.id, isoDate);
+											setDueDatePickerOpen(false);
+										}}
+										onClose={() => setDueDatePickerOpen(false)}
+									/>
+								)}
+							</div>
+						)}
 						{task.total_time_ms > 0 && !isEditing && (
 							<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
 								{formatTimeCompact(task.total_time_ms)}
@@ -1333,6 +1363,7 @@ export function TaskList({
 	pamphlets,
 	activePamphletId,
 	onMoveTask,
+	onUpdateDueDate,
 }: TaskListProps) {
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -1381,22 +1412,6 @@ export function TaskList({
 			return task.tag && selectedTags.has(task.tag);
 		});
 	}, [localTasks, selectedTags]);
-
-	/* handleUpdateTagOld
-	const handleUpdateTagOld = useCallback(
-		async (taskId: string, tag: TagId | null) => {
-			if (loadingTaskId) return;
-			setLoadingTaskId(taskId);
-			try {
-				await updateTaskTag(taskId, tag);
-				await onRefresh();
-			} finally {
-				setLoadingTaskId(null);
-			}
-		},
-		[loadingTaskId, onRefresh],
-	);
-	*/
 
 	const handleUpdateTag = useCallback(
 		async (taskId: string, tag: TagId | null) => {
@@ -1456,6 +1471,22 @@ export function TaskList({
 			}
 		},
 		[onReorderTasks],
+	);
+
+	const handleUpdateDueDate = useCallback(
+		async (taskId: string, dueDate: string | null) => {
+			// Optimistically update local state so the badge changes instantly
+			setLocalTasks((prev) =>
+				prev.map((t) => (t.id === taskId ? { ...t, due_date: dueDate } : t)),
+			);
+			try {
+				await onUpdateDueDate(taskId, dueDate);
+			} catch (error) {
+				console.error("Failed to update due date:", error);
+				onRefresh();
+			}
+		},
+		[onUpdateDueDate, onRefresh],
 	);
 
 	const activeTask = activeId ? allTasks.find((t) => t.id === activeId) : null;
@@ -1698,6 +1729,7 @@ export function TaskList({
 									pamphlets={pamphlets}
 									activePamphletId={activePamphletId}
 									onMoveTask={onMoveTask}
+									onUpdateDueDate={handleUpdateDueDate}
 								/>
 							))}
 						</ul>
@@ -1724,6 +1756,7 @@ export function TaskList({
 								pamphlets={pamphlets}
 								activePamphletId={activePamphletId}
 								onMoveTask={onMoveTask}
+								onUpdateDueDate={handleUpdateDueDate}
 							/>
 						)}
 					</DragOverlay>

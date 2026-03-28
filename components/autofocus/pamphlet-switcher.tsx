@@ -9,6 +9,9 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { createPortal } from "react-dom";
 
 import { Plus, Pencil, Trash2, Check, X, GripVertical } from "lucide-react";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 import {
 	DndContext,
@@ -350,6 +353,174 @@ function PamphletTabContextMenu({
 }
 
 // =============================================================================
+// MOBILE PAMPHLETS
+// =============================================================================
+
+function useIsMobile() {
+	const [isMobile, setIsMobile] = useState(false);
+	useEffect(() => {
+		const check = () => setIsMobile(window.innerWidth < 768);
+		check();
+		window.addEventListener("resize", check);
+		return () => window.removeEventListener("resize", check);
+	}, []);
+	return isMobile;
+}
+
+function MobilePamphletRow({
+	p,
+	isActive,
+	onSwitch,
+	onLongPress,
+}: {
+	p: Pamphlet;
+	isActive: boolean;
+	onSwitch: (id: string) => void;
+	onLongPress: (p: Pamphlet, pos: { x: number; y: number }) => void;
+}) {
+	const c = PAMPHLET_COLORS[p.color];
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({ id: p.id });
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.4 : 1,
+	};
+
+	const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress({
+		onLongPress: (e) => {
+			const touch = e.touches[0];
+			onLongPress(p, { x: touch.clientX, y: touch.clientY });
+		},
+		delay: 600,
+	});
+
+	return (
+		<div
+			ref={setNodeRef}
+			style={style}
+			className={`flex items-center gap-3 px-2 py-2.5 rounded-xl mb-1 transition-colors
+        ${isActive ? `${c.bg} ${c.border} border` : "hover:bg-accent"}`}
+		>
+			<button
+				className="flex-1 flex items-center gap-2.5 text-left min-w-0"
+				onClick={() => onSwitch(p.id)}
+				onTouchStart={onTouchStart}
+				onTouchMove={onTouchMove}
+				onTouchEnd={onTouchEnd}
+			>
+				<span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} />
+				<span
+					className={`text-sm font-medium truncate ${isActive ? c.text : "text-foreground"}`}
+				>
+					{p.name}
+				</span>
+				{isActive && (
+					<Check className={`w-3.5 h-3.5 shrink-0 ml-auto ${c.text}`} />
+				)}
+			</button>
+			<button
+				{...attributes}
+				{...listeners}
+				className="p-1 touch-none cursor-grab active:cursor-grabbing text-muted-foreground"
+				onClick={(e) => e.stopPropagation()}
+			>
+				<GripVertical className="w-4 h-4" />
+			</button>
+		</div>
+	);
+}
+
+function MobilePamphletSheet({
+	pamphlets,
+	activePamphlet,
+	onSwitch,
+	onClose,
+	onAdd,
+	onLongPress,
+	onDragEnd,
+}: {
+	pamphlets: Pamphlet[];
+	activePamphlet: Pamphlet | null;
+	onSwitch: (id: string) => void;
+	onClose: () => void;
+	onAdd: () => void;
+	onLongPress: (p: Pamphlet, pos: { x: number; y: number }) => void;
+	onDragEnd: (event: DragEndEvent) => Promise<void>;
+}) {
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+		useSensor(TouchSensor, {
+			activationConstraint: { delay: 200, tolerance: 5 },
+		}),
+	);
+
+	return createPortal(
+		<>
+			<div
+				className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+				onClick={onClose}
+			/>
+			<motion.div
+				initial={{ y: "100%" }}
+				animate={{ y: 0 }}
+				exit={{ y: "100%" }}
+				transition={{ type: "spring", stiffness: 400, damping: 40 }}
+				className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border rounded-t-2xl"
+			>
+				<div className="flex justify-center pt-3 pb-1">
+					<div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+				</div>
+				<div className="px-4 py-2 flex items-center justify-between">
+					<p className="text-sm font-medium text-foreground">Pamphlets</p>
+					<button
+						onClick={onAdd}
+						className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+					>
+						<Plus className="w-3.5 h-3.5" />
+						New
+					</button>
+				</div>
+				<div className="px-2 pb-8 max-h-[60vh] overflow-y-auto">
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragEnd={onDragEnd}
+						modifiers={[restrictToVerticalAxis]}
+					>
+						<SortableContext
+							items={pamphlets.map((p) => p.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							{pamphlets.map((p) => (
+								<MobilePamphletRow
+									key={p.id}
+									p={p}
+									isActive={p.id === activePamphlet?.id}
+									onSwitch={(id) => {
+										onSwitch(id);
+										onClose();
+									}}
+									onLongPress={onLongPress}
+								/>
+							))}
+						</SortableContext>
+					</DndContext>
+				</div>
+			</motion.div>
+		</>,
+		document.body,
+	);
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -373,6 +544,8 @@ export function PamphletSwitcher({
 	const [overlay, setOverlay] = useState<OverlayState>({ type: "none" });
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const overlayRef = useRef<HTMLDivElement>(null);
+	const isMobile = useIsMobile();
+	const [sheetOpen, setSheetOpen] = useState(false);
 
 	const [tabContextMenu, setTabContextMenu] = useState<{
 		pamphlet: Pamphlet;
@@ -450,72 +623,6 @@ export function PamphletSwitcher({
 
 	// ── PamphletTab (inner component — defined here so it closes ──
 	// ── over overlay/setOverlay from the parent scope)           ──
-	function PamphletTabOld({
-		p,
-		isActive,
-		onSwitch,
-		onLongPress,
-	}: {
-		p: Pamphlet;
-		isActive: boolean;
-		onSwitch: (id: string) => void;
-		onLongPress: (p: Pamphlet, pos: { x: number; y: number }) => void;
-	}) {
-		const c = PAMPHLET_COLORS[p.color];
-		const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress({
-			onLongPress: (e) => {
-				const touch = e.touches[0];
-				onLongPress(p, { x: touch.clientX, y: touch.clientY });
-			},
-			delay: 600,
-		});
-
-		return (
-			<div className="relative group shrink-0 flex items-center select-none">
-				<button
-					onClick={() => onSwitch(p.id)}
-					onTouchStart={onTouchStart}
-					onTouchMove={onTouchMove}
-					onTouchEnd={onTouchEnd}
-					className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-						isActive
-							? `${c.bg} ${c.text} ${c.border} border`
-							: "text-muted-foreground hover:text-foreground hover:bg-accent"
-					}`}
-				>
-					<ColorDot color={p.color} />
-					{p.name}
-				</button>
-
-				{/* Desktop hover controls — unchanged */}
-				{overlay.type === "none" && (
-					<div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded shadow-sm px-0.5 py-0.5 z-10">
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								setOverlay({ type: "edit", pamphlet: p });
-							}}
-							className="p-0.5 hover:text-foreground text-muted-foreground rounded transition-colors"
-						>
-							<Pencil className="w-2.5 h-2.5" />
-						</button>
-						{pamphlets.length > 1 && (
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									setOverlay({ type: "delete", pamphlet: p });
-								}}
-								className="p-0.5 hover:text-destructive text-muted-foreground rounded transition-colors"
-							>
-								<Trash2 className="w-2.5 h-2.5" />
-							</button>
-						)}
-					</div>
-				)}
-			</div>
-		);
-	}
-
 	function PamphletTab({
 		p,
 		isActive,
@@ -551,12 +658,24 @@ export function PamphletSwitcher({
 			delay: 800,
 		});
 
+		const [contextPos, setContextPos] = useState<{
+			x: number;
+			y: number;
+		} | null>(null);
+
+		const handleContextMenu = useCallback((e: React.MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			setContextPos({ x: e.clientX, y: e.clientY });
+		}, []);
+
 		return (
 			<div
 				ref={setNodeRef}
 				style={style}
 				{...attributes}
 				{...listeners}
+				onContextMenu={handleContextMenu}
 				className="relative group shrink-0 flex items-center cursor-grab active:cursor-grabbing touch-none"
 			>
 				<button
@@ -574,72 +693,115 @@ export function PamphletSwitcher({
 					{p.name}
 				</button>
 
-				{overlay.type === "none" && (
-					<div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded shadow-sm px-0.5 py-0.5 z-10">
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								setOverlay({ type: "edit", pamphlet: p });
-							}}
-							className="p-0.5 hover:text-foreground text-muted-foreground rounded transition-colors"
-						>
-							<Pencil className="w-2.5 h-2.5" />
-						</button>
-						{pamphlets.length > 1 && (
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									setOverlay({ type: "delete", pamphlet: p });
-								}}
-								className="p-0.5 hover:text-destructive text-muted-foreground rounded transition-colors"
-							>
-								<Trash2 className="w-2.5 h-2.5" />
-							</button>
-						)}
-					</div>
+				{contextPos && (
+					<PamphletTabContextMenu
+						pamphlet={p}
+						position={contextPos}
+						canDelete={pamphlets.length > 1}
+						onEdit={() => {
+							setOverlay({ type: "edit", pamphlet: p });
+							setContextPos(null);
+						}}
+						onDelete={() => {
+							setOverlay({ type: "delete", pamphlet: p });
+							setContextPos(null);
+						}}
+						onClose={() => setContextPos(null)}
+					/>
 				)}
 			</div>
 		);
 	}
 
+	// ── PamphletTab (inner component) ──
+
 	return (
 		<div className="relative px-4 py-1.5 border-b border-border/50">
-			{/* Tab strip */}
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragEnd={handleDragEnd}
-			>
-				<SortableContext
-					items={localPamphlets.map((p) => p.id)}
-					strategy={horizontalListSortingStrategy}
-				>
-					<div
-						ref={scrollRef}
-						className="flex items-center gap-1 overflow-x-auto scrollbar-none"
+			{isMobile ? (
+				<>
+					{/* Active pamphlet button — tapping opens the sheet */}
+					<button
+						onClick={() => setSheetOpen(true)}
+						className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium transition-all
+            ${
+							activePamphlet
+								? `${PAMPHLET_COLORS[activePamphlet.color].bg} ${PAMPHLET_COLORS[activePamphlet.color].text} ${PAMPHLET_COLORS[activePamphlet.color].border} border`
+								: "text-muted-foreground bg-accent"
+						}`}
 					>
-						{localPamphlets.map((p) => (
-							<PamphletTab
-								key={p.id}
-								p={p}
-								isActive={p.id === activePamphlet?.id}
+						{activePamphlet && <ColorDot color={activePamphlet.color} />}
+						<span>{activePamphlet?.name ?? "Select"}</span>
+						<svg
+							width="10"
+							height="10"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2.5"
+							className="ml-0.5 opacity-60"
+						>
+							<polyline points="6 9 12 15 18 9" />
+						</svg>
+					</button>
+
+					<AnimatePresence>
+						{sheetOpen && (
+							<MobilePamphletSheet
+								pamphlets={localPamphlets}
+								activePamphlet={activePamphlet}
 								onSwitch={onSwitch}
+								onClose={() => setSheetOpen(false)}
+								onAdd={() => {
+									setSheetOpen(false);
+									setOverlay({ type: "add" });
+								}}
 								onLongPress={(pamphlet, position) =>
 									setTabContextMenu({ pamphlet, position })
 								}
+								onDragEnd={handleDragEnd}
 							/>
-						))}
-						<button
-							onClick={() => setOverlay({ type: "add" })}
-							className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ml-1"
+						)}
+					</AnimatePresence>
+				</>
+			) : (
+				/* Desktop: existing horizontal sortable tab strip — unchanged */
+				<DndContext
+					sensors={sensors}
+					collisionDetection={closestCenter}
+					onDragEnd={handleDragEnd}
+					modifiers={[restrictToHorizontalAxis]}
+				>
+					<SortableContext
+						items={localPamphlets.map((p) => p.id)}
+						strategy={horizontalListSortingStrategy}
+					>
+						<div
+							ref={scrollRef}
+							className="flex items-center gap-1 overflow-x-auto scrollbar-none"
 						>
-							<Plus className="w-3 h-3" />
-						</button>
-					</div>
-				</SortableContext>
-			</DndContext>
+							{localPamphlets.map((p) => (
+								<PamphletTab
+									key={p.id}
+									p={p}
+									isActive={p.id === activePamphlet?.id}
+									onSwitch={onSwitch}
+									onLongPress={(pamphlet, position) =>
+										setTabContextMenu({ pamphlet, position })
+									}
+								/>
+							))}
+							<button
+								onClick={() => setOverlay({ type: "add" })}
+								className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ml-1"
+							>
+								<Plus className="w-3 h-3" />
+							</button>
+						</div>
+					</SortableContext>
+				</DndContext>
+			)}
 
-			{/* Floating overlay panels */}
+			{/* Overlay forms — shared, works for both mobile and desktop */}
 			<AnimatePresence>
 				{overlay.type !== "none" && (
 					<motion.div

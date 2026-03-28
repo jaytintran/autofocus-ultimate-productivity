@@ -1065,6 +1065,22 @@ export function AutofocusApp() {
 		],
 	);
 
+	const handleUpdateWorkingTaskDueDate = useCallback(
+		async (taskId: string, dueDate: string | null) => {
+			await updateTask(taskId, { due_date: dueDate });
+			await mutateAllActive();
+		},
+		[mutateAllActive],
+	);
+
+	const handleUpdateTaskDueDate = useCallback(
+		async (taskId: string, dueDate: string | null) => {
+			await updateTask(taskId, { due_date: dueDate });
+			await mutateActive();
+		},
+		[mutateActive],
+	);
+
 	// -------------------------------------------------------------------------
 	// Callbacks - Timer Operations
 	// -------------------------------------------------------------------------
@@ -1859,6 +1875,7 @@ export function AutofocusApp() {
 				onStartTask={handleStartTask}
 				activeTasks={displayedActiveTasks}
 				pamphlets={pamphlets}
+				onUpdateDueDate={handleUpdateWorkingTaskDueDate}
 			/>
 
 			<ViewTabs
@@ -1913,6 +1930,7 @@ export function AutofocusApp() {
 						pamphlets={pamphlets}
 						activePamphletId={activePamphletId}
 						onMoveTask={handleMoveTask}
+						onUpdateDueDate={handleUpdateTaskDueDate}
 					/>
 				) : (
 					<CompletedList
