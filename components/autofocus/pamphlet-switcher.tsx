@@ -1,13 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Plus, Pencil, Trash2, Check, X, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PAMPHLET_COLORS, PAMPHLET_COLOR_LIST } from "@/lib/pamphlet-colors";
 import type { Pamphlet, PamphletColor } from "@/lib/types";
 
 import { useLongPress } from "@/hooks/use-long-press";
 import { createPortal } from "react-dom";
+
+import { Plus, Pencil, Trash2, Check, X, GripVertical } from "lucide-react";
+
+import {
+	DndContext,
+	closestCenter,
+	PointerSensor,
+	TouchSensor,
+	useSensor,
+	useSensors,
+	DragEndEvent,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	horizontalListSortingStrategy,
+	useSortable,
+	arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // =============================================================================
 // TYPES
@@ -24,6 +42,7 @@ interface PamphletSwitcherProps {
 		action: "transfer" | "delete-all",
 		transferToId?: string,
 	) => Promise<void>;
+	onReorder: (orderedIds: string[]) => Promise<void>;
 }
 
 // =============================================================================
@@ -347,6 +366,7 @@ export function PamphletSwitcher({
 	onAdd,
 	onRename,
 	onRemove,
+	onReorder,
 }: PamphletSwitcherProps) {
 	// ── State ──────────────────────────────────────────────────────
 
@@ -358,6 +378,38 @@ export function PamphletSwitcher({
 		pamphlet: Pamphlet;
 		position: { x: number; y: number };
 	} | null>(null);
+
+	// ── Re-Order ──────────────────────────────────────────────────────
+
+	const [localPamphlets, setLocalPamphlets] = useState(pamphlets);
+
+	useEffect(() => {
+		setLocalPamphlets(pamphlets);
+	}, [pamphlets]);
+
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: { distance: 5 },
+		}),
+		useSensor(TouchSensor, {
+			activationConstraint: { delay: 600, tolerance: 8 },
+		}),
+	);
+
+	const handleDragEnd = useCallback(
+		async (event: DragEndEvent) => {
+			const { active, over } = event;
+			if (!over || active.id === over.id) return;
+
+			const oldIndex = localPamphlets.findIndex((p) => p.id === active.id);
+			const newIndex = localPamphlets.findIndex((p) => p.id === over.id);
+			const reordered = arrayMove(localPamphlets, oldIndex, newIndex);
+
+			setLocalPamphlets(reordered); // optimistic
+			await onReorder(reordered.map((p) => p.id));
+		},
+		[localPamphlets, onReorder],
+	);
 
 	// ── Handlers ───────────────────────────────────────────────────
 
@@ -398,7 +450,7 @@ export function PamphletSwitcher({
 
 	// ── PamphletTab (inner component — defined here so it closes ──
 	// ── over overlay/setOverlay from the parent scope)           ──
-	function PamphletTab({
+	function PamphletTabOld({
 		p,
 		isActive,
 		onSwitch,
@@ -464,33 +516,128 @@ export function PamphletSwitcher({
 		);
 	}
 
+	function PamphletTab({
+		p,
+		isActive,
+		onSwitch,
+		onLongPress,
+	}: {
+		p: Pamphlet;
+		isActive: boolean;
+		onSwitch: (id: string) => void;
+		onLongPress: (p: Pamphlet, pos: { x: number; y: number }) => void;
+	}) {
+		const c = PAMPHLET_COLORS[p.color];
+		const {
+			attributes,
+			listeners,
+			setNodeRef,
+			transform,
+			transition,
+			isDragging,
+		} = useSortable({ id: p.id });
+
+		const style = {
+			transform: CSS.Transform.toString(transform),
+			transition,
+			opacity: isDragging ? 0.5 : 1,
+		};
+
+		const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress({
+			onLongPress: (e) => {
+				const touch = e.touches[0];
+				onLongPress(p, { x: touch.clientX, y: touch.clientY });
+			},
+			delay: 800,
+		});
+
+		return (
+			<div
+				ref={setNodeRef}
+				style={style}
+				{...attributes}
+				{...listeners}
+				className="relative group shrink-0 flex items-center cursor-grab active:cursor-grabbing touch-none"
+			>
+				<button
+					onClick={() => onSwitch(p.id)}
+					onTouchStart={onTouchStart}
+					onTouchMove={onTouchMove}
+					onTouchEnd={onTouchEnd}
+					className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+						isActive
+							? `${c.bg} ${c.text} ${c.border} border`
+							: "text-muted-foreground hover:text-foreground hover:bg-accent"
+					}`}
+				>
+					<ColorDot color={p.color} />
+					{p.name}
+				</button>
+
+				{overlay.type === "none" && (
+					<div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded shadow-sm px-0.5 py-0.5 z-10">
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setOverlay({ type: "edit", pamphlet: p });
+							}}
+							className="p-0.5 hover:text-foreground text-muted-foreground rounded transition-colors"
+						>
+							<Pencil className="w-2.5 h-2.5" />
+						</button>
+						{pamphlets.length > 1 && (
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setOverlay({ type: "delete", pamphlet: p });
+								}}
+								className="p-0.5 hover:text-destructive text-muted-foreground rounded transition-colors"
+							>
+								<Trash2 className="w-2.5 h-2.5" />
+							</button>
+						)}
+					</div>
+				)}
+			</div>
+		);
+	}
+
 	return (
 		<div className="relative px-4 py-1.5 border-b border-border/50">
 			{/* Tab strip */}
-			<div
-				ref={scrollRef}
-				className="flex items-center gap-1 overflow-x-auto scrollbar-none"
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragEnd={handleDragEnd}
 			>
-				{pamphlets.map((p) => (
-					<PamphletTab
-						key={p.id}
-						p={p}
-						isActive={p.id === activePamphlet?.id}
-						onSwitch={onSwitch}
-						onLongPress={(pamphlet, position) =>
-							setTabContextMenu({ pamphlet, position })
-						}
-					/>
-				))}
-
-				{/* Add button */}
-				<button
-					onClick={() => setOverlay({ type: "add" })}
-					className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ml-1"
+				<SortableContext
+					items={localPamphlets.map((p) => p.id)}
+					strategy={horizontalListSortingStrategy}
 				>
-					<Plus className="w-3 h-3" />
-				</button>
-			</div>
+					<div
+						ref={scrollRef}
+						className="flex items-center gap-1 overflow-x-auto scrollbar-none"
+					>
+						{localPamphlets.map((p) => (
+							<PamphletTab
+								key={p.id}
+								p={p}
+								isActive={p.id === activePamphlet?.id}
+								onSwitch={onSwitch}
+								onLongPress={(pamphlet, position) =>
+									setTabContextMenu({ pamphlet, position })
+								}
+							/>
+						))}
+						<button
+							onClick={() => setOverlay({ type: "add" })}
+							className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ml-1"
+						>
+							<Plus className="w-3 h-3" />
+						</button>
+					</div>
+				</SortableContext>
+			</DndContext>
 
 			{/* Floating overlay panels */}
 			<AnimatePresence>

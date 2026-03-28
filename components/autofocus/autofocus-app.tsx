@@ -172,6 +172,7 @@ export function AutofocusApp() {
 		removePamphlet,
 		fetchCompletedTasks,
 		fetchTotalPages,
+		reorderPamphletsList,
 	} = usePamphlets();
 
 	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
@@ -1840,6 +1841,7 @@ export function AutofocusApp() {
 				onAdd={addPamphlet}
 				onRename={renamePamphlet}
 				onRemove={removePamphlet}
+				onReorder={reorderPamphletsList}
 			/>
 
 			<TimerBar

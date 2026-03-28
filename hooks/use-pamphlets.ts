@@ -20,6 +20,7 @@ import {
 	invalidatePamphletCache,
 } from "@/lib/pamphlet-cache";
 import type { Task, Pamphlet, PamphletColor } from "@/lib/types";
+import { reorderPamphlets } from "@/lib/store";
 
 export function usePamphlets() {
 	// -------------------------------------------------------------------------
@@ -169,6 +170,15 @@ export function usePamphlets() {
 		[activePamphletId, pamphlets, switchPamphlet, mutatePamphlets],
 	);
 
+	const reorderPamphletsList = useCallback(
+		async (orderedIds: string[]) => {
+			const updates = orderedIds.map((id, index) => ({ id, position: index }));
+			await reorderPamphlets(updates);
+			await mutatePamphlets();
+		},
+		[mutatePamphlets],
+	);
+
 	return {
 		// Data
 		pamphlets,
@@ -182,6 +192,7 @@ export function usePamphlets() {
 		addPamphlet,
 		renamePamphlet,
 		removePamphlet,
+		reorderPamphletsList,
 		// Raw refetch for completed tasks (pamphlet-scoped, called ad hoc)
 		fetchCompletedTasks: getCompletedTasksForPamphlet,
 		fetchTotalPages: getTotalPageCountForPamphlet,

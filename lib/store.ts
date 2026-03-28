@@ -1185,3 +1185,19 @@ export async function moveTaskToPamphlet(
 
 	if (error) throw error;
 }
+
+export async function reorderPamphlets(
+	updates: Array<{ id: string; position: number }>,
+): Promise<void> {
+	const supabase = createClient();
+	for (const update of updates) {
+		const { error } = await supabase
+			.from("pamphlets")
+			.update({
+				position: update.position,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", update.id);
+		if (error) throw error;
+	}
+}
