@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PAMPHLET_COLORS, PAMPHLET_COLOR_LIST } from "@/lib/pamphlet-colors";
 import type { Pamphlet, PamphletColor } from "@/lib/types";
 
+import { useLongPress } from "@/hooks/use-long-press";
+import { createPortal } from "react-dom";
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -229,6 +232,105 @@ function DeleteConfirm({
 }
 
 // =============================================================================
+// CONTEXT MENU
+// =============================================================================
+
+function PamphletTabContextMenu({
+	pamphlet,
+	position,
+	canDelete,
+	onEdit,
+	onDelete,
+	onClose,
+}: {
+	pamphlet: Pamphlet;
+	position: { x: number; y: number };
+	canDelete: boolean;
+	onEdit: () => void;
+	onDelete: () => void;
+	onClose: () => void;
+}) {
+	const menuRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const handler = (e: MouseEvent | TouchEvent) => {
+			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+				onClose();
+			}
+		};
+		const keyHandler = (e: KeyboardEvent) => {
+			if (e.key === "Escape") onClose();
+		};
+		document.addEventListener("mousedown", handler);
+		document.addEventListener("touchstart", handler);
+		document.addEventListener("keydown", keyHandler);
+		return () => {
+			document.removeEventListener("mousedown", handler);
+			document.removeEventListener("touchstart", handler);
+			document.removeEventListener("keydown", keyHandler);
+		};
+	}, [onClose]);
+
+	// Clamp to viewport
+	useEffect(() => {
+		if (!menuRef.current) return;
+		const rect = menuRef.current.getBoundingClientRect();
+		if (rect.right > window.innerWidth) {
+			menuRef.current.style.left = `${window.innerWidth - rect.width - 8}px`;
+		}
+		if (rect.bottom > window.innerHeight) {
+			menuRef.current.style.top = `${window.innerHeight - rect.height - 8}px`;
+		}
+	}, [position]);
+
+	const c = PAMPHLET_COLORS[pamphlet.color];
+
+	return createPortal(
+		<div
+			ref={menuRef}
+			style={{
+				position: "fixed",
+				top: position.y,
+				left: position.x,
+				zIndex: 9999,
+			}}
+			className="bg-popover border border-border rounded-xl shadow-xl p-1.5 w-44 animate-in fade-in-0 zoom-in-95 duration-100"
+		>
+			<div className="px-3 py-1.5 mb-1 flex items-center gap-2">
+				<span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
+				<p className={`text-xs font-medium truncate ${c.text}`}>
+					{pamphlet.name}
+				</p>
+			</div>
+			<div className="h-px bg-border mx-2 mb-1" />
+			<button
+				onClick={() => {
+					onEdit();
+					onClose();
+				}}
+				className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors text-left text-foreground"
+			>
+				<Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+				Rename
+			</button>
+			{canDelete && (
+				<button
+					onClick={() => {
+						onDelete();
+						onClose();
+					}}
+					className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors text-left text-destructive"
+				>
+					<Trash2 className="w-3.5 h-3.5" />
+					Delete
+				</button>
+			)}
+		</div>,
+		document.body,
+	);
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -246,9 +348,18 @@ export function PamphletSwitcher({
 	onRename,
 	onRemove,
 }: PamphletSwitcherProps) {
+	// ── State ──────────────────────────────────────────────────────
+
 	const [overlay, setOverlay] = useState<OverlayState>({ type: "none" });
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const overlayRef = useRef<HTMLDivElement>(null);
+
+	const [tabContextMenu, setTabContextMenu] = useState<{
+		pamphlet: Pamphlet;
+		position: { x: number; y: number };
+	} | null>(null);
+
+	// ── Handlers ───────────────────────────────────────────────────
 
 	// Close overlay on outside click
 	useEffect(() => {
@@ -285,6 +396,74 @@ export function PamphletSwitcher({
 		setOverlay({ type: "none" });
 	};
 
+	// ── PamphletTab (inner component — defined here so it closes ──
+	// ── over overlay/setOverlay from the parent scope)           ──
+	function PamphletTab({
+		p,
+		isActive,
+		onSwitch,
+		onLongPress,
+	}: {
+		p: Pamphlet;
+		isActive: boolean;
+		onSwitch: (id: string) => void;
+		onLongPress: (p: Pamphlet, pos: { x: number; y: number }) => void;
+	}) {
+		const c = PAMPHLET_COLORS[p.color];
+		const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress({
+			onLongPress: (e) => {
+				const touch = e.touches[0];
+				onLongPress(p, { x: touch.clientX, y: touch.clientY });
+			},
+			delay: 600,
+		});
+
+		return (
+			<div className="relative group shrink-0 flex items-center select-none">
+				<button
+					onClick={() => onSwitch(p.id)}
+					onTouchStart={onTouchStart}
+					onTouchMove={onTouchMove}
+					onTouchEnd={onTouchEnd}
+					className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+						isActive
+							? `${c.bg} ${c.text} ${c.border} border`
+							: "text-muted-foreground hover:text-foreground hover:bg-accent"
+					}`}
+				>
+					<ColorDot color={p.color} />
+					{p.name}
+				</button>
+
+				{/* Desktop hover controls — unchanged */}
+				{overlay.type === "none" && (
+					<div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded shadow-sm px-0.5 py-0.5 z-10">
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setOverlay({ type: "edit", pamphlet: p });
+							}}
+							className="p-0.5 hover:text-foreground text-muted-foreground rounded transition-colors"
+						>
+							<Pencil className="w-2.5 h-2.5" />
+						</button>
+						{pamphlets.length > 1 && (
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setOverlay({ type: "delete", pamphlet: p });
+								}}
+								className="p-0.5 hover:text-destructive text-muted-foreground rounded transition-colors"
+							>
+								<Trash2 className="w-2.5 h-2.5" />
+							</button>
+						)}
+					</div>
+				)}
+			</div>
+		);
+	}
+
 	return (
 		<div className="relative px-4 py-1.5 border-b border-border/50">
 			{/* Tab strip */}
@@ -292,54 +471,17 @@ export function PamphletSwitcher({
 				ref={scrollRef}
 				className="flex items-center gap-1 overflow-x-auto scrollbar-none"
 			>
-				{pamphlets.map((p) => {
-					const isActive = p.id === activePamphlet?.id;
-					const c = PAMPHLET_COLORS[p.color];
-					return (
-						<div
-							key={p.id}
-							className="relative group shrink-0 flex items-center"
-						>
-							<button
-								onClick={() => onSwitch(p.id)}
-								className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-									isActive
-										? `${c.bg} ${c.text} ${c.border} border`
-										: "text-muted-foreground hover:text-foreground hover:bg-accent"
-								}`}
-							>
-								<ColorDot color={p.color} />
-								{p.name}
-							</button>
-
-							{/* Edit / delete on hover — only show when no overlay open */}
-							{overlay.type === "none" && (
-								<div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded shadow-sm px-0.5 py-0.5 z-10">
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											setOverlay({ type: "edit", pamphlet: p });
-										}}
-										className="p-0.5 hover:text-foreground text-muted-foreground rounded transition-colors"
-									>
-										<Pencil className="w-2.5 h-2.5" />
-									</button>
-									{pamphlets.length > 1 && (
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setOverlay({ type: "delete", pamphlet: p });
-											}}
-											className="p-0.5 hover:text-destructive text-muted-foreground rounded transition-colors"
-										>
-											<Trash2 className="w-2.5 h-2.5" />
-										</button>
-									)}
-								</div>
-							)}
-						</div>
-					);
-				})}
+				{pamphlets.map((p) => (
+					<PamphletTab
+						key={p.id}
+						p={p}
+						isActive={p.id === activePamphlet?.id}
+						onSwitch={onSwitch}
+						onLongPress={(pamphlet, position) =>
+							setTabContextMenu({ pamphlet, position })
+						}
+					/>
+				))}
 
 				{/* Add button */}
 				<button
@@ -391,6 +533,21 @@ export function PamphletSwitcher({
 					</motion.div>
 				)}
 			</AnimatePresence>
+
+			{tabContextMenu && (
+				<PamphletTabContextMenu
+					pamphlet={tabContextMenu.pamphlet}
+					position={tabContextMenu.position}
+					canDelete={pamphlets.length > 1}
+					onEdit={() =>
+						setOverlay({ type: "edit", pamphlet: tabContextMenu.pamphlet })
+					}
+					onDelete={() =>
+						setOverlay({ type: "delete", pamphlet: tabContextMenu.pamphlet })
+					}
+					onClose={() => setTabContextMenu(null)}
+				/>
+			)}
 		</div>
 	);
 }

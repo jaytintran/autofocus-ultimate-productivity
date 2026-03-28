@@ -817,6 +817,7 @@ function TaskRow({
 		onTouchMove: lpMove,
 	} = useLongPress({
 		onLongPress: (e) => {
+			if (isEditing) return;
 			const touch = e.touches[0];
 			setContextMenu({ x: touch.clientX, y: touch.clientY });
 		},
