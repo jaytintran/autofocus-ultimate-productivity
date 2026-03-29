@@ -1208,7 +1208,12 @@ export async function reorderPamphlets(
 // TRACKER FUNCTIONS
 // =============================================================================
 
-export type TrackerType = "book" | "course" | "project" | "mega-project";
+export type TrackerType =
+	| "book"
+	| "course"
+	| "project"
+	| "mega-project"
+	| "habit";
 
 export interface Tracker {
 	id: string;
@@ -1216,17 +1221,17 @@ export interface Tracker {
 	type: TrackerType;
 	completed: boolean;
 	completed_at: string | null;
+	position: number;
 	created_at: string;
 	updated_at: string;
 }
-
 export async function getTrackers(): Promise<Tracker[]> {
 	const supabase = createClient();
 	const { data, error } = await supabase
 		.from("tracker")
 		.select("*")
 		.order("completed", { ascending: true })
-		.order("created_at", { ascending: false });
+		.order("position", { ascending: true });
 
 	if (error) throw error;
 	return data || [];
@@ -1346,4 +1351,20 @@ export async function searchTrackers(query: string): Promise<Tracker[]> {
 
 	if (error) throw error;
 	return data || [];
+}
+
+export async function reorderTrackers(
+	updates: Array<{ id: string; position: number }>,
+): Promise<void> {
+	const supabase = createClient();
+	for (const update of updates) {
+		const { error } = await supabase
+			.from("tracker")
+			.update({
+				position: update.position,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", update.id);
+		if (error) throw error;
+	}
 }

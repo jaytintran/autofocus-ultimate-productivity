@@ -60,7 +60,11 @@ import type {
 	TaskReorderUpdate,
 	AchievementPending,
 } from "@/lib/types";
-import { type CompletedSortKey, type CompletedViewType } from "./view-tabs";
+import {
+	type CompletedSortKey,
+	type CompletedViewType,
+	type TrackerViewType,
+} from "./view-tabs";
 import { TAG_DEFINITIONS, TagId } from "@/lib/tags";
 import {
 	applyContentFilter,
@@ -223,6 +227,9 @@ export function AutofocusApp() {
 		new Map(),
 	);
 	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
+
+	const [trackerViewType, setTrackerViewType] =
+		useState<TrackerViewType>("gallery");
 
 	// -------------------------------------------------------------------------
 	// State - Achievement Toast
@@ -622,6 +629,7 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 				due_date: null,
 				pamphlet_id: activePamphletId,
+				tracker_id: null,
 			}));
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
@@ -1231,6 +1239,7 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
+				tracker_id: null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -1912,6 +1921,8 @@ export function AutofocusApp() {
 				onChangeContentFilter={setContentFilter}
 				trackerTypeFilter={trackerTypeFilter}
 				onTrackerTypeFilterChange={setTrackerTypeFilter}
+				trackerViewType={trackerViewType}
+				onTrackerViewTypeChange={setTrackerViewType}
 			/>
 
 			{activeView === "tasks" && (
@@ -1974,7 +1985,10 @@ export function AutofocusApp() {
 					/>
 				)}
 				{activeView === "tracker" && (
-					<TrackerView typeFilter={trackerTypeFilter} />
+					<TrackerView
+						typeFilter={trackerTypeFilter}
+						viewType={trackerViewType}
+					/>
 				)}
 			</main>
 

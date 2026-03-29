@@ -23,6 +23,8 @@ import {
 	Square,
 	SquareCheck,
 	BookMarked,
+	LayoutDashboard,
+	GalleryHorizontalEnd,
 } from "lucide-react";
 import type { TrackerType } from "@/lib/store";
 
@@ -33,6 +35,7 @@ export type CompletedSortKey =
 	| "time_spent_desc";
 
 export type CompletedViewType = "default" | "7days";
+export type TrackerViewType = "flow" | "board" | "gallery";
 
 const SORT_OPTIONS: {
 	key: CompletedSortKey;
@@ -53,6 +56,58 @@ interface SortSelectorProps {
 interface ViewTypeToggleProps {
 	value: CompletedViewType;
 	onChange: (view: CompletedViewType) => void;
+}
+
+function TrackerViewToggle({
+	value,
+	onChange,
+}: {
+	value: TrackerViewType;
+	onChange: (v: TrackerViewType) => void;
+}) {
+	return (
+		<div className="inline-flex bg-secondary rounded overflow-hidden">
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={() => onChange("flow")}
+				className={`h-8 rounded text-xs transition-colors ${
+					value === "flow"
+						? "bg-accent! text-foreground"
+						: "text-muted-foreground hover:text-foreground"
+				}`}
+				title="Flow View"
+			>
+				<LayoutList className="w-3.5 h-3.5" />
+			</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={() => onChange("board")}
+				className={`h-8 rounded text-xs transition-colors ${
+					value === "board"
+						? "bg-accent! text-foreground"
+						: "text-muted-foreground hover:text-foreground"
+				}`}
+				title="Board View"
+			>
+				<LayoutDashboard className="w-3.5 h-3.5" />
+			</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={() => onChange("gallery")}
+				className={`h-8 rounded text-xs transition-colors ${
+					value === "gallery"
+						? "bg-accent! text-foreground"
+						: "text-muted-foreground hover:text-foreground"
+				}`}
+				title="Gallery View"
+			>
+				<GalleryHorizontalEnd className="w-3.5 h-3.5" />
+			</Button>
+		</div>
+	);
 }
 
 function SortSelector({ value, onChange }: SortSelectorProps) {
@@ -184,10 +239,11 @@ function ViewTypeToggle({ value, onChange }: ViewTypeToggleProps) {
 
 const TRACKER_TYPE_FILTER_OPTIONS = [
 	{ value: "all", label: "All" },
-	{ value: "book", label: "📖 Books" },
-	{ value: "course", label: "🎓 Courses" },
-	{ value: "project", label: "🏗️ Projects" },
+	{ value: "book", label: "📚 Books" },
+	{ value: "course", label: "📼 Courses" },
+	{ value: "project", label: "💼 Projects" },
 	{ value: "mega-project", label: "🚀 Mega Projects" },
+	{ value: "habit", label: "🔁 Habits" },
 ] as const;
 
 function TrackerTypeFilter({
@@ -249,6 +305,8 @@ interface ViewTabsProps {
 	onChangeContentFilter: (filter: ContentFilterState) => void;
 	trackerTypeFilter?: TrackerType | "all";
 	onTrackerTypeFilterChange?: (filter: TrackerType | "all") => void;
+	trackerViewType?: TrackerViewType | any;
+	onTrackerViewTypeChange?: (view: TrackerViewType) => void;
 }
 
 export function ViewTabs({
@@ -265,6 +323,8 @@ export function ViewTabs({
 	onChangeContentFilter,
 	trackerTypeFilter,
 	onTrackerTypeFilterChange,
+	trackerViewType,
+	onTrackerViewTypeChange,
 }: ViewTabsProps) {
 	return (
 		<div className="flex flex-row flex-wrap gap-2 justify-between sm:flex-row sm:items-center sm:justify-between px-4 py-3">
@@ -281,10 +341,16 @@ export function ViewTabs({
 
 			<div className="flex items-center gap-2">
 				{activeView === "tracker" && trackerTypeFilter !== undefined && (
-					<TrackerTypeFilter
-						value={trackerTypeFilter}
-						onChange={onTrackerTypeFilterChange!}
-					/>
+					<>
+						<TrackerViewToggle
+							value={trackerViewType}
+							onChange={onTrackerViewTypeChange!}
+						/>
+						<TrackerTypeFilter
+							value={trackerTypeFilter}
+							onChange={onTrackerTypeFilterChange!}
+						/>
+					</>
 				)}
 				{activeView === "tasks" && (
 					<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />

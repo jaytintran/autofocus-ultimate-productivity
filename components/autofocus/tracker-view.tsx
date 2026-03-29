@@ -2,11 +2,38 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronDown, Trash2, Pencil, Plus, Send } from "lucide-react";
+import {
+	Check,
+	ChevronDown,
+	Trash2,
+	Pencil,
+	Plus,
+	Send,
+	GripVertical,
+} from "lucide-react";
 import { useTracker } from "@/hooks/use-tracker";
 import type { Tracker, TrackerType } from "@/lib/store";
 import { formatTimeCompact, getTaskAge } from "@/lib/utils/time-utils";
 import type { Task } from "@/lib/types";
+import type { TrackerViewType } from "./view-tabs";
+
+import {
+	DndContext,
+	closestCenter,
+	PointerSensor,
+	TouchSensor,
+	useSensor,
+	useSensors,
+	DragEndEvent,
+	DragOverlay,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	verticalListSortingStrategy,
+	useSortable,
+	arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -15,6 +42,7 @@ const TYPE_LABELS: Record<TrackerType, string> = {
 	course: "🎓 Course",
 	project: "🏗️ Project",
 	"mega-project": "🚀 Mega Project",
+	habit: "🔁 Habit",
 };
 
 const TYPE_FILTER_OPTIONS: Array<{
@@ -33,6 +61,7 @@ const TRACKER_TYPES: TrackerType[] = [
 	"course",
 	"project",
 	"mega-project",
+	"habit",
 ];
 
 const TYPE_EMOJI: Record<TrackerType, string> = {
@@ -40,6 +69,7 @@ const TYPE_EMOJI: Record<TrackerType, string> = {
 	course: "🎓",
 	project: "🏗️",
 	"mega-project": "🚀",
+	habit: "🔁",
 };
 
 const TYPE_SHORT: Record<TrackerType, string> = {
@@ -47,6 +77,7 @@ const TYPE_SHORT: Record<TrackerType, string> = {
 	course: "Course",
 	project: "Project",
 	"mega-project": "Mega Project",
+	habit: "Habit",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -247,7 +278,8 @@ function TrackerEditForm({ initial, onSave, onCancel }: TrackerEditFormProps) {
 		book: "Book",
 		course: "Course",
 		project: "Project",
-		"mega-project": "Mega",
+		"mega-project": "Mega Project",
+		habit: "Habit",
 	};
 
 	return (
@@ -331,14 +363,45 @@ function TrackerRow({
 	);
 	const completedTasks = tasks?.filter((t) => t.status === "completed");
 
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({ id: tracker.id, disabled: tracker.completed });
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.4 : 1,
+	};
+
 	return (
-		<li className={`${tracker.completed ? "opacity-60" : ""}`}>
+		<li
+			ref={setNodeRef}
+			style={style}
+			className={`border-b border-border ${tracker.completed ? "opacity-60" : ""}`}
+		>
 			<div
 				className={`flex items-center gap-2.5 px-3 py-2.5 group hover:bg-accent/50 transition-colors cursor-pointer rounded-lg ${
 					isExpanded ? "bg-accent/30" : ""
 				}`}
 				onClick={() => onToggleExpand(tracker.id)}
 			>
+				{!tracker.completed && (
+					<button
+						{...attributes}
+						{...listeners}
+						type="button"
+						className="cursor-grab active:cursor-grabbing p-1 touch-none select-none flex-shrink-0"
+						aria-label="Drag to reorder"
+					>
+						<GripVertical className="w-3.5 h-3.5 text-muted-foreground/40" />
+					</button>
+				)}
+
 				<button
 					onClick={(e) => {
 						e.stopPropagation();
@@ -515,13 +578,117 @@ function TaskLine({ task }: { task: Task }) {
 	);
 }
 
+// ─── Gallery Card ──────────────────────────────────────────────────────────────
+
+function GalleryCard({
+	tracker,
+	agg,
+	onToggleExpand,
+	onComplete,
+	onUncomplete,
+	onEdit,
+	onDelete,
+}: {
+	tracker: Tracker;
+	agg: { count: number; totalMs: number };
+	onToggleExpand: (id: string) => void;
+	onComplete: (id: string) => void;
+	onUncomplete: (id: string) => void;
+	onEdit: (tracker: Tracker) => void;
+	onDelete: (id: string) => void;
+}) {
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({ id: tracker.id, disabled: tracker.completed });
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.4 : 1,
+	};
+
+	return (
+		<div
+			ref={setNodeRef}
+			style={style}
+			{...attributes}
+			{...listeners}
+			onClick={() => onToggleExpand(tracker.id)}
+			className={`relative flex flex-col gap-2 p-3 rounded-xl border border-border bg-card hover:bg-accent/40 transition-colors cursor-pointer ${tracker.completed ? "opacity-60" : ""}`}
+		>
+			<div className="flex items-start justify-between gap-1">
+				<p
+					className={`text-sm font-medium leading-snug line-clamp-2 flex items-center gap-1.5 ${tracker.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+				>
+					<span className="text-base leading-none flex-shrink-0">
+						{TYPE_EMOJI[tracker.type]}
+					</span>
+					{tracker.name}
+				</p>
+				<button
+					onClick={(e) => {
+						e.stopPropagation();
+						tracker.completed
+							? onUncomplete(tracker.id)
+							: onComplete(tracker.id);
+					}}
+					className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors mt-0.5 ${tracker.completed ? "bg-foreground/20 border-foreground/30" : "border-border hover:border-foreground/40"}`}
+				>
+					{tracker.completed && (
+						<Check className="w-2.5 h-2.5 text-foreground" />
+					)}
+				</button>
+			</div>
+
+			<div className="mt-auto flex flex-wrap gap-1">
+				{agg.count > 0 && (
+					<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/20 text-muted-foreground/60">
+						{agg.count} task{agg.count !== 1 ? "s" : ""}
+					</span>
+				)}
+				{agg.totalMs > 0 && (
+					<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/20 text-muted-foreground/60">
+						{formatTimeCompact(agg.totalMs)}
+					</span>
+				)}
+			</div>
+			<div className="flex items-center gap-1">
+				<button
+					onClick={(e) => {
+						e.stopPropagation();
+						onEdit(tracker);
+					}}
+					className="p-1 rounded hover:bg-accent transition-colors"
+				>
+					<Pencil className="w-3 h-3 text-muted-foreground" />
+				</button>
+				<button
+					onClick={(e) => {
+						e.stopPropagation();
+						onDelete(tracker.id);
+					}}
+					className="p-1 rounded hover:bg-accent transition-colors"
+				>
+					<Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+				</button>
+			</div>
+		</div>
+	);
+}
+
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 interface TrackerViewProps {
 	typeFilter: TrackerType | "all";
+	viewType: TrackerViewType;
 }
 
-export function TrackerView({ typeFilter }: TrackerViewProps) {
+export function TrackerView({ typeFilter, viewType }: TrackerViewProps) {
 	const {
 		trackers,
 		isLoading,
@@ -534,6 +701,7 @@ export function TrackerView({ typeFilter }: TrackerViewProps) {
 		handleUncomplete,
 		handleDelete,
 		handleToggleExpand,
+		handleReorder,
 	} = useTracker();
 
 	const [editingTracker, setEditingTracker] = useState<Tracker | null>(null);
@@ -544,104 +712,457 @@ export function TrackerView({ typeFilter }: TrackerViewProps) {
 	const active = filtered.filter((t) => !t.completed);
 	const completed = filtered.filter((t) => t.completed);
 
+	const [collapsedTypes, setCollapsedTypes] = useState<Set<TrackerType>>(
+		new Set(),
+	);
+
+	const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+		useSensor(TouchSensor, {
+			activationConstraint: { delay: 150, tolerance: 5 },
+		}),
+	);
+
+	const toggleTypeGroup = (type: TrackerType) => {
+		setCollapsedTypes((prev) => {
+			const next = new Set(prev);
+			next.has(type) ? next.delete(type) : next.add(type);
+			return next;
+		});
+	};
+
+	const activeByType = TRACKER_TYPES.map((type) => ({
+		type,
+		items: active.filter((t) => t.type === type),
+	})).filter(({ items }) => items.length > 0);
+
 	// Pre-select type in the floating input when a specific filter is active
 	const defaultInputType: TrackerType =
 		typeFilter === "all" ? "book" : typeFilter;
 
 	return (
 		<div className="flex-1 flex flex-col min-h-0">
-			{/* Filter chips */}
-			{/* <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0">
-				{TYPE_FILTER_OPTIONS.map((opt) => (
-					<button
-						key={opt.value}
-						onClick={() => setTypeFilter(opt.value as TrackerType | "all")}
-						className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors flex-shrink-0 ${
-							typeFilter === opt.value
-								? "border-foreground/40 bg-foreground/10 text-foreground"
-								: "border-border text-muted-foreground hover:border-foreground/30"
-						}`}
-					>
-						{opt.label}
-					</button>
-				))}
-			</div> */}
-
 			{/* Scrollable list — pb-24 so content never hides behind the floating bar */}
-			<div
-				className="flex-1 overflow-y-auto px-2 py-2 pb-24 space-y-0.5"
-				style={{ scrollbarWidth: "thin" }}
-			>
-				{isLoading && (
-					<p className="text-sm text-muted-foreground px-3 py-4">Loading...</p>
-				)}
-
-				{!isLoading && trackers.length === 0 && (
-					<div className="px-3 py-8 text-center space-y-1">
-						<p className="text-sm text-muted-foreground">No trackers yet.</p>
-						<p className="text-[12px] text-muted-foreground/60">
-							Add a book, course, or project using the input below.
-						</p>
+			{viewType === "board" && (
+				<div
+					className="flex-1 overflow-x-auto overflow-y-hidden px-2 py-2 pb-24"
+					style={{ scrollbarWidth: "thin" }}
+				>
+					<div className="flex gap-3 h-full min-w-max">
+						{TRACKER_TYPES.filter((type) =>
+							typeFilter === "all" ? true : type === typeFilter,
+						).map((type) => {
+							const items = active.filter((t) => t.type === type);
+							const completedItems = completed.filter((t) => t.type === type);
+							if (items.length === 0 && completedItems.length === 0)
+								return null;
+							return (
+								<div
+									key={type}
+									className="flex flex-col w-[500px] flex-shrink-0 bg-accent/20 rounded-xl p-2 gap-1"
+								>
+									<p className="text-[11px] text-muted-foreground/60 uppercase tracking-wide px-2 py-1">
+										{TYPE_LABELS[type]} ({items.length})
+									</p>
+									<div
+										className="flex-1 overflow-y-auto space-y-0.5"
+										style={{ scrollbarWidth: "thin" }}
+									>
+										<ul className="space-y-0.5">
+											{items.map((tracker) => (
+												<React.Fragment key={tracker.id}>
+													{editingTracker?.id === tracker.id ? (
+														<li className="mb-1 px-1">
+															<TrackerEditForm
+																initial={{
+																	name: tracker.name,
+																	type: tracker.type,
+																}}
+																onSave={async (name, type) => {
+																	await handleUpdate(tracker.id, {
+																		name,
+																		type,
+																	});
+																	setEditingTracker(null);
+																}}
+																onCancel={() => setEditingTracker(null)}
+															/>
+														</li>
+													) : (
+														<TrackerRow
+															tracker={tracker}
+															isExpanded={expandedId === tracker.id}
+															tasks={trackerTasks.get(tracker.id)}
+															isLoadingTasks={loadingTasksFor.has(tracker.id)}
+															onToggleExpand={handleToggleExpand}
+															onComplete={handleComplete}
+															onUncomplete={handleUncomplete}
+															onDelete={handleDelete}
+															onEdit={setEditingTracker}
+														/>
+													)}
+												</React.Fragment>
+											))}
+										</ul>
+										{completedItems.length > 0 && (
+											<>
+												<p className="text-[10px] text-muted-foreground/40 uppercase tracking-wide px-2 pt-2 pb-0.5">
+													Done
+												</p>
+												<ul className="space-y-0.5">
+													{completedItems.map((tracker) => (
+														<TrackerRow
+															key={tracker.id}
+															tracker={tracker}
+															isExpanded={expandedId === tracker.id}
+															tasks={trackerTasks.get(tracker.id)}
+															isLoadingTasks={loadingTasksFor.has(tracker.id)}
+															onToggleExpand={handleToggleExpand}
+															onComplete={handleComplete}
+															onUncomplete={handleUncomplete}
+															onDelete={handleDelete}
+															onEdit={setEditingTracker}
+														/>
+													))}
+												</ul>
+											</>
+										)}
+									</div>
+								</div>
+							);
+						})}
 					</div>
-				)}
+				</div>
+			)}
 
-				{/* Active trackers */}
-				<ul className="space-y-0.5">
-					{active.map((tracker) => (
-						<React.Fragment key={tracker.id}>
-							{editingTracker?.id === tracker.id ? (
-								<li className="mb-1 px-1">
-									<TrackerEditForm
-										initial={{ name: tracker.name, type: tracker.type }}
-										onSave={async (name, type) => {
-											await handleUpdate(tracker.id, { name, type });
-											setEditingTracker(null);
-										}}
-										onCancel={() => setEditingTracker(null)}
+			{viewType === "gallery" && (
+				<div
+					className="flex-1 overflow-y-auto px-2 py-2 pb-24"
+					style={{ scrollbarWidth: "thin" }}
+				>
+					{typeFilter !== "all" ? (
+						<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+							{[...active, ...completed].map((tracker) => {
+								const tasks = trackerTasks.get(tracker.id) ?? [];
+								const agg = aggregateTasks(tasks);
+								return (
+									<GalleryCard
+										key={tracker.id}
+										tracker={tracker}
+										agg={agg}
+										onToggleExpand={handleToggleExpand}
+										onComplete={handleComplete}
+										onUncomplete={handleUncomplete}
+										onEdit={setEditingTracker}
+										onDelete={handleDelete}
 									/>
-								</li>
-							) : (
-								<TrackerRow
-									tracker={tracker}
-									isExpanded={expandedId === tracker.id}
-									tasks={trackerTasks.get(tracker.id)}
-									isLoadingTasks={loadingTasksFor.has(tracker.id)}
-									onToggleExpand={handleToggleExpand}
-									onComplete={handleComplete}
-									onUncomplete={handleUncomplete}
-									onDelete={handleDelete}
-									onEdit={setEditingTracker}
-								/>
+								);
+							})}
+						</div>
+					) : (
+						<div className="space-y-4">
+							{activeByType.map(({ type, items }) => {
+								const isCollapsed = collapsedTypes.has(type);
+								return (
+									<div key={type}>
+										<button
+											type="button"
+											onClick={() => toggleTypeGroup(type)}
+											className="flex items-center gap-1.5 w-full px-1 py-1 text-[11px] text-muted-foreground/60 uppercase tracking-wide hover:text-muted-foreground transition-colors"
+										>
+											<ChevronDown
+												className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+											/>
+											{TYPE_LABELS[type]}
+											<span className="ml-1 normal-case tracking-normal">
+												({items.length})
+											</span>
+										</button>
+										<AnimatePresence initial={false}>
+											{!isCollapsed && (
+												<motion.div
+													key="gallery-group"
+													initial={{ height: 0, opacity: 0 }}
+													animate={{ height: "auto", opacity: 1 }}
+													exit={{ height: 0, opacity: 0 }}
+													transition={{ duration: 0.18, ease: "easeInOut" }}
+													className="overflow-hidden"
+												>
+													<DndContext
+														sensors={sensors}
+														collisionDetection={closestCenter}
+														onDragStart={(e) =>
+															setActiveDragId(e.active.id as string)
+														}
+														onDragEnd={async (e) => {
+															setActiveDragId(null);
+															const { active, over } = e;
+															if (!over || active.id === over.id) return;
+															await handleReorder(
+																active.id as string,
+																over.id as string,
+															);
+														}}
+													>
+														<SortableContext
+															items={items.map((t) => t.id)}
+															strategy={verticalListSortingStrategy}
+														>
+															<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-1">
+																{items.map((tracker) => {
+																	const tasks =
+																		trackerTasks.get(tracker.id) ?? [];
+																	const agg = aggregateTasks(tasks);
+																	return (
+																		<GalleryCard
+																			key={tracker.id}
+																			tracker={tracker}
+																			agg={agg}
+																			onToggleExpand={handleToggleExpand}
+																			onComplete={handleComplete}
+																			onUncomplete={handleUncomplete}
+																			onEdit={setEditingTracker}
+																			onDelete={handleDelete}
+																		/>
+																	);
+																})}
+															</div>
+														</SortableContext>
+														<DragOverlay>
+															{activeDragId &&
+																(() => {
+																	const t = items.find(
+																		(x) => x.id === activeDragId,
+																	);
+																	if (!t) return null;
+																	return (
+																		<div className="bg-card border border-border rounded-xl p-3 shadow-lg text-sm opacity-90 flex items-center gap-2">
+																			<span>{TYPE_EMOJI[t.type]}</span>
+																			<span>{t.name}</span>
+																		</div>
+																	);
+																})()}
+														</DragOverlay>
+													</DndContext>
+												</motion.div>
+											)}
+										</AnimatePresence>
+									</div>
+								);
+							})}
+							{completed.length > 0 && (
+								<div>
+									<p className="text-[11px] text-muted-foreground/50 uppercase tracking-wide px-1 py-1">
+										Completed
+									</p>
+									<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-1">
+										{completed.map((tracker) => {
+											const tasks = trackerTasks.get(tracker.id) ?? [];
+											const agg = aggregateTasks(tasks);
+											return (
+												<GalleryCard
+													key={tracker.id}
+													tracker={tracker}
+													agg={agg}
+													onToggleExpand={handleToggleExpand}
+													onComplete={handleComplete}
+													onUncomplete={handleUncomplete}
+													onEdit={setEditingTracker}
+													onDelete={handleDelete}
+												/>
+											);
+										})}
+									</div>
+								</div>
 							)}
-						</React.Fragment>
-					))}
-				</ul>
+						</div>
+					)}
+				</div>
+			)}
 
-				{/* Completed trackers */}
-				{completed.length > 0 && (
-					<div className="mt-3">
-						<p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide px-3 pb-1">
-							Completed
+			{viewType === "flow" && (
+				<div
+					className="flex-1 overflow-y-auto px-2 py-2 pb-24 space-y-0.5"
+					style={{ scrollbarWidth: "thin" }}
+				>
+					{isLoading && (
+						<p className="text-sm text-muted-foreground px-3 py-4">
+							Loading...
 						</p>
-						<ul className="space-y-0.5">
-							{completed.map((tracker) => (
-								<TrackerRow
-									key={tracker.id}
-									tracker={tracker}
-									isExpanded={expandedId === tracker.id}
-									tasks={trackerTasks.get(tracker.id)}
-									isLoadingTasks={loadingTasksFor.has(tracker.id)}
-									onToggleExpand={handleToggleExpand}
-									onComplete={handleComplete}
-									onUncomplete={handleUncomplete}
-									onDelete={handleDelete}
-									onEdit={setEditingTracker}
-								/>
-							))}
-						</ul>
-					</div>
-				)}
-			</div>
+					)}
+
+					{!isLoading && trackers.length === 0 && (
+						<div className="px-3 py-8 text-center space-y-1">
+							<p className="text-sm text-muted-foreground">No trackers yet.</p>
+							<p className="text-[12px] text-muted-foreground/60">
+								Add a book, course, or project using the input below.
+							</p>
+						</div>
+					)}
+
+					{/* Active trackers */}
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragStart={(e) => setActiveDragId(e.active.id as string)}
+						onDragEnd={async (e) => {
+							setActiveDragId(null);
+							const { active, over } = e;
+							if (!over || active.id === over.id) return;
+							await handleReorder(active.id as string, over.id as string);
+						}}
+					>
+						<SortableContext
+							items={active.map((t) => t.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							{typeFilter !== "all" ? (
+								<ul className="space-y-0.5">
+									{active.map((tracker) => (
+										<React.Fragment key={tracker.id}>
+											{editingTracker?.id === tracker.id ? (
+												<li className="mb-1 px-1">
+													<TrackerEditForm
+														initial={{ name: tracker.name, type: tracker.type }}
+														onSave={async (name, type) => {
+															await handleUpdate(tracker.id, { name, type });
+															setEditingTracker(null);
+														}}
+														onCancel={() => setEditingTracker(null)}
+													/>
+												</li>
+											) : (
+												<TrackerRow
+													tracker={tracker}
+													isExpanded={expandedId === tracker.id}
+													tasks={trackerTasks.get(tracker.id)}
+													isLoadingTasks={loadingTasksFor.has(tracker.id)}
+													onToggleExpand={handleToggleExpand}
+													onComplete={handleComplete}
+													onUncomplete={handleUncomplete}
+													onDelete={handleDelete}
+													onEdit={setEditingTracker}
+												/>
+											)}
+										</React.Fragment>
+									))}
+								</ul>
+							) : (
+								<div className="space-y-1">
+									{activeByType.map(({ type, items }) => {
+										const isCollapsed = collapsedTypes.has(type);
+										return (
+											<div key={type}>
+												<button
+													type="button"
+													onClick={() => toggleTypeGroup(type)}
+													className="flex items-center gap-1.5 w-full px-3 py-1 text-[11px] text-muted-foreground/60 uppercase tracking-wide hover:text-muted-foreground transition-colors"
+												>
+													<ChevronDown
+														className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+													/>
+													{TYPE_LABELS[type]}
+													<span className="ml-1 normal-case tracking-normal">
+														({items.length})
+													</span>
+												</button>
+												<AnimatePresence initial={false}>
+													{!isCollapsed && (
+														<motion.ul
+															key="group"
+															initial={{ height: 0, opacity: 0 }}
+															animate={{ height: "auto", opacity: 1 }}
+															exit={{ height: 0, opacity: 0 }}
+															transition={{ duration: 0.18, ease: "easeInOut" }}
+															className="overflow-hidden space-y-0.5"
+														>
+															{items.map((tracker) => (
+																<React.Fragment key={tracker.id}>
+																	{editingTracker?.id === tracker.id ? (
+																		<li className="mb-1 px-1">
+																			<TrackerEditForm
+																				initial={{
+																					name: tracker.name,
+																					type: tracker.type,
+																				}}
+																				onSave={async (name, type) => {
+																					await handleUpdate(tracker.id, {
+																						name,
+																						type,
+																					});
+																					setEditingTracker(null);
+																				}}
+																				onCancel={() => setEditingTracker(null)}
+																			/>
+																		</li>
+																	) : (
+																		<TrackerRow
+																			tracker={tracker}
+																			isExpanded={expandedId === tracker.id}
+																			tasks={trackerTasks.get(tracker.id)}
+																			isLoadingTasks={loadingTasksFor.has(
+																				tracker.id,
+																			)}
+																			onToggleExpand={handleToggleExpand}
+																			onComplete={handleComplete}
+																			onUncomplete={handleUncomplete}
+																			onDelete={handleDelete}
+																			onEdit={setEditingTracker}
+																		/>
+																	)}
+																</React.Fragment>
+															))}
+														</motion.ul>
+													)}
+												</AnimatePresence>
+											</div>
+										);
+									})}
+								</div>
+							)}
+
+							{/* Completed trackers */}
+							{completed.length > 0 && (
+								<div className="mt-3">
+									<p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide px-3 pb-1">
+										Completed
+									</p>
+									<ul className="space-y-0.5">
+										{completed.map((tracker) => (
+											<TrackerRow
+												key={tracker.id}
+												tracker={tracker}
+												isExpanded={expandedId === tracker.id}
+												tasks={trackerTasks.get(tracker.id)}
+												isLoadingTasks={loadingTasksFor.has(tracker.id)}
+												onToggleExpand={handleToggleExpand}
+												onComplete={handleComplete}
+												onUncomplete={handleUncomplete}
+												onDelete={handleDelete}
+												onEdit={setEditingTracker}
+											/>
+										))}
+									</ul>
+								</div>
+							)}
+						</SortableContext>
+						<DragOverlay>
+							{activeDragId &&
+								(() => {
+									const t = trackers.find((x) => x.id === activeDragId);
+									if (!t) return null;
+									return (
+										<div className="bg-card border border-border rounded-lg px-3 py-2.5 shadow-lg text-sm opacity-90">
+											{TYPE_EMOJI[t.type]} {t.name}
+										</div>
+									);
+								})()}
+						</DragOverlay>
+					</DndContext>
+				</div>
+			)}
 
 			{/* Floating input — always visible, matches TaskInput exactly */}
 			<TrackerInput defaultType={defaultInputType} onSave={handleCreate} />

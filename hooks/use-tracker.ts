@@ -8,10 +8,12 @@ import {
 	uncompleteTracker,
 	deleteTracker,
 	getTasksForTracker,
+	reorderTrackers,
 	type Tracker,
 	type TrackerType,
 } from "@/lib/store";
 import type { Task } from "@/lib/types";
+import { arrayMove } from "@dnd-kit/sortable";
 
 export function useTracker() {
 	const {
@@ -107,6 +109,23 @@ export function useTracker() {
 		setTrackerTasks((prev) => new Map(prev).set(trackerId, tasks));
 	}, []);
 
+	const handleReorder = useCallback(
+		async (activeId: string, overId: string) => {
+			const oldIndex = trackers.findIndex((t) => t.id === activeId);
+			const newIndex = trackers.findIndex((t) => t.id === overId);
+			if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+			const reordered = arrayMove(trackers, oldIndex, newIndex);
+			const updates = reordered.map((t, i) => ({ id: t.id, position: i }));
+
+			// Optimistic update
+			mutate(reordered, false);
+			await reorderTrackers(updates);
+			await mutate();
+		},
+		[trackers, mutate],
+	);
+
 	return {
 		trackers,
 		isLoading,
@@ -121,5 +140,6 @@ export function useTracker() {
 		handleDelete,
 		handleToggleExpand,
 		refreshTrackerTasks,
+		handleReorder,
 	};
 }
