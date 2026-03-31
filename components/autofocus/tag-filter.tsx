@@ -20,9 +20,9 @@ export function TagFilter({ selectedTags, onToggleTag }: TagFilterProps) {
 	const isAllSelected = selectedTags.size === 0;
 
 	const getButtonLabel = () => {
-		if (isAllSelected) return "All Tags";
+		if (isAllSelected) return "🏷️";
 		if (selectedTags.size === 1) {
-			if (selectedTags.has("none")) return "No Tags";
+			if (selectedTags.has("none")) return "!🏷️";
 			const tagId = Array.from(selectedTags)[0] as TagId;
 			const tag = TAG_DEFINITIONS.find((t) => t.id === tagId);
 			return tag ? `${tag.emoji} ${tag.label}` : "Filter";

@@ -114,7 +114,6 @@ export async function addTask(
 	tag?: TagId | null,
 	dueDate?: string | null,
 	pamphletId?: string | null,
-	trackerId?: string | null,
 ): Promise<Task> {
 	const supabase = createClient();
 
@@ -155,7 +154,6 @@ export async function addTask(
 			tag: tag ?? null,
 			due_date: dueDate ?? null,
 			pamphlet_id: pamphletId ?? null,
-			tracker_id: trackerId ?? null,
 		})
 		.select()
 		.single();
@@ -243,55 +241,6 @@ export async function updateTask(
 		.single();
 
 	if (error) throw error;
-	return data;
-}
-
-export async function completeTaskOld(
-	id: string,
-	totalTimeMs: number,
-): Promise<Task> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tasks")
-		.update({
-			status: "completed",
-			completed_at: new Date().toISOString(),
-			total_time_ms: totalTimeMs,
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", id)
-		.select()
-		.single();
-
-	if (error) throw error;
-
-	// Re-index all remaining active tasks
-	const { data: remainingTasks, error: fetchError } = await supabase
-		.from("tasks")
-		.select("id, page_number, position")
-		.in("status", ["active", "in-progress"])
-		.order("page_number", { ascending: true })
-		.order("position", { ascending: true });
-
-	if (fetchError) throw fetchError;
-	if (!remainingTasks || remainingTasks.length === 0) return data;
-
-	const PAGE_SIZE = 12;
-	const now = new Date().toISOString();
-
-	for (const [index, task] of remainingTasks.entries()) {
-		const { error: updateError } = await supabase
-			.from("tasks")
-			.update({
-				page_number: Math.floor(index / PAGE_SIZE) + 1,
-				position: index % PAGE_SIZE,
-				updated_at: now,
-			})
-			.eq("id", task.id);
-
-		if (updateError) throw updateError;
-	}
-
 	return data;
 }
 
@@ -1205,171 +1154,6 @@ export async function reorderPamphlets(
 }
 
 // =============================================================================
-// TRACKER FUNCTIONS
-// =============================================================================
-
-export type TrackerType =
-	| "book"
-	| "course"
-	| "project"
-	| "mega-project"
-	| "habit";
-
-export interface Tracker {
-	id: string;
-	name: string;
-	type: TrackerType;
-	completed: boolean;
-	completed_at: string | null;
-	position: number;
-	created_at: string;
-	updated_at: string;
-}
-export async function getTrackers(): Promise<Tracker[]> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.select("*")
-		.order("completed", { ascending: true })
-		.order("position", { ascending: true });
-
-	if (error) throw error;
-	return data || [];
-}
-
-export async function createTracker(
-	name: string,
-	type: TrackerType,
-): Promise<Tracker> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.insert({ name, type })
-		.select()
-		.single();
-
-	if (error) throw error;
-	return data;
-}
-
-export async function updateTracker(
-	id: string,
-	updates: Partial<Pick<Tracker, "name" | "type">>,
-): Promise<Tracker> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.update({ ...updates, updated_at: new Date().toISOString() })
-		.eq("id", id)
-		.select()
-		.single();
-
-	if (error) throw error;
-	return data;
-}
-
-export async function completeTracker(id: string): Promise<Tracker> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.update({
-			completed: true,
-			completed_at: new Date().toISOString(),
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", id)
-		.select()
-		.single();
-
-	if (error) throw error;
-	return data;
-}
-
-export async function uncompleteTracker(id: string): Promise<Tracker> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.update({
-			completed: false,
-			completed_at: null,
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", id)
-		.select()
-		.single();
-
-	if (error) throw error;
-	return data;
-}
-
-export async function deleteTracker(id: string): Promise<void> {
-	const supabase = createClient();
-	// tasks.tracker_id will be set to null automatically via ON DELETE SET NULL
-	const { error } = await supabase.from("tracker").delete().eq("id", id);
-
-	if (error) throw error;
-}
-
-export async function linkTaskToTracker(
-	taskId: string,
-	trackerId: string | null,
-): Promise<void> {
-	const supabase = createClient();
-	const { error } = await supabase
-		.from("tasks")
-		.update({
-			tracker_id: trackerId,
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", taskId);
-
-	if (error) throw error;
-}
-
-export async function getTasksForTracker(trackerId: string): Promise<Task[]> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tasks")
-		.select("*")
-		.eq("tracker_id", trackerId)
-		.order("completed_at", { ascending: false })
-		.order("added_at", { ascending: false });
-
-	if (error) throw error;
-	return data || [];
-}
-
-export async function searchTrackers(query: string): Promise<Tracker[]> {
-	const supabase = createClient();
-	const { data, error } = await supabase
-		.from("tracker")
-		.select("*")
-		.ilike("name", `%${query}%`)
-		.eq("completed", false)
-		.order("created_at", { ascending: false })
-		.limit(8);
-
-	if (error) throw error;
-	return data || [];
-}
-
-export async function reorderTrackers(
-	updates: Array<{ id: string; position: number }>,
-): Promise<void> {
-	const supabase = createClient();
-	for (const update of updates) {
-		const { error } = await supabase
-			.from("tracker")
-			.update({
-				position: update.position,
-				updated_at: new Date().toISOString(),
-			})
-			.eq("id", update.id);
-		if (error) throw error;
-	}
-}
-
-// =============================================================================
 // LOGGED ACTIVITY FUNCTIONS
 // =============================================================================
 
@@ -1396,7 +1180,6 @@ export async function addLoggedActivity(
 			tag: tag ?? null,
 			note: note ?? null,
 			pamphlet_id: pamphletId ?? null,
-			tracker_id: null,
 		})
 		.select()
 		.single();

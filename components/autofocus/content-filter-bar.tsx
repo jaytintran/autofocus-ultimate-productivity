@@ -34,13 +34,13 @@ export function ContentFilterBar({ value, onChange }: ContentFilterBarProps) {
 	const [open, setOpen] = useState(false);
 
 	const getSelectedLabels = () => {
-		if (value.preset === "show-all") return "All Types";
-		if (value.preset === "exclude-all") return "➖ All";
+		if (value.preset === "show-all") return "All";
+		if (value.preset === "exclude-all") return "➖";
 
-		if (value.options.length === 0) return "All Types";
-		if (value.options.length === FILTER_OPTIONS.length) return "All Types";
+		if (value.options.length === 0) return "All";
+		if (value.options.length === FILTER_OPTIONS.length) return "All";
 
-		return `${value.options.length} Selected`;
+		return `${value.options.length} / ${FILTER_OPTIONS.length}`;
 	};
 
 	const toggleOption = (option: ContentFilterOption) => {

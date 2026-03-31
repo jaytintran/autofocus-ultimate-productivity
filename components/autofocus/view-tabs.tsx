@@ -27,7 +27,6 @@ import {
 	GalleryHorizontalEnd,
 	BookOpen,
 } from "lucide-react";
-import type { TrackerType } from "@/lib/store";
 
 export type CompletedSortKey =
 	| "default"
@@ -36,7 +35,6 @@ export type CompletedSortKey =
 	| "time_spent_desc";
 
 export type CompletedViewType = "bullet" | "default" | "7days";
-export type TrackerViewType = "flow" | "board" | "gallery";
 
 const SORT_OPTIONS: {
 	key: CompletedSortKey;
@@ -57,58 +55,6 @@ interface SortSelectorProps {
 interface ViewTypeToggleProps {
 	value: CompletedViewType;
 	onChange: (view: CompletedViewType) => void;
-}
-
-function TrackerViewToggle({
-	value,
-	onChange,
-}: {
-	value: TrackerViewType;
-	onChange: (v: TrackerViewType) => void;
-}) {
-	return (
-		<div className="inline-flex bg-secondary rounded overflow-hidden">
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => onChange("flow")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "flow"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
-				title="Flow View"
-			>
-				<LayoutList className="w-3.5 h-3.5" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => onChange("board")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "board"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
-				title="Board View"
-			>
-				<LayoutDashboard className="w-3.5 h-3.5" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => onChange("gallery")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "gallery"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
-				title="Gallery View"
-			>
-				<GalleryHorizontalEnd className="w-3.5 h-3.5" />
-			</Button>
-		</div>
-	);
 }
 
 function SortSelector({ value, onChange }: SortSelectorProps) {
@@ -154,8 +100,8 @@ function MainViewToggle({
 	activeView,
 	onChange,
 }: {
-	activeView: "tasks" | "completed" | "tracker";
-	onChange: (view: "tasks" | "completed" | "tracker") => void;
+	activeView: "tasks" | "completed";
+	onChange: (view: "tasks" | "completed") => void;
 }) {
 	return (
 		<div className="inline-flex bg-secondary rounded overflow-hidden w-fit">
@@ -186,20 +132,6 @@ function MainViewToggle({
 			>
 				<span className="max-sm:hidden">Completed</span>
 				<SquareCheck className="w-3.5 h-3.5 sm:hidden" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => onChange("tracker")}
-				className={`h8 rounded text-xs transition-colors ${
-					activeView === "tracker"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
-				title="Tracker View"
-			>
-				{/* <span className="max-sm:hidden">Tracker</span> */}
-				<BookMarked className="w-3.5 h-3.5" />
 			</Button>
 		</div>
 	);
@@ -251,86 +183,9 @@ function ViewTypeToggle({ value, onChange }: ViewTypeToggleProps) {
 	);
 }
 
-const TRACKER_TYPE_FILTER_OPTIONS = [
-	{ value: "all", label: "All" },
-	{ value: "book", label: "📚 Books" },
-	{ value: "course", label: "📼 Courses" },
-	{ value: "project", label: "💼 Projects" },
-	{ value: "mega-project", label: "🚀 Mega Projects" },
-	{ value: "habit", label: "🔁 Habits" },
-] as const;
-
-function TrackerTypeFilter({
-	value,
-	onChange,
-}: {
-	value: TrackerType | "all";
-	onChange: (v: TrackerType | "all") => void;
-}) {
-	const [open, setOpen] = useState(false);
-
-	const current =
-		TRACKER_TYPE_FILTER_OPTIONS.find((o) => o.value === value) ??
-		TRACKER_TYPE_FILTER_OPTIONS[0];
-
-	return (
-		<>
-			{/* ── Desktop: inline pill strip ── */}
-			<div className="hidden md:flex items-center gap-1">
-				{TRACKER_TYPE_FILTER_OPTIONS.map((opt) => (
-					<button
-						key={opt.value}
-						type="button"
-						onClick={() => onChange(opt.value as TrackerType | "all")}
-						className={`px-2.5 py-1 text-xs rounded-sm border transition-colors ${
-							value === opt.value
-								? "border-[#8b9a6b]/60 bg-[#8b9a6b]/10 text-foreground"
-								: "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-						}`}
-					>
-						{opt.label}
-					</button>
-				))}
-			</div>
-
-			{/* ── Mobile: popover ── */}
-			<div className="md:hidden">
-				<Popover open={open} onOpenChange={setOpen}>
-					<PopoverTrigger asChild>
-						<Button variant="outline" size="sm" className="h-8 rounded">
-							<span className="text-sm">{current.label}</span>
-							<ArrowUpDown className="w-3 h-3 opacity-50 -mr-1" />
-						</Button>
-					</PopoverTrigger>
-					<PopoverContent className="w-48 p-2" align="end">
-						<div className="flex flex-col gap-1">
-							{TRACKER_TYPE_FILTER_OPTIONS.map((opt) => (
-								<button
-									key={opt.value}
-									onClick={() => {
-										onChange(opt.value as TrackerType | "all");
-										setOpen(false);
-									}}
-									className={`flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors text-left ${
-										value === opt.value
-											? "bg-[#8b9a6b] text-white"
-											: "hover:bg-accent"
-									}`}
-								>
-									{opt.label}
-								</button>
-							))}
-						</div>
-					</PopoverContent>
-				</Popover>
-			</div>
-		</>
-	);
-}
-
 interface ViewTabsProps {
-	activeView: "tasks" | "completed" | "tracker";
-	onViewChange: (view: "tasks" | "completed" | "tracker") => void;
+	activeView: "tasks" | "completed";
+	onViewChange: (view: "tasks" | "completed") => void;
 	selectedTags: Set<TagId | "none">;
 	onToggleTag: (tag: TagId | "none" | "all") => void;
 	onAddTasks: (tasks: string[], tag?: TagId | null) => Promise<void>;
@@ -340,10 +195,6 @@ interface ViewTabsProps {
 	onCompletedViewTypeChange: (view: CompletedViewType) => void;
 	contentFilter: ContentFilterState;
 	onChangeContentFilter: (filter: ContentFilterState) => void;
-	trackerTypeFilter?: TrackerType | "all";
-	onTrackerTypeFilterChange?: (filter: TrackerType | "all") => void;
-	trackerViewType?: TrackerViewType | any;
-	onTrackerViewTypeChange?: (view: TrackerViewType) => void;
 }
 
 export function ViewTabs({
@@ -358,10 +209,6 @@ export function ViewTabs({
 	onCompletedViewTypeChange,
 	contentFilter,
 	onChangeContentFilter,
-	trackerTypeFilter,
-	onTrackerTypeFilterChange,
-	trackerViewType,
-	onTrackerViewTypeChange,
 }: ViewTabsProps) {
 	return (
 		<div className="flex flex-row flex-wrap gap-2 justify-between sm:flex-row sm:items-center sm:justify-between px-4 py-3">
@@ -377,36 +224,22 @@ export function ViewTabs({
 			</div>
 
 			<div className="flex items-center gap-2">
-				{activeView === "tracker" && trackerTypeFilter !== undefined && (
+				{activeView === "tasks" && (
 					<>
-						<TrackerTypeFilter
-							value={trackerTypeFilter}
-							onChange={onTrackerTypeFilterChange!}
-						/>
-						<TrackerViewToggle
-							value={trackerViewType}
-							onChange={onTrackerViewTypeChange!}
-						/>
+						<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />
 					</>
 				)}
-				{activeView === "tasks" && (
-					<BacklogDump onAddTasks={onAddTasks} selectedTags={selectedTags} />
-				)}
+				<ContentFilterBar
+					value={contentFilter}
+					onChange={onChangeContentFilter}
+				/>
+				<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
 				{activeView === "completed" && (
 					<>
 						<SortSelector
 							value={completedSort}
 							onChange={onCompletedSortChange}
 						/>
-					</>
-				)}
-				{activeView !== "tracker" && (
-					<>
-						<ContentFilterBar
-							value={contentFilter}
-							onChange={onChangeContentFilter}
-						/>
-						<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
 					</>
 				)}
 			</div>

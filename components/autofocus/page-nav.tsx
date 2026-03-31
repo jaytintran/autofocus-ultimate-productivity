@@ -33,12 +33,6 @@ import { PAMPHLET_COLORS } from "@/lib/pamphlet-colors";
 
 const NOTION_PAGES = [
 	{
-		label: "Received Thoughts",
-		description: "Capturing thoughts before refining and storing",
-		icon: Inbox,
-		href: "notion://www.notion.so/32aa0f71b1028092ba0dc76db7752f9d?v=32aa0f71b1028009a540000cff473e9e&source=copy_link",
-	},
-	{
 		label: "Books",
 		description: "Reading list & notes",
 		icon: BookOpen,
@@ -55,6 +49,12 @@ const NOTION_PAGES = [
 		description: "Ongoing work & ideas",
 		icon: FolderKanban,
 		href: "notion://www.notion.so/31fa0f71b10280309f09d1bea29c86d9?v=31fa0f71b102804ca34a000cff172a17&source=copy_link",
+	},
+	{
+		label: "Habits",
+		description: "Daily routines & habits",
+		icon: FunnelPlus,
+		href: "https://www.notion.so/326a0f71b102807cbb3ed7de5007a8aa?v=31fa0f71b102804ca34a000cff172a17&source=copy_link",
 	},
 	{
 		label: "Ideas",

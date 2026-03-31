@@ -5,7 +5,6 @@ import { Plus, Send } from "lucide-react";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
 import { Task } from "@/lib/types";
 import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
-import { searchTrackers, type Tracker } from "@/lib/store";
 
 const TEMPLATES = [
 	{ label: "Go", text: "🏍️ Go to " },
@@ -78,57 +77,6 @@ function TagMentionDropdown({ query, onSelect }: TagMentionDropdownProps) {
 	);
 }
 
-interface TrackerMentionDropdownProps {
-	results: Tracker[];
-	query: string;
-	onSelect: (tracker: Tracker) => void;
-}
-
-const TRACKER_TYPE_EMOJI: Record<string, string> = {
-	book: "📖",
-	course: "🎓",
-	project: "🏗️",
-	"mega-project": "🚀",
-};
-
-function TrackerMentionDropdown({
-	results,
-	query,
-	onSelect,
-}: TrackerMentionDropdownProps) {
-	if (query.length === 0) return null;
-	if (results.length === 0)
-		return (
-			<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg p-1.5 z-50 min-w-[200px]">
-				<p className="text-[11px] text-muted-foreground px-2 py-1">
-					No trackers match "{query}"
-				</p>
-			</div>
-		);
-
-	return (
-		<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg p-1.5 z-50 min-w-[200px]">
-			<p className="text-[10px] text-muted-foreground px-2 py-1">
-				Link to tracker...
-			</p>
-			{results.map((tracker) => (
-				<button
-					key={tracker.id}
-					type="button"
-					onMouseDown={(e) => {
-						e.preventDefault();
-						onSelect(tracker);
-					}}
-					className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-lg hover:bg-accent transition-colors text-left"
-				>
-					<span>{TRACKER_TYPE_EMOJI[tracker.type]}</span>
-					<span className="flex-1 min-w-0 truncate">{tracker.name}</span>
-				</button>
-			))}
-		</div>
-	);
-}
-
 interface TaskInputProps {
 	onAddTask: (
 		text: string,
@@ -147,8 +95,6 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 	const [dueDate, setDueDate] = useState<Date | null>(null);
 	const [dueDateLabel, setDueDateLabel] = useState<string | null>(null);
 	const [trackerQuery, setTrackerQuery] = useState<string | null>(null);
-	const [trackerResults, setTrackerResults] = useState<Tracker[]>([]);
-	const [selectedTracker, setSelectedTracker] = useState<Tracker | null>(null);
 	const trackerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -210,22 +156,6 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 				parseDueDateShortcut(value);
 			setDueDate(parsedDueDate);
 			setDueDateLabel(parsedLabel);
-
-			// Detect active > mention being typed
-			const trackerMatch = value.match(/>(\w+.*)$/);
-			if (trackerMatch) {
-				const q = trackerMatch[1].trim();
-				setTrackerQuery(q);
-				// Debounce the search
-				if (trackerSearchRef.current) clearTimeout(trackerSearchRef.current);
-				trackerSearchRef.current = setTimeout(async () => {
-					const results = await searchTrackers(q);
-					setTrackerResults(results);
-				}, 200);
-			} else {
-				setTrackerQuery(null);
-				setTrackerResults([]);
-			}
 		},
 		[],
 	);
@@ -237,19 +167,6 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 			setText(cleanText);
 			setInlineTag(tagId);
 			setMentionQuery(null);
-			inputRef.current?.focus();
-		},
-		[text],
-	);
-
-	const handleSelectTracker = useCallback(
-		(tracker: Tracker) => {
-			// Strip the >keyword from text
-			const cleanText = text.replace(/>[\w\s]*$/, "").trim();
-			setText(cleanText);
-			setSelectedTracker(tracker);
-			setTrackerQuery(null);
-			setTrackerResults([]);
 			inputRef.current?.focus();
 		},
 		[text],
@@ -304,16 +221,13 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 		setMentionQuery(null);
 		setDueDate(null);
 		setDueDateLabel(null);
-		setSelectedTracker(null);
 		setTrackerQuery(null);
-		setTrackerResults([]);
 		inputRef.current?.focus();
 
 		onAddTask(
 			capitalized,
 			resolvedTag,
 			dueDate ? dueDate.toISOString() : null,
-			selectedTracker?.id ?? null,
 		).catch((error) => {
 			console.error("Failed to add task:", error);
 		});
@@ -389,16 +303,6 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 					</div>
 				)}
 
-				{trackerQuery !== null && (
-					<div className="absolute bottom-full left-4 mb-2">
-						<TrackerMentionDropdown
-							query={trackerQuery}
-							results={trackerResults}
-							onSelect={handleSelectTracker}
-						/>
-					</div>
-				)}
-
 				<button
 					type="button"
 					onClick={() => setShowTemplates((prev) => !prev)}
@@ -422,23 +326,6 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 					>
 						<span>{tagDefinition.emoji}</span>
 						<span>{tagDefinition.label}</span>
-						<span className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5">
-							×
-						</span>
-					</button>
-				)}
-
-				{selectedTracker && (
-					<button
-						type="button"
-						onClick={() => setSelectedTracker(null)}
-						className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-500 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors group"
-						title="Remove tracker link"
-					>
-						<span>{TRACKER_TYPE_EMOJI[selectedTracker.type]}</span>
-						<span className="max-w-[80px] truncate">
-							{selectedTracker.name}
-						</span>
 						<span className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5">
 							×
 						</span>

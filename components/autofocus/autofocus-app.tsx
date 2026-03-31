@@ -21,7 +21,6 @@ import { CompletedList } from "./completed-list";
 import { TaskInput } from "./task-input";
 import { AchievementChip } from "./achievement-chip";
 import { PamphletSwitcher } from "./pamphlet-switcher";
-import { TrackerView } from "./tracker-view";
 
 // Store & Types
 import {
@@ -49,7 +48,6 @@ import {
 	revertTask,
 } from "@/lib/store";
 import { moveTaskToPamphlet } from "@/lib/store";
-import type { TrackerType } from "@/lib/store";
 
 import type {
 	Task,
@@ -61,11 +59,7 @@ import type {
 	TaskReorderUpdate,
 	AchievementPending,
 } from "@/lib/types";
-import {
-	type CompletedSortKey,
-	type CompletedViewType,
-	type TrackerViewType,
-} from "./view-tabs";
+import { type CompletedSortKey, type CompletedViewType } from "./view-tabs";
 import { TAG_DEFINITIONS, TagId } from "@/lib/tags";
 import {
 	applyContentFilter,
@@ -182,9 +176,7 @@ export function AutofocusApp() {
 		reorderPamphletsList,
 	} = usePamphlets();
 
-	const [activeView, setActiveView] = useState<
-		"tasks" | "completed" | "tracker"
-	>("tasks");
+	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
 	const [selectedTags, setSelectedTags] = useState<Set<TagId | "none">>(
 		new Set(),
 	);
@@ -194,9 +186,6 @@ export function AutofocusApp() {
 	});
 	const [searchQuery, setSearchQuery] = useState("");
 	const debouncedSearchQuery = useDebouncedValue(searchQuery, 2500);
-	const [trackerTypeFilter, setTrackerTypeFilter] = useState<
-		TrackerType | "all"
-	>("all");
 
 	// -------------------------------------------------------------------------
 	// State - Pagination
@@ -229,9 +218,6 @@ export function AutofocusApp() {
 		new Map(),
 	);
 	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
-
-	const [trackerViewType, setTrackerViewType] =
-		useState<TrackerViewType>("gallery");
 
 	// -------------------------------------------------------------------------
 	// State - Achievement Toast
@@ -586,7 +572,6 @@ export function AutofocusApp() {
 					tag ?? null,
 					dueDate ?? null,
 					activePamphletId,
-					trackerId ?? null,
 				);
 				await mutateActive();
 				await mutateTotalPages();
@@ -1246,7 +1231,6 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
-				tracker_id: null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -1941,10 +1925,6 @@ export function AutofocusApp() {
 				onCompletedViewTypeChange={setCompletedViewType}
 				contentFilter={contentFilter}
 				onChangeContentFilter={setContentFilter}
-				trackerTypeFilter={trackerTypeFilter}
-				onTrackerTypeFilterChange={setTrackerTypeFilter}
-				trackerViewType={trackerViewType}
-				onTrackerViewTypeChange={setTrackerViewType}
 			/>
 
 			{activeView === "tasks" && (
@@ -2006,12 +1986,6 @@ export function AutofocusApp() {
 						onAddLoggedActivity={handleAddLoggedActivity}
 						pamphlets={pamphlets}
 						activePamphletId={activePamphletId}
-					/>
-				)}
-				{activeView === "tracker" && (
-					<TrackerView
-						typeFilter={trackerTypeFilter}
-						viewType={trackerViewType}
 					/>
 				)}
 			</main>
