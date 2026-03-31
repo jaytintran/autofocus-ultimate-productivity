@@ -719,7 +719,10 @@ const EntryModal = memo(function EntryModal({
 
 	return (
 		<Dialog open onOpenChange={onClose}>
-			<DialogContent className="sm:max-w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden p-0">
+			<DialogContent
+				className="sm:max-w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden p-0"
+				aria-describedby="dialog-description"
+			>
 				<div className="px-6 pt-5 pb-4">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
