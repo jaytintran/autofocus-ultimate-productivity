@@ -1,20 +1,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import {
-	Search,
-	Plus,
-	Star,
-	BookOpen,
-	X,
-	ChevronRight,
-	Flame,
-	CheckCircle2,
-	Circle,
-	BookMarked,
-	Layers,
-	ArrowLeft,
-} from "lucide-react";
 import { useBooks } from "@/hooks/use-books";
 import type { Book, BookStatus, BookPriority } from "@/lib/books";
 import {
@@ -24,6 +10,70 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+
+import {
+	Brain,
+	Code2,
+	DollarSign,
+	Heart,
+	Globe,
+	Lightbulb,
+	BarChart2,
+	Pen,
+	Microscope,
+	Dumbbell,
+	Music,
+	Cpu,
+	BookOpen as BookOpenIcon,
+	Layers as LayersIcon,
+	Search,
+	Plus,
+	Star,
+	BookOpen,
+	X,
+	Flame,
+	CheckCircle2,
+	Circle,
+	BookMarked,
+	Layers,
+	Edit,
+	Trash2,
+	Menu,
+	ChevronRight,
+} from "lucide-react";
+
+// ─── Domain Icons ─────────────────────────────────────────────────────
+
+const DOMAIN_ICONS: Record<string, React.ElementType> = {
+	psychology: Brain,
+	philosophical: Lightbulb,
+	programming: Code2,
+	code: Code2,
+	software: Code2,
+	wealth: DollarSign,
+	money: DollarSign,
+	investing: BarChart2,
+	trading: BarChart2,
+	health: Heart,
+	fitness: Dumbbell,
+	science: Microscope,
+	writing: Pen,
+	music: Music,
+	tech: Cpu,
+	technology: Cpu,
+	global: Globe,
+	power: Globe,
+	mental: Brain,
+	reality: Flame,
+};
+
+function getDomainIcon(domain: string): React.ElementType {
+	const lower = domain.toLowerCase();
+	for (const [key, Icon] of Object.entries(DOMAIN_ICONS)) {
+		if (lower.includes(key)) return Icon;
+	}
+	return BookOpenIcon;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -91,18 +141,6 @@ const PRIORITY_CONFIG: Record<
 		bg: "bg-muted",
 		order: 4,
 	},
-};
-
-const DOMAIN_SHORT: Record<string, string> = {
-	"Mental Sovereignty": "Mental",
-	"Psychological X-Ray Vision": "Psych",
-	"Power, Influence & Social Strategy": "Power",
-	"Strategic Thinking & Wealth": "Strategy",
-	"Reality Creation & Perception Control": "Reality",
-	"Philosophical Invincibility": "Philosophy",
-	"Day Trading Mastery": "Trading",
-	"Health, Fitness, & Human Performance": "Health",
-	"AI, Technology, & Software": "AI & Tech",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -736,15 +774,6 @@ function DashboardView({
 		[books],
 	);
 
-	const criticalUnread = useMemo(
-		() =>
-			books
-				.filter((b) => b.priority === "CRITICAL" && b.status === "unread")
-				.sort(sortByPriority)
-				.slice(0, 6),
-		[books],
-	);
-
 	const currentlyReading = useMemo(
 		() => books.filter((b) => b.status === "reading").sort(sortByPriority),
 		[books],
@@ -846,26 +875,34 @@ function DashboardView({
 					</div>
 				</div>
 			)}
-			{/* Critical unread */}
-			{criticalUnread.length > 0 && (
-				<div className="space-y-3">
-					<div className="flex items-center gap-2">
-						<div className="w-2 h-2 rounded-full bg-red-500" />
-						<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-							Critical Priority — Up Next
-						</h3>
+			{/* Completed */}
+			{(() => {
+				const completed = books
+					.filter((b) => b.status === "completed")
+					.sort(sortByPriority);
+				return completed.length > 0 ? (
+					<div className="space-y-3">
+						<div className="flex items-center gap-2">
+							<CheckCircle2 className="w-3.5 h-3.5 text-[#8b9a6b]" />
+							<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+								Completed
+							</h3>
+							<span className="text-[10px] text-muted-foreground/40 tabular-nums">
+								{completed.length}
+							</span>
+						</div>
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+							{completed.map((book) => (
+								<BookCard
+									key={book.id}
+									book={book}
+									onClick={() => onBookClick(book)}
+								/>
+							))}
+						</div>
 					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-						{criticalUnread.map((book) => (
-							<BookCard
-								key={book.id}
-								book={book}
-								onClick={() => onBookClick(book)}
-							/>
-						))}
-					</div>
-				</div>
-			)}
+				) : null;
+			})()}
 		</div>
 	);
 }
@@ -977,17 +1014,14 @@ function DomainView({
 
 function EditDomainModal({
 	domain,
-	currentShort,
 	onClose,
 	onSave,
 }: {
 	domain: string;
-	currentShort: string;
 	onClose: () => void;
-	onSave: (fullName: string, shortName: string) => void;
+	onSave: (fullName: string) => void;
 }) {
 	const [fullName, setFullName] = useState(domain);
-	const [shortName, setShortName] = useState(currentShort);
 
 	return (
 		<Dialog open onOpenChange={onClose}>
@@ -1008,25 +1042,15 @@ function EditDomainModal({
 							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 						/>
 					</div>
-					<div className="space-y-1.5">
-						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-							Short Name (pill label)
-						</label>
-						<input
-							value={shortName}
-							onChange={(e) => setShortName(e.target.value)}
-							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-						/>
-					</div>
 					<div className="flex justify-end gap-2 pt-1">
 						<Button variant="outline" size="sm" onClick={onClose}>
 							Cancel
 						</Button>
 						<Button
 							size="sm"
-							disabled={!fullName.trim() || !shortName.trim()}
+							disabled={!fullName.trim()}
 							onClick={() => {
-								onSave(fullName.trim(), shortName.trim());
+								onSave(fullName.trim());
 								onClose();
 							}}
 						>
@@ -1036,6 +1060,293 @@ function EditDomainModal({
 				</div>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+// ─── Book Sidebar ─────────────────────────────────────────────────────────
+
+function BookSidebar({
+	domains,
+	books,
+	activeDomain,
+	onSelect,
+	onAddBook,
+	collapsed,
+	onToggleCollapse,
+	mobileOpen,
+	onMobileClose,
+}: {
+	domains: string[];
+	books: Book[];
+	activeDomain: string;
+	onSelect: (d: string) => void;
+	onAddBook: () => void;
+	collapsed: boolean;
+	onToggleCollapse: () => void;
+	mobileOpen: boolean;
+	onMobileClose: () => void;
+}) {
+	const [addingDomain, setAddingDomain] = useState(false);
+	const [newDomainName, setNewDomainName] = useState("");
+	const newDomainInputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		if (addingDomain) newDomainInputRef.current?.focus();
+	}, [addingDomain]);
+
+	const handleNewDomainSubmit = () => {
+		const name = newDomainName.trim();
+		if (!name) {
+			setAddingDomain(false);
+			return;
+		}
+		onSelect(name); // just switch to it — real domain created when book is added
+		setNewDomainName("");
+		setAddingDomain(false);
+	};
+
+	const SidebarContent = (
+		<div
+			className={`flex flex-col h-[95vh] pb-7 bg-card border-r border-border/50 transition-all duration-200 ${collapsed ? "w-14" : "w-fit"}`}
+		>
+			{/* Header */}
+			<div
+				className={`flex items-center px-3 py-3 border-b border-border/50 flex-shrink-0 ${collapsed ? "justify-center" : "justify-between"}`}
+			>
+				{!collapsed && (
+					<span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+						Library
+					</span>
+				)}
+				<button
+					onClick={onToggleCollapse}
+					className="p-1 rounded-md hover:bg-accent text-muted-foreground/60 hover:text-foreground transition-colors hidden sm:flex"
+				>
+					<ChevronRight
+						className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "" : "rotate-180"}`}
+					/>
+				</button>
+			</div>
+
+			{/* Nav items */}
+			<div className="flex-1 overflow-y-auto py-2 space-y-0.5 px-2 min-h-0">
+				{/* Overview */}
+				{(() => {
+					const isActive = activeDomain === "__dashboard__";
+					return (
+						<button
+							onClick={() => {
+								onSelect("__dashboard__");
+								onMobileClose();
+							}}
+							title="Overview"
+							className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-colors group
+                ${isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"}
+                ${collapsed ? "justify-center" : ""}`}
+						>
+							<BookMarked className="w-4 h-4 flex-shrink-0" />
+							{!collapsed && (
+								<span className="truncate flex-1 text-left">Overview</span>
+							)}
+						</button>
+					);
+				})()}
+
+				<div className="h-px bg-border/40 my-1 mx-1" />
+
+				{/* Domain rows */}
+				{domains.map((domain) => {
+					const count = books.filter((b) => b.domain === domain).length;
+					const isActive = activeDomain === domain;
+					const Icon = getDomainIcon(domain);
+					return (
+						<button
+							key={domain}
+							onClick={() => {
+								onSelect(domain);
+								onMobileClose();
+							}}
+							title={domain}
+							className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm transition-colors group relative
+            	   	 				${isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"}
+                					${collapsed ? "justify-center" : ""}`}
+						>
+							<Icon className="w-4 h-4 flex-shrink-0" />
+							{!collapsed && (
+								<>
+									<span className="truncate flex-1 text-left text-sm">
+										{domain}
+									</span>
+									<span
+										className={`text-[10px] tabular-nums ml-auto flex-shrink-0 ${isActive ? "opacity-70" : "opacity-40"}`}
+									>
+										{count}
+									</span>
+								</>
+							)}
+							{collapsed && (
+								<span className="absolute -top-1 -right-1 text-[9px] bg-muted text-muted-foreground rounded-full w-4 h-4 flex items-center justify-center leading-none">
+									{count}
+								</span>
+							)}
+						</button>
+					);
+				})}
+
+				{/* Inline new domain input */}
+				{addingDomain && !collapsed && (
+					<div className="px-2 py-1">
+						<input
+							ref={newDomainInputRef}
+							value={newDomainName}
+							onChange={(e) => setNewDomainName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleNewDomainSubmit();
+								if (e.key === "Escape") {
+									setAddingDomain(false);
+									setNewDomainName("");
+								}
+							}}
+							onBlur={handleNewDomainSubmit}
+							placeholder="Domain name..."
+							className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+						/>
+					</div>
+				)}
+			</div>
+
+			{/* Footer actions */}
+			<div
+				className={`w-full p-2 flex-shrink-0 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}
+			>
+				{/* Add book */}
+				<button
+					onClick={onAddBook}
+					title="Add Book"
+					className={`flex items-center px-2 py-3 justify-center gap-1 rounded-lg text-xs font-medium bg-[#8b9a6b]/10 hover:bg-[#8b9a6b]/20 text-[#8b9a6b] transition-colors
+            ${collapsed ? "w-8 h-8 justify-center" : "w-full"}`}
+				>
+					<Plus className="w-3.5 h-3.5 flex-shrink-0" />
+					{!collapsed && <span>Add Book</span>}
+				</button>
+			</div>
+		</div>
+	);
+
+	return (
+		<>
+			{/* Desktop sidebar */}
+			<div className="hidden sm:flex h-fit flex-shrink-0 sticky top-0">
+				{SidebarContent}
+			</div>
+
+			{/* Mobile drawer */}
+			{mobileOpen && (
+				<>
+					<div
+						className="fixed inset-0 z-40 bg-black/40 sm:hidden"
+						onClick={onMobileClose}
+					/>
+					<div className="fixed inset-y-0 left-0 z-50 sm:hidden flex">
+						<div className="w-64 h-full">
+							{/* Force expanded on mobile */}
+							<div className="flex flex-col h-full bg-card border-r border-border/50 w-64">
+								{/* reuse same content but force uncollapsed */}
+								<div className="flex items-center justify-between px-3 py-3 border-b border-border/50 flex-shrink-0">
+									<span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+										Library
+									</span>
+									<button
+										onClick={onMobileClose}
+										className="p-1 rounded-md hover:bg-accent text-muted-foreground/60"
+									>
+										<X className="w-4 h-4" />
+									</button>
+								</div>
+								{/* Domain list — same structure, collapsed=false forced */}
+								<div className="flex-1 overflow-y-auto py-2 space-y-0.5 px-2">
+									<button
+										onClick={() => {
+											onSelect("__dashboard__");
+											onMobileClose();
+										}}
+										className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${activeDomain === "__dashboard__" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+									>
+										<BookMarked className="w-4 h-4 flex-shrink-0" />
+										<span className="truncate flex-1 text-left">Overview</span>
+									</button>
+									<div className="h-px bg-border/40 my-1 mx-1" />
+									{domains.map((domain) => {
+										const count = books.filter(
+											(b) => b.domain === domain,
+										).length;
+										const isActive = activeDomain === domain;
+										const Icon = getDomainIcon(domain);
+										return (
+											<button
+												key={domain}
+												onClick={() => {
+													onSelect(domain);
+													onMobileClose();
+												}}
+												className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm transition-colors
+                          ${isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+											>
+												<Icon className="w-4 h-4 flex-shrink-0" />
+												<span className="truncate flex-1 text-left text-[13px]">
+													{domain}
+												</span>
+												<span
+													className={`text-[10px] tabular-nums ${isActive ? "opacity-70" : "opacity-40"}`}
+												>
+													{count}
+												</span>
+											</button>
+										);
+									})}
+									{addingDomain && (
+										<div className="px-2 py-1">
+											<input
+												ref={newDomainInputRef}
+												value={newDomainName}
+												onChange={(e) => setNewDomainName(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") handleNewDomainSubmit();
+													if (e.key === "Escape") {
+														setAddingDomain(false);
+														setNewDomainName("");
+													}
+												}}
+												onBlur={handleNewDomainSubmit}
+												placeholder="Domain name..."
+												className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+											/>
+										</div>
+									)}
+								</div>
+								<div className="border-t border-border/50 p-2 flex flex-col gap-1">
+									<button
+										onClick={() => setAddingDomain(true)}
+										className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-muted-foreground/60 hover:text-foreground hover:bg-accent transition-colors"
+									>
+										<Plus className="w-3.5 h-3.5" />
+										<span>New domain</span>
+									</button>
+									<button
+										onClick={onAddBook}
+										className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium bg-[#8b9a6b]/10 hover:bg-[#8b9a6b]/20 text-[#8b9a6b] transition-colors"
+									>
+										<Plus className="w-3.5 h-3.5" />
+										<span>Add Book</span>
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</>
+			)}
+		</>
 	);
 }
 
@@ -1063,51 +1374,36 @@ export function BookView() {
 		y: number;
 	} | null>(null);
 	const [editingDomain, setEditingDomain] = useState<string | null>(null);
-	const [domainShortMap, setDomainShortMap] =
-		useState<Record<string, string>>(DOMAIN_SHORT);
-
 	const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
 	const handleDomainMouseDown = (e: React.MouseEvent, domain: string) => {
 		longPressTimer.current = setTimeout(() => {
 			setDomainMenu({ domain, x: e.clientX, y: e.clientY });
 		}, 500);
 	};
-
 	const handleDomainMouseUp = () => {
 		if (longPressTimer.current) clearTimeout(longPressTimer.current);
 	};
-
 	const handleDomainContextMenu = (e: React.MouseEvent, domain: string) => {
 		e.preventDefault();
 		setDomainMenu({ domain, x: e.clientX, y: e.clientY });
 	};
-
-	const handleUpdateDomain = async (
-		oldName: string,
-		newName: string,
-		newShort: string,
-	) => {
+	const handleUpdateDomain = async (oldName: string, newName: string) => {
 		// Update all books with this domain
 		const affected = books.filter((b) => b.domain === oldName);
 		await Promise.all(
 			affected.map((b) => handleUpdate(b.id, { domain: newName })),
 		);
-		// Update DOMAIN_SHORT — since it's a module constant you'll want to move it to state
-		setDomainShortMap((prev) => {
-			const next = { ...prev };
-			delete next[oldName];
-			next[newName] = newShort;
-			return next;
-		});
+
 		if (activeDomain === oldName) setActiveDomain(newName);
 	};
-
 	const handleDeleteDomain = async (domain: string) => {
 		const affected = books.filter((b) => b.domain === domain);
 		await Promise.all(affected.map((b) => handleDelete(b.id)));
 		if (activeDomain === domain) setActiveDomain("__dashboard__");
 	};
+
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
 	useEffect(() => {
 		const timer = setTimeout(() => {
@@ -1148,104 +1444,75 @@ export function BookView() {
 	}
 
 	return (
-		<div className="flex flex-col h-full min-h-0">
-			{/* Top action bar */}
-			<div className="flex items-center gap-2 px-4 sm:px-6 py-3 border-b border-border/50 flex-shrink-0">
-				{/* Search */}
-				<div className="flex items-center gap-2 flex-1 bg-secondary/50 rounded-lg px-3 py-1.5">
-					<Search className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0" />
-					<input
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						placeholder="Search title or author..."
-						className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
-					/>
-					{search && (
-						<button
-							onClick={() => setSearch("")}
-							className="text-muted-foreground/50 hover:text-foreground transition-colors"
-						>
-							<X className="w-3.5 h-3.5" />
-						</button>
+		<div className="flex flex-col h-screen overflow-hidden">
+			{/* Hamburger — mobile only */}
+			<button
+				onClick={() => setMobileSidebarOpen(true)}
+				className="fixed top-4.75 right-15 sm:hidden p-1.75 border rounded-[0.25rem] hover:bg-af4-olive-muted  text-muted-foreground/60 hover:text-foreground transition-colors flex-shrink-0"
+			>
+				<Menu className="w-4 h-4" />
+			</button>
+
+			<div className="flex flex-1 min-h-0 overflow-hidden">
+				<BookSidebar
+					domains={domains}
+					books={books}
+					activeDomain={activeDomain}
+					onSelect={(d) => setActiveDomain(d)}
+					onAddBook={() => setShowAddModal(true)}
+					collapsed={sidebarCollapsed}
+					onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+					mobileOpen={mobileSidebarOpen}
+					onMobileClose={() => setMobileSidebarOpen(false)}
+				/>
+
+				{/* Main content */}
+				<div className="flex-1 min-w-0 min-h-0 overflow-y-auto ">
+					<div className="flex gap-3 px-5 mt-5">
+						{/* Search */}
+						<div className="relative flex max-w-[600px] items-center gap-2 flex-1 bg-secondary/50 px-3 py-3 rounded-full">
+							<Search className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0" />
+							<input
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								placeholder="Search title or author..."
+								className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
+							/>
+							{search && (
+								<button
+									onClick={() => setSearch("")}
+									className="text-muted-foreground/50 hover:text-foreground transition-colors"
+								>
+									<X className="w-3.5 h-3.5" />
+								</button>
+							)}
+							{/* Add book */}
+							<button
+								onClick={() => setShowAddModal(true)}
+								className="absolute right-0.5 py-4 px-4 bg-transparent hover:bg-[#8b9a6b]/20 text-[#8b9a6b] rounded-r-full border-l-0 transition-colors"
+							>
+								<Plus className="w-3 h-3" />
+							</button>
+						</div>
+					</div>
+
+					{activeDomain === "__dashboard__" ? (
+						<DashboardView
+							books={books}
+							search={debouncedSearch}
+							onBookClick={(book) => setSelectedBookId(book.id)}
+						/>
+					) : (
+						<DomainView
+							domain={activeDomain}
+							books={domainBooks}
+							search={debouncedSearch}
+							onBookClick={(book) => setSelectedBookId(book.id)}
+						/>
 					)}
 				</div>
-
-				{/* Add book */}
-				<button
-					onClick={() => setShowAddModal(true)}
-					className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8b9a6b]/10 hover:bg-[#8b9a6b]/20 text-[#8b9a6b] rounded-lg text-xs font-medium transition-colors flex-shrink-0"
-				>
-					<Plus className="w-3.5 h-3.5" />
-					<span className="hidden sm:inline">Add Book</span>
-				</button>
 			</div>
-			{/* Domain pill strip */}
-			<div className="flex-shrink-0 border-b border-border/50 overflow-x-auto">
-				<div className="flex items-center gap-1 px-4 sm:px-6 py-2 w-max min-w-full">
-					{/* Dashboard pill */}
-					<button
-						onClick={() => setActiveDomain("__dashboard__")}
-						className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-							activeDomain === "__dashboard__"
-								? "bg-foreground text-background"
-								: "text-muted-foreground hover:text-foreground hover:bg-accent"
-						}`}
-					>
-						<BookMarked className="w-3 h-3" />
-						Overview
-					</button>
 
-					<div className="w-px h-4 bg-border/50 mx-1 flex-shrink-0" />
-
-					{domains.map((domain) => {
-						const count = books.filter((b) => b.domain === domain).length;
-						const short = domainShortMap[domain] ?? domain;
-						const isActive = activeDomain === domain;
-						return (
-							<button
-								key={domain}
-								title={domain}
-								onClick={() => setActiveDomain(domain)}
-								className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-									isActive
-										? "bg-foreground text-background"
-										: "text-muted-foreground hover:text-foreground hover:bg-accent"
-								}`}
-								onMouseDown={(e) => handleDomainMouseDown(e, domain)}
-								onMouseUp={handleDomainMouseUp}
-								onMouseLeave={handleDomainMouseUp}
-								onContextMenu={(e) => handleDomainContextMenu(e, domain)}
-							>
-								{short}
-								<span
-									className={`text-[10px] tabular-nums ${
-										isActive ? "opacity-70" : "opacity-50"
-									}`}
-								>
-									{count}
-								</span>
-							</button>
-						);
-					})}
-				</div>
-			</div>
-			{/* Main content */}
-			<div className="flex-1 min-h-0 overflow-y-auto">
-				{activeDomain === "__dashboard__" ? (
-					<DashboardView
-						books={books}
-						search={debouncedSearch}
-						onBookClick={(book) => setSelectedBookId(book.id)}
-					/>
-				) : (
-					<DomainView
-						domain={activeDomain}
-						books={domainBooks}
-						search={debouncedSearch}
-						onBookClick={(book) => setSelectedBookId(book.id)}
-					/>
-				)}
-			</div>
 			{/* Book detail modal */}
 			{selectedBook && (
 				<BookModal
@@ -1275,27 +1542,31 @@ export function BookView() {
 
 			{domainMenu && (
 				<div
-					className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[160px]"
+					className="fixed flex flex-col z-50 bg-popover border border-border rounded-xl shadow-lg w-fit"
 					style={{ top: domainMenu.y, left: domainMenu.x }}
 					onClick={(e) => e.stopPropagation()}
 				>
 					<button
-						className="w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors"
+						className="text-left px-4 py-2 text-sm hover:bg-accent transition-colors"
 						onClick={() => {
 							setEditingDomain(domainMenu.domain);
 							setDomainMenu(null);
 						}}
 					>
-						Edit domain
+						<span className="flex">
+							<Edit className="w-4 h-4 shrink-0 mr-2" /> Edit Domain
+						</span>
 					</button>
 					<button
-						className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+						className="text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
 						onClick={() => {
 							handleDeleteDomain(domainMenu.domain);
 							setDomainMenu(null);
 						}}
 					>
-						Delete domain
+						<span className="flex">
+							<Trash2 className="w-4 h-4 shrink-0 mr-2" /> Delete It
+						</span>
 					</button>
 				</div>
 			)}
@@ -1303,11 +1574,8 @@ export function BookView() {
 			{editingDomain && (
 				<EditDomainModal
 					domain={editingDomain}
-					currentShort={DOMAIN_SHORT[editingDomain] ?? editingDomain}
 					onClose={() => setEditingDomain(null)}
-					onSave={(fullName, shortName) =>
-						handleUpdateDomain(editingDomain, fullName, shortName)
-					}
+					onSave={(fullName) => handleUpdateDomain(editingDomain, fullName)}
 				/>
 			)}
 		</div>
