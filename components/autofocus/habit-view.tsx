@@ -36,6 +36,13 @@ import {
 	Archive,
 	Circle,
 	LucideIcon,
+	Laptop2,
+	BicepsFlexed,
+	Glasses,
+	Globe2,
+	ShoppingBasket,
+	DollarSign,
+	Users,
 } from "lucide-react";
 
 // ─── Category Icons (reuse from project-view) ─────────────────────────────────
@@ -59,15 +66,15 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 	"software & ai engineering": Target,
 	"agency & freelance": FolderOpen,
 	"day trading": TrendingUp,
-	"solopreneur & saas": Flame,
+	"solopreneur & saas": Laptop2,
 	"ace of all trades": Target,
-	"combatbuilding & superhuman": Target,
-	"supermale & alpha": Flame,
-	"polyglot vagabond": Target,
-	"personal brand": Target,
-	"e-commerce": Target,
-	"business & investment": TrendingUp,
-	"society & influence": Target,
+	"combatbuilding & superhuman": BicepsFlexed,
+	"supermale & alpha": Glasses,
+	"polyglot vagabond": Globe2,
+	"personal brand": Flame,
+	"e-commerce": ShoppingBasket,
+	"business & investment": DollarSign,
+	"society & influence": Users,
 };
 
 function getCategoryIcon(category: string): LucideIcon {
@@ -117,7 +124,7 @@ const HABIT_COLORS = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatStreak(streak: number): string {
-	if (streak === 0) return "No streak";
+	if (streak === 0) return "0";
 	if (streak === 1) return "1 day";
 	return `${streak} days`;
 }
@@ -195,7 +202,7 @@ function HabitCard({
 			{/* Title */}
 			<div onClick={onClick} className="cursor-pointer flex-1 min-w-0">
 				<p
-					className={`text-sm font-medium leading-snug ${
+					className={`max-sm:text-xs text-sm font-medium leading-snug ${
 						habit.status === "archived"
 							? "text-muted-foreground"
 							: "text-foreground"
@@ -204,7 +211,7 @@ function HabitCard({
 					{habit.name}
 				</p>
 				{habit.description && (
-					<p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-1">
+					<p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-1 max-sm:hidden">
 						{habit.description}
 					</p>
 				)}
@@ -246,7 +253,7 @@ function HabitCard({
 
 			{/* Mini 7-day calendar */}
 			{showMiniCalendar && (
-				<div className="pt-2 border-t border-border/40">
+				<div className="pt-2 border-t border-border/40 max-sm:hidden">
 					<div className="flex items-center justify-between">
 						{last7Days.map((date, idx) => {
 							const completed = habit.completions.includes(date);
@@ -840,7 +847,7 @@ function DashboardView({
 							Today's Habits
 						</h3>
 					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+					<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
 						{activeHabits.map((h) => (
 							<HabitCard
 								key={h.id}
