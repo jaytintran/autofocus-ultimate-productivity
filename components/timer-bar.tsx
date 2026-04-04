@@ -12,6 +12,7 @@ import {
 	KeyboardIcon,
 	ClipboardList,
 	Trophy,
+	CheckCheck,
 } from "lucide-react";
 import type { Task, AppState, Pamphlet } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
@@ -31,7 +32,7 @@ interface NoteEntry {
 	id: string;
 	elapsedMs: number;
 	text: string;
-	type: "log" | "achievement";
+	type: "log" | "achievement" | "sidequest";
 }
 
 interface TimerBarProps {
@@ -59,6 +60,10 @@ interface TimerBarProps {
 	pamphlets: Pamphlet[];
 	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
 	onUpdateTaskTag: (taskId: string, tag: TagId | null) => Promise<void>;
+	onCompleteAdjacentTask: (
+		taskId: string | null,
+		text: string,
+	) => Promise<void>;
 }
 
 // =============================================================================
@@ -510,6 +515,7 @@ export function TimerBar({
 	pamphlets,
 	onUpdateDueDate,
 	onUpdateTaskTag,
+	onCompleteAdjacentTask,
 }: TimerBarProps) {
 	// ── Optimistic timer state ─────────────────────────────────────────────────
 	// Instead of isLoading blocking everything, we track optimistic timer state
@@ -537,9 +543,17 @@ export function TimerBar({
 	const sessionStartRef = useRef<number | null>(null);
 	const baseSessionMsRef = useRef(0);
 
+	// ── Note entries ───────────────────────────────────────────────────────────
 	const [noteEntries, setNoteEntries] = useState<NoteEntry[]>([]);
 	const [noteInput, setNoteInput] = useState("");
-	const [noteType, setNoteType] = useState<"log" | "achievement">("log");
+	const [noteType, setNoteType] = useState<"log" | "achievement" | "sidequest">(
+		"log",
+	);
+
+	// ── Sidequest entries ───────────────────────────────────────────────────────
+	const [sidequestInput, setSidequestInput] = useState("");
+	const [sidequestMatches, setSidequestMatches] = useState<Task[]>([]);
+	const [sidequestSubmitting, setSidequestSubmitting] = useState(false);
 
 	const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 	const [editingNoteText, setEditingNoteText] = useState("");
@@ -549,8 +563,10 @@ export function TimerBar({
 			setSessionMs(0);
 			sessionStartRef.current = null;
 			baseSessionMsRef.current = 0;
-			setNoteEntries([]); // ADD
-			setNoteInput(""); // ADD
+			setNoteEntries([]);
+			setNoteInput("");
+			setSidequestInput("");
+			setSidequestMatches([]);
 			return;
 		}
 
@@ -629,6 +645,7 @@ export function TimerBar({
 			const logs = noteEntries
 				.filter((e) => e.type === "log")
 				.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`);
+			// sidequest entries excluded — they're already completed tasks
 			combinedNote = [...achievements, ...logs].join("\n");
 		} else {
 			combinedNote = note;
@@ -651,11 +668,14 @@ export function TimerBar({
 						...noteEntries
 							.filter((e) => e.type === "log")
 							.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`),
+						// sidequest entries excluded — they're already completed tasks
 					].join("\n")
 				: note;
 		setNote("");
 		setNoteEntries([]);
 		setNoteType("log");
+		setSidequestInput("");
+		setSidequestMatches([]);
 		await onReenterTask(workingTask, combinedNote);
 	}, [workingTask, noteEntries, note, onReenterTask]);
 
@@ -663,6 +683,51 @@ export function TimerBar({
 		if (!workingTask) return;
 		await onCancelTask(workingTask, sessionMs);
 	}, [workingTask, sessionMs, onCancelTask]);
+
+	const handleSidequestChange = useCallback(
+		(value: string) => {
+			setSidequestInput(value);
+			if (value.trim()) {
+				setSidequestMatches(
+					activeTasks
+						.filter(
+							(t) =>
+								t.text.toLowerCase().includes(value.toLowerCase()) &&
+								t.id !== workingTask?.id,
+						)
+						.slice(0, 5),
+				);
+			} else {
+				setSidequestMatches([]);
+			}
+		},
+		[activeTasks, workingTask],
+	);
+
+	const handleSidequestSubmit = useCallback(
+		async (taskId: string | null, text: string) => {
+			const trimmed = text.trim();
+			if (!trimmed || sidequestSubmitting) return;
+			setSidequestSubmitting(true);
+			try {
+				await onCompleteAdjacentTask(taskId, trimmed);
+				setNoteEntries((prev) => [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						elapsedMs: (workingTask?.total_time_ms ?? 0) + sessionMs,
+						text: trimmed,
+						type: "sidequest",
+					},
+				]);
+				setSidequestInput("");
+				setSidequestMatches([]);
+			} finally {
+				setSidequestSubmitting(false);
+			}
+		},
+		[sidequestSubmitting, onCompleteAdjacentTask, workingTask, sessionMs],
+	);
 
 	const handleNoteSubmit = useCallback(() => {
 		const trimmed = noteInput.trim();
@@ -887,23 +952,95 @@ export function TimerBar({
 						>
 							<Trophy className="w-3 h-3" />
 						</button>
+						<button
+							type="button"
+							onClick={() => setNoteType("sidequest")}
+							title="Side completion — knocked off another task"
+							className={`rounded p-1 transition-colors ${
+								noteType === "sidequest"
+									? "bg-sky-500/20 text-sky-500"
+									: "text-muted-foreground/40 hover:text-muted-foreground"
+							}`}
+						>
+							<CheckCheck className="w-3 h-3" />
+						</button>
 					</div>
 
-					<input
-						type="text"
-						value={noteInput}
-						onChange={(e) => setNoteInput(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") handleNoteSubmit();
-						}}
-						placeholder={
-							noteType === "log"
-								? "Log a note, hit Enter..."
-								: "What did you achieve?"
-						}
-						className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
-					/>
-					{noteInput && (
+					{noteType === "sidequest" ? (
+						<div className="flex-1 relative">
+							<input
+								type="text"
+								value={sidequestInput}
+								onChange={(e) => handleSidequestChange(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && !sidequestSubmitting) {
+										if (sidequestMatches.length === 1) {
+											handleSidequestSubmit(
+												sidequestMatches[0].id,
+												sidequestMatches[0].text,
+											);
+										} else {
+											handleSidequestSubmit(null, sidequestInput);
+										}
+									}
+									if (e.key === "Escape") setSidequestMatches([]);
+								}}
+								placeholder="What did you knock off?"
+								disabled={sidequestSubmitting}
+								className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
+							/>
+							{/* Dropdown for existing task matches */}
+							{sidequestMatches.length > 0 && (
+								<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
+									{sidequestMatches.map((task) => (
+										<button
+											key={task.id}
+											type="button"
+											onMouseDown={(e) => {
+												e.preventDefault();
+												handleSidequestSubmit(task.id, task.text);
+											}}
+											className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+										>
+											<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+											<span className="truncate text-foreground">
+												{task.text}
+											</span>
+										</button>
+									))}
+									{sidequestInput.trim() && (
+										<button
+											type="button"
+											onMouseDown={(e) => {
+												e.preventDefault();
+												handleSidequestSubmit(null, sidequestInput);
+											}}
+											className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left border-t border-border text-muted-foreground"
+										>
+											<CheckCheck className="w-3 h-3 flex-shrink-0" />
+											<span>Complete "{sidequestInput.trim()}" as new</span>
+										</button>
+									)}
+								</div>
+							)}
+						</div>
+					) : (
+						<input
+							type="text"
+							value={noteInput}
+							onChange={(e) => setNoteInput(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleNoteSubmit();
+							}}
+							placeholder={
+								noteType === "log"
+									? "Log a note, hit Enter..."
+									: "What did you achieve?"
+							}
+							className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
+						/>
+					)}
+					{noteType !== "sidequest" && noteInput && (
 						<button
 							type="button"
 							onClick={handleNoteSubmit}
@@ -912,6 +1049,20 @@ export function TimerBar({
 							<Send className="w-3 h-3" />
 						</button>
 					)}
+					{noteType === "sidequest" &&
+						sidequestInput &&
+						!sidequestSubmitting && (
+							<button
+								type="button"
+								onMouseDown={(e) => {
+									e.preventDefault();
+									handleSidequestSubmit(null, sidequestInput);
+								}}
+								className="text-muted-foreground/40 hover:text-sky-500 transition-colors"
+							>
+								<Send className="w-3 h-3" />
+							</button>
+						)}
 				</div>
 
 				{/* Note log zone */}
@@ -927,9 +1078,11 @@ export function TimerBar({
 						>
 							{[
 								...noteEntries.filter((e) => e.type === "achievement"),
+								...noteEntries.filter((e) => e.type === "sidequest"),
 								...noteEntries.filter((e) => e.type === "log"),
 							].map((entry) => {
 								const isAchievement = entry.type === "achievement";
+								const isSidequest = entry.type === "sidequest";
 								return (
 									<div
 										key={entry.id}
@@ -940,6 +1093,8 @@ export function TimerBar({
 											<span className="text-amber-500 flex-shrink-0 text-[11px]">
 												🏆
 											</span>
+										) : isSidequest ? (
+											<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
 										) : (
 											<span className="text-[#8b9a6b] font-mono flex-shrink-0">
 												•
@@ -947,7 +1102,7 @@ export function TimerBar({
 										)}
 
 										{/* Timestamp — only for logs */}
-										{!isAchievement && (
+										{!isAchievement && !isSidequest && (
 											<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
 												{formatTimeCompact(entry.elapsedMs)}
 											</span>
@@ -1000,7 +1155,11 @@ export function TimerBar({
 													setEditingNoteText("");
 												}}
 												className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-													isAchievement ? "text-amber-400" : "text-foreground"
+													isAchievement
+														? "text-amber-400"
+														: isSidequest
+															? "text-sky-400"
+															: "text-foreground"
 												}`}
 											/>
 										) : (
@@ -1012,7 +1171,9 @@ export function TimerBar({
 												className={`cursor-pointer hover:text-foreground transition-colors ${
 													isAchievement
 														? "text-amber-500 dark:text-amber-400"
-														: "text-foreground/70"
+														: isSidequest
+															? "text-sky-500 dark:text-sky-400"
+															: "text-foreground/70"
 												}`}
 											>
 												{entry.text}

@@ -47,6 +47,7 @@ import {
 	updateTask,
 	updateTaskTag,
 	revertTask,
+	createAndCompleteTask,
 } from "@/lib/store";
 import { moveTaskToPamphlet } from "@/lib/store";
 
@@ -1170,6 +1171,21 @@ export function AutofocusApp() {
 		[mutateAllActive],
 	);
 
+	const handleCompleteAdjacentTask = useCallback(
+		async (taskId: string | null, text: string) => {
+			if (taskId) {
+				// Existing task — mark it done directly
+				await markTaskDone(taskId, 0, activePamphletId);
+			} else {
+				// New task — create and immediately complete
+				await createAndCompleteTask(text, activePamphletId, null);
+			}
+			await mutateCompleted();
+			await mutateActive();
+		},
+		[activePamphletId, mutateCompleted, mutateActive],
+	);
+
 	const handleUpdateTaskDueDate = useCallback(
 		async (taskId: string, dueDate: string | null) => {
 			await updateTask(taskId, { due_date: dueDate });
@@ -1913,6 +1929,7 @@ export function AutofocusApp() {
 				pamphlets={pamphlets}
 				onUpdateDueDate={handleUpdateWorkingTaskDueDate}
 				onUpdateTaskTag={handleUpdateWorkingTaskTag}
+				onCompleteAdjacentTask={handleCompleteAdjacentTask}
 			/>
 
 			<ViewTabs

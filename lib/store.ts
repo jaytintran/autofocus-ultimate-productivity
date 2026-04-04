@@ -1173,3 +1173,38 @@ export async function addLoggedActivity(
 	if (error) throw error;
 	return data;
 }
+
+export async function createAndCompleteTask(
+	text: string,
+	pamphletId?: string | null,
+	tag?: TagId | null,
+): Promise<Task> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	const now = new Date().toISOString();
+
+	const { data, error } = await supabase
+		.from("tasks")
+		.insert({
+			text,
+			status: "completed",
+			source: "task",
+			completed_at: now,
+			total_time_ms: 0,
+			page_number: 1,
+			position: 0,
+			tag: tag ?? null,
+			note: null,
+			pamphlet_id: pamphletId ?? null,
+			user_id: user.id,
+		})
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
