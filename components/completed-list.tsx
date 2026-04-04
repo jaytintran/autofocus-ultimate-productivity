@@ -22,6 +22,7 @@ import {
 	X,
 	ChevronDown,
 	ChevronRight,
+	Dot,
 } from "lucide-react";
 import {
 	TAG_DEFINITIONS,
@@ -69,6 +70,7 @@ interface CompletedListProps {
 		tag?: TagId | null,
 		note?: string | null,
 		completedAt?: string | null,
+		source?: "log" | "task",
 	) => Promise<Task>;
 	contentFilter?: ContentFilterState;
 	pamphlets: Pamphlet[];
@@ -146,6 +148,7 @@ interface LogActivityBarProps {
 		tag?: TagId | null,
 		note?: string | null,
 		completedAt?: string | null,
+		source?: "log" | "task",
 	) => Promise<Task>;
 }
 
@@ -1041,6 +1044,7 @@ const LogActivityBar = memo(function LogActivityBar({
 	onAddLoggedActivity,
 }: LogActivityBarProps) {
 	const [logText, setLogText] = useState("");
+	const [source, setSource] = useState<"log" | "task">("log");
 	const [logTag, setLogTag] = useState<TagId | null>(null);
 	const [logMentionQuery, setLogMentionQuery] = useState<string | null>(null);
 	const [logParsedTime, setLogParsedTime] = useState<{
@@ -1113,6 +1117,7 @@ const LogActivityBar = memo(function LogActivityBar({
 				logTag,
 				null,
 				logParsedTime?.isoString ?? null,
+				source,
 			);
 			setLogText("");
 			setLogTag(null);
@@ -1159,9 +1164,34 @@ const LogActivityBar = memo(function LogActivityBar({
 					</div>
 				)}
 
-				<span className="text-muted-foreground/50 font-mono text-base flex-shrink-0 select-none">
-					•
-				</span>
+				<button
+					type="button"
+					onClick={() => setSource((s) => (s === "log" ? "task" : "log"))}
+					className="flex-shrink-0 select-none leading-none relative p-1"
+				>
+					{/* <span
+						className={`absolute inset-0 rounded-full animate-pulse opacity-40 ${
+							source === "log" ? "bg-muted-foreground/30" : "bg-[#8b9a6b]/50"
+						}`}
+					/> */}
+					<span
+						className={`relative flex items-center justify-center w-5 h-5 rounded-full border transition-colors ${
+							source === "log"
+								? "border-muted-foreground/30"
+								: "border-[#8b9a6b]/60"
+						}`}
+					>
+						{source === "log" ? (
+							<span className="text-muted-foreground/50 font-mono text-base leading-none">
+								<Dot className="w-5 h-5" />
+							</span>
+						) : (
+							<span className="text-[#8b9a6b] font-mono text-sm leading-none">
+								<X className="w-2.5 h-2.5" />
+							</span>
+						)}
+					</span>
+				</button>
 
 				{logTagDef && (
 					<button

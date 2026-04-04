@@ -1144,6 +1144,7 @@ export async function addLoggedActivity(
 	note?: string | null,
 	completedAt?: string | null, // allows backdating
 	pamphletId?: string | null,
+	source?: "log" | "task",
 ): Promise<Task> {
 	const supabase = createClient();
 	const now = new Date().toISOString();
@@ -1157,7 +1158,7 @@ export async function addLoggedActivity(
 		.insert({
 			text,
 			status: "completed",
-			source: "log",
+			source: source ?? "log",
 			completed_at: completedAt ?? now,
 			total_time_ms: 0,
 			page_number: 1,

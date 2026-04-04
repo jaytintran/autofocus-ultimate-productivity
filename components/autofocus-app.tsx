@@ -1838,6 +1838,7 @@ export function AutofocusApp() {
 			tag?: TagId | null,
 			note?: string | null,
 			completedAt?: string | null,
+			source?: "log" | "task",
 		) => {
 			const task = await addLoggedActivity(
 				text,
@@ -1845,6 +1846,7 @@ export function AutofocusApp() {
 				note,
 				completedAt,
 				activePamphletId,
+				source,
 			);
 			await mutateCompleted();
 			return task;
