@@ -125,9 +125,9 @@ function parseTagMention(text: string): {
 // =============================================================================
 
 const primaryBtn =
-	"inline-flex items-center justify-center gap-2 rounded-sm border border-[#a3b56a]/40 bg-[#a3b56a] px-4 py-2 text-sm font-medium text-[#1f2414] transition-colors hover:bg-[#b2c777] disabled:cursor-not-allowed disabled:opacity-50";
+	"items-center justify-center gap-2 rounded-sm border border-[#a3b56a]/40 bg-[#a3b56a] px-4 py-2 text-sm font-medium text-[#1f2414] transition-colors hover:bg-[#b2c777] disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryBtn =
-	"inline-flex items-center justify-center gap-2 rounded-sm border border-border bg-transparent px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50";
+	"items-center justify-center gap-2 rounded-sm border border-border bg-transparent px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50";
 const iconBtn =
 	"inline-flex items-center justify-center rounded-sm border border-transparent p-2 text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -773,196 +773,346 @@ export function TimerBar({
 		<div className="border-y border-border/80 bg-card px-4 py-3 md:px-10 md:py-4">
 			<div className="mx-auto flex max-w-6xl flex-col gap-3">
 				{/* Top row */}
-				<div className="flex items-start justify-between gap-3">
-					<div className="min-w-0 flex-1 space-y-1 md:space-y-2">
-						{/* Badges row: pamphlet + due date + tag */}
-						<div className="flex items-center gap-2 flex-wrap">
-							{workingPamphlet && (
-								<span
-									className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.15em] ${PAMPHLET_COLORS[workingPamphlet.color].bg} ${PAMPHLET_COLORS[workingPamphlet.color].text} ${PAMPHLET_COLORS[workingPamphlet.color].border} border`}
-								>
-									{workingPamphlet.name}
-								</span>
-							)}
-
-							{/* Due date chip */}
-							<div className="relative">
-								<button
-									onClick={() => setDueDatePickerOpen((prev) => !prev)}
-									className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors
-                                    ${
-																			workingTask.due_date
-																				? (() => {
-																						const { urgency } = formatDueDate(
-																							workingTask.due_date,
-																						);
-																						const urgencyClasses: Record<
-																							string,
-																							string
-																						> = {
-																							overdue:
-																								"border-red-500/40 bg-red-500/10 text-red-500",
-																							soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
-																							normal:
-																								"border-muted-foreground/30 bg-muted/50 text-muted-foreground",
-																							far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
-																						};
-																						return urgencyClasses[urgency];
-																					})()
-																				: "border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground/60 hover:text-muted-foreground"
-																		}`}
-								>
-									{workingTask.due_date
-										? `⏰ ${formatDueDate(workingTask.due_date).label}`
-										: "+ due date"}
-								</button>
-								{dueDatePickerOpen && (
-									<DueDatePicker
-										currentDueDate={workingTask.due_date}
-										onSet={(isoDate) =>
-											onUpdateDueDate(workingTask.id, isoDate)
-										}
-										onClose={() => setDueDatePickerOpen(false)}
-									/>
-								)}
-							</div>
-
-							{/* Tag pill */}
-							<TagPill
-								tagId={workingTask.tag}
-								onSelectTag={(tag) => onUpdateTaskTag(workingTask.id, tag)}
-								className="scale-90 origin-left"
-							/>
-						</div>
-
-						{/* Task title */}
+				<div className="flex flex-col gap-1.5">
+					{/* Title + X */}
+					<div className="flex items-start justify-between gap-3">
 						<p className="truncate text-base font-semibold tracking-tight text-foreground md:text-3xl md:tracking-[0.04em]">
 							{workingTask.text}
 						</p>
+						<button
+							onClick={handleCancelTask}
+							className={iconBtn}
+							title="Remove from working panel"
+						>
+							<X className="h-4 w-4" />
+						</button>
 					</div>
 
-					<button
-						onClick={handleCancelTask}
-						className={iconBtn}
-						title="Remove from working panel"
-					>
-						<X className="h-4 w-4" />
-					</button>
+					{/* Badges row: pamphlet + due date + tag */}
+					<div className="flex items-center gap-2 flex-wrap">
+						{workingPamphlet && (
+							<span
+								className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.15em] ${PAMPHLET_COLORS[workingPamphlet.color].bg} ${PAMPHLET_COLORS[workingPamphlet.color].text} ${PAMPHLET_COLORS[workingPamphlet.color].border} border`}
+							>
+								{workingPamphlet.name}
+							</span>
+						)}
+
+						{/* Due date chip */}
+						<div className="relative">
+							<button
+								onClick={() => setDueDatePickerOpen((prev) => !prev)}
+								className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors
+                    ${
+											workingTask.due_date
+												? (() => {
+														const { urgency } = formatDueDate(
+															workingTask.due_date,
+														);
+														const urgencyClasses: Record<string, string> = {
+															overdue:
+																"border-red-500/40 bg-red-500/10 text-red-500",
+															soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+															normal:
+																"border-muted-foreground/30 bg-muted/50 text-muted-foreground",
+															far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
+														};
+														return urgencyClasses[urgency];
+													})()
+												: "border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground/60 hover:text-muted-foreground"
+										}`}
+							>
+								{workingTask.due_date
+									? `⏰ ${formatDueDate(workingTask.due_date).label}`
+									: "+ due date"}
+							</button>
+							{dueDatePickerOpen && (
+								<DueDatePicker
+									currentDueDate={workingTask.due_date}
+									onSet={(isoDate) => onUpdateDueDate(workingTask.id, isoDate)}
+									onClose={() => setDueDatePickerOpen(false)}
+								/>
+							)}
+						</div>
+
+						{/* Tag pill */}
+						<TagPill
+							tagId={workingTask.tag}
+							onSelectTag={(tag) => onUpdateTaskTag(workingTask.id, tag)}
+							className="scale-90 origin-left"
+						/>
+					</div>
 				</div>
 
-				{/* Timer display */}
-				<span
-					className={`font-mono text-xl tracking-[0.12em] md:text-4xl md:tracking-[0.16em] ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
-				>
-					{formatTimerDisplay(totalDisplayTime)}
-				</span>
+				{/* Timer + action buttons — inline on mobile, stacked on desktop */}
+				<div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-3">
+					{/* Timer */}
+					<span
+						className={`font-mono text-xl tracking-[0.12em] md:text-4xl md:tracking-[0.16em] ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
+					>
+						{formatTimerDisplay(totalDisplayTime)}
+					</span>
 
-				{/* Action buttons */}
-				<div className="flex items-center gap-1.5 flex-wrap">
-					{isIdle && (
-						<>
-							<button onClick={handleStartTimer} className={primaryBtn}>
-								<Play className="h-3.5 w-3.5" />
-								Start
-							</button>
-							<button onClick={handleComplete} className={secondaryBtn}>
-								<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-								Complete
-							</button>
-						</>
-					)}
-					{isRunning && (
-						<>
-							<button onClick={handlePause} className={secondaryBtn}>
-								<Pause className="h-3.5 w-3.5" />
-								Pause
-							</button>
-							<button onClick={handleStop} className={secondaryBtn}>
-								<Square className="h-3.5 w-3.5" />
-								Stop
-							</button>
-							<button onClick={handleComplete} className={primaryBtn}>
-								<Check className="h-3.5 w-3.5" />
-								Complete
-							</button>
-						</>
-					)}
-					{isPaused && (
-						<>
-							<button onClick={handleResume} className={primaryBtn}>
-								<Play className="h-3.5 w-3.5" />
-								Resume
-							</button>
-							<button onClick={handleStop} className={secondaryBtn}>
-								<Square className="h-3.5 w-3.5" />
-								Stop
-							</button>
-							<button onClick={handleComplete} className={secondaryBtn}>
-								<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-								Complete
-							</button>
-						</>
-					)}
-					{isStopped && (
-						<>
-							<button onClick={handleStartTimer} className={secondaryBtn}>
-								<Play className="h-3.5 w-3.5" />
-								Resume
-							</button>
-							<button onClick={handleComplete} className={primaryBtn}>
-								<Check className="h-3.5 w-3.5" />
-								Complete
-							</button>
-							<button onClick={handleReenter} className={secondaryBtn}>
-								<RefreshCw className="h-3.5 w-3.5" />
-								Re-enter
-							</button>
-						</>
-					)}
+					{/* Action buttons */}
+					<div className="flex items-center gap-1.5">
+						{isIdle && (
+							<>
+								{/* Mobile: icon only */}
+								<button
+									onClick={handleStartTimer}
+									className={`${primaryBtn} md:hidden`}
+									title="Start"
+								>
+									<Play className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${secondaryBtn} md:hidden`}
+									title="Complete"
+								>
+									<Check className="h-4 w-4 text-[#8b9a6b]" />
+								</button>
+								{/* Desktop: icon + text */}
+								<button
+									onClick={handleStartTimer}
+									className={`${primaryBtn} hidden md:inline-flex`}
+								>
+									<Play className="h-3.5 w-3.5" />
+									Start
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
+									Complete
+								</button>
+							</>
+						)}
+						{isRunning && (
+							<>
+								<button
+									onClick={handlePause}
+									className={`${secondaryBtn} md:hidden`}
+									title="Pause"
+								>
+									<Pause className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleStop}
+									className={`${secondaryBtn} md:hidden`}
+									title="Stop"
+								>
+									<Square className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${primaryBtn} md:hidden`}
+									title="Complete"
+								>
+									<Check className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handlePause}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Pause className="h-3.5 w-3.5" />
+									Pause
+								</button>
+								<button
+									onClick={handleStop}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Square className="h-3.5 w-3.5" />
+									Stop
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${primaryBtn} hidden md:inline-flex`}
+								>
+									<Check className="h-3.5 w-3.5" />
+									Complete
+								</button>
+							</>
+						)}
+						{isPaused && (
+							<>
+								<button
+									onClick={handleResume}
+									className={`${primaryBtn} md:hidden`}
+									title="Resume"
+								>
+									<Play className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleStop}
+									className={`${secondaryBtn} md:hidden`}
+									title="Stop"
+								>
+									<Square className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${secondaryBtn} md:hidden`}
+									title="Complete"
+								>
+									<Check className="h-4 w-4 text-[#8b9a6b]" />
+								</button>
+								<button
+									onClick={handleResume}
+									className={`${primaryBtn} hidden md:inline-flex`}
+								>
+									<Play className="h-3.5 w-3.5" />
+									Resume
+								</button>
+								<button
+									onClick={handleStop}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Square className="h-3.5 w-3.5" />
+									Stop
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
+									Complete
+								</button>
+							</>
+						)}
+						{isStopped && (
+							<>
+								<button
+									onClick={handleStartTimer}
+									className={`${secondaryBtn} md:hidden`}
+									title="Resume"
+								>
+									<Play className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${primaryBtn} md:hidden`}
+									title="Complete"
+								>
+									<Check className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleReenter}
+									className={`${secondaryBtn} md:hidden`}
+									title="Re-enter"
+								>
+									<RefreshCw className="h-4 w-4" />
+								</button>
+								<button
+									onClick={handleStartTimer}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<Play className="h-3.5 w-3.5" />
+									Resume
+								</button>
+								<button
+									onClick={handleComplete}
+									className={`${primaryBtn} hidden md:inline-flex`}
+								>
+									<Check className="h-3.5 w-3.5" />
+									Complete
+								</button>
+								<button
+									onClick={handleReenter}
+									className={`${secondaryBtn} hidden md:inline-flex`}
+								>
+									<RefreshCw className="h-3.5 w-3.5" />
+									Re-enter
+								</button>
+							</>
+						)}
+					</div>
 				</div>
 
 				{/* Divider */}
 				<div className="h-px w-full bg-border/50" />
 
 				{/* Note input */}
+				{/* Mobile toggler — own row */}
+				<div className="flex md:hidden items-center gap-1.5 w-full">
+					<button
+						type="button"
+						onClick={() => setNoteType("log")}
+						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+							noteType === "log"
+								? "border-[#8b9a6b]/40 bg-[#8b9a6b]/10 text-[#8b9a6b]"
+								: "border-border text-muted-foreground/50"
+						}`}
+					>
+						<ClipboardList className="w-3.5 h-3.5" />
+						Log
+					</button>
+					<button
+						type="button"
+						onClick={() => setNoteType("achievement")}
+						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+							noteType === "achievement"
+								? "border-amber-500/40 bg-amber-500/10 text-amber-500"
+								: "border-border text-muted-foreground/50"
+						}`}
+					>
+						<Trophy className="w-3.5 h-3.5" />
+						Win
+					</button>
+					<button
+						type="button"
+						onClick={() => setNoteType("sidequest")}
+						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+							noteType === "sidequest"
+								? "border-sky-500/40 bg-sky-500/10 text-sky-500"
+								: "border-border text-muted-foreground/50"
+						}`}
+					>
+						<CheckCheck className="w-3.5 h-3.5" />
+						Side Quest
+					</button>
+				</div>
+
+				{/* Input row — desktop toggler + input + send */}
 				<div className="flex items-center gap-2">
-					{/* Type toggler */}
-					<div className="flex items-center gap-0.5 rounded-md border border-border p-0.5 flex-shrink-0">
+					{/* Desktop toggler only */}
+					<div className="hidden md:flex items-center gap-0.5 rounded-md border border-border p-1 flex-shrink-0">
 						<button
 							type="button"
 							onClick={() => setNoteType("log")}
 							title="Session log — timestamped entry"
-							className={`rounded p-1 transition-colors ${
+							className={`rounded p-1.5 transition-colors ${
 								noteType === "log"
 									? "bg-[#8b9a6b]/20 text-[#8b9a6b]"
 									: "text-muted-foreground/40 hover:text-muted-foreground"
 							}`}
 						>
-							<ClipboardList className="w-3 h-3" />
+							<ClipboardList className="w-3.5 h-3.5" />
 						</button>
 						<button
 							type="button"
 							onClick={() => setNoteType("achievement")}
 							title="Achievement — completion reflection"
-							className={`rounded p-1 transition-colors ${
+							className={`rounded p-1.5 transition-colors ${
 								noteType === "achievement"
 									? "bg-amber-500/20 text-amber-500"
 									: "text-muted-foreground/40 hover:text-muted-foreground"
 							}`}
 						>
-							<Trophy className="w-3 h-3" />
+							<Trophy className="w-3.5 h-3.5" />
 						</button>
 						<button
 							type="button"
 							onClick={() => setNoteType("sidequest")}
 							title="Side completion — knocked off another task"
-							className={`rounded p-1 transition-colors ${
+							className={`rounded p-1.5 transition-colors ${
 								noteType === "sidequest"
 									? "bg-sky-500/20 text-sky-500"
 									: "text-muted-foreground/40 hover:text-muted-foreground"
 							}`}
 						>
-							<CheckCheck className="w-3 h-3" />
+							<CheckCheck className="w-3.5 h-3.5" />
 						</button>
 					</div>
 
@@ -989,7 +1139,6 @@ export function TimerBar({
 								disabled={sidequestSubmitting}
 								className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
 							/>
-							{/* Dropdown for existing task matches */}
 							{sidequestMatches.length > 0 && (
 								<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
 									{sidequestMatches.map((task) => (
