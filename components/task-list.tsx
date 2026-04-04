@@ -56,6 +56,113 @@ import { TaskContextMenu } from "./task-context-menu";
 import { useLongPress } from "@/hooks/use-long-press";
 import { DueDatePicker } from "./due-date-picker";
 
+function parseAtTime(
+	text: string,
+): { isoString: string; display: string } | null {
+	const now = new Date();
+
+	// @midnight
+	if (/@midnight(?=\s|$)/i.test(text)) {
+		const result = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			0,
+			0,
+			0,
+			0,
+		);
+		return { isoString: result.toISOString(), display: "00:00" };
+	}
+
+	// @midday / @noon
+	if (/@(?:midday|noon)(?=\s|$)/i.test(text)) {
+		const result = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			12,
+			0,
+			0,
+			0,
+		);
+		return { isoString: result.toISOString(), display: "12:00" };
+	}
+
+	// @now
+	if (/@now(?=\s|$)/i.test(text)) {
+		const display = now.toLocaleTimeString("en-GB", {
+			hour: "2-digit",
+			minute: "2-digit",
+			hour12: false,
+		});
+		return { isoString: now.toISOString(), display };
+	}
+
+	// @<N>ago — e.g. @30mago @2hago @2hrago
+	const agoMatch = text.match(/@(\d+)\s*(h|hr|m|min|mins?)ago(?=\s|$)/i);
+	if (agoMatch) {
+		const amount = parseInt(agoMatch[1], 10);
+		const unit = agoMatch[2].toLowerCase();
+		const ms =
+			unit === "h" || unit === "hr" ? amount * 3600000 : amount * 60000;
+		const result = new Date(now.getTime() - ms);
+		const display = result.toLocaleTimeString("en-GB", {
+			hour: "2-digit",
+			minute: "2-digit",
+			hour12: false,
+		});
+		return { isoString: result.toISOString(), display };
+	}
+
+	// @6am, @6pm, @6am30, @6pm30, @6:30am, @6:30pm, @18:30, @1800
+	const match = text.match(
+		/@(\d{1,2})(?::(\d{2})|h(\d{2})|(\d{2})(?=am|pm))?\s*(am|pm)?(?=\s|$)/i,
+	);
+	if (!match) return null;
+
+	let hours = parseInt(match[1], 10);
+	const minutes = parseInt(match[2] ?? match[3] ?? match[4] ?? "0", 10);
+	const meridiem = (match[5] ?? "").toLowerCase();
+	const rawToken = match[0].toLowerCase();
+	const hasPm = rawToken.includes("pm") || meridiem === "pm";
+	const hasAm = rawToken.includes("am") || meridiem === "am";
+
+	if (hasPm && hours !== 12) hours += 12;
+	if (hasAm && hours === 12) hours = 0;
+	if (hours > 23 || minutes > 59) return null;
+
+	const result = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate(),
+		hours,
+		minutes,
+		0,
+		0,
+	);
+	const display = result.toLocaleTimeString("en-GB", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	});
+	return { isoString: result.toISOString(), display };
+}
+
+function stripAtTime(text: string): string {
+	return text
+		.replace(/@midnight(?=\s|$)/gi, "")
+		.replace(/@(?:midday|noon)(?=\s|$)/gi, "")
+		.replace(/@now(?=\s|$)/gi, "")
+		.replace(/@\d+\s*(?:h|hr|m|min|mins?)ago(?=\s|$)/gi, "")
+		.replace(
+			/@\d{1,2}(?::\d{2}|h\d{2}|\d{2}(?=am|pm))?\s*(?:am|pm)?(?=\s|$)/gi,
+			"",
+		)
+		.replace(/\s{2,}/g, " ")
+		.trim();
+}
+
 function useIsMobile() {
 	const [isMobile, setIsMobile] = useState(false);
 	useEffect(() => {
@@ -393,6 +500,11 @@ function TaskRow({
 		opacity: isDragging ? 0.5 : 1,
 	};
 
+	const [parsedTime, setParsedTime] = useState<{
+		isoString: string;
+		display: string;
+	} | null>(null);
+
 	useEffect(() => {
 		setEditText(task.text);
 	}, [task.text]);
@@ -428,10 +540,12 @@ function TaskRow({
 		const trimmed = editText.trim();
 		if (!trimmed) {
 			setIsEditing(false);
+			setParsedTime(null);
 			return;
 		}
 		const { cleanText, dueDate } = parseDueDateShortcut(trimmed);
-		const finalText = cleanText || trimmed;
+		const strippedOfTime = stripAtTime(cleanText || trimmed);
+		const finalText = strippedOfTime || trimmed;
 		if (finalText !== task.text || dueDate !== null) {
 			onUpdateText(
 				task.id,
@@ -440,6 +554,7 @@ function TaskRow({
 			);
 		}
 		setIsEditing(false);
+		setParsedTime(null);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -449,6 +564,7 @@ function TaskRow({
 		} else if (e.key === "Escape") {
 			setEditText(task.text);
 			setIsEditing(false);
+			setParsedTime(null);
 		}
 	};
 
@@ -592,7 +708,10 @@ function TaskRow({
 								<textarea
 									ref={inputRef as React.RefObject<HTMLTextAreaElement>}
 									value={editText}
-									onChange={(e) => setEditText(e.target.value)}
+									onChange={(e) => {
+										setEditText(e.target.value);
+										setParsedTime(parseAtTime(e.target.value));
+									}}
 									onBlur={handleSave}
 									onKeyDown={handleKeyDown}
 									placeholder="Task text… or append !1d, !2h, !30m"
@@ -607,6 +726,12 @@ function TaskRow({
 										</span>
 									) : null;
 								})()}
+
+								{parsedTime && (
+									<span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-500/40 bg-sky-500/10 text-sky-500 flex-shrink-0">
+										🕐 {parsedTime.display}
+									</span>
+								)}
 							</div>
 						) : (
 							<span
