@@ -152,8 +152,36 @@ function parseAtTime(
 ): { isoString: string; display: string } | null {
 	const now = new Date();
 
+	// @midnight
+	if (/@midnight(?=\s|$)/i.test(text)) {
+		const result = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			0,
+			0,
+			0,
+			0,
+		);
+		return { isoString: result.toISOString(), display: "00:00" };
+	}
+
+	// @midday / @noon
+	if (/@(?:midday|noon)(?=\s|$)/i.test(text)) {
+		const result = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			12,
+			0,
+			0,
+			0,
+		);
+		return { isoString: result.toISOString(), display: "12:00" };
+	}
+
 	// @now
-	if (/@now(?=\\s|$)/i.test(text)) {
+	if (/@now(?=\s|$)/i.test(text)) {
 		const display = now.toLocaleTimeString("en-GB", {
 			hour: "2-digit",
 			minute: "2-digit",
@@ -162,15 +190,13 @@ function parseAtTime(
 		return { isoString: now.toISOString(), display };
 	}
 
-	// @<N>ago patterns
-	const agoMatch = text.match(/@(\\d+)\\s*(h|hr|m|min|mins|)ago(?=\\s|$)/i);
+	// @<N>ago — e.g. @30mago @2hago @2hrago
+	const agoMatch = text.match(/@(\d+)\s*(h|hr|m|min|mins?)ago(?=\s|$)/i);
 	if (agoMatch) {
 		const amount = parseInt(agoMatch[1], 10);
 		const unit = agoMatch[2].toLowerCase();
 		const ms =
-			unit === "h" || unit === "hr"
-				? amount * 60 * 60 * 1000
-				: amount * 60 * 1000;
+			unit === "h" || unit === "hr" ? amount * 3600000 : amount * 60000;
 		const result = new Date(now.getTime() - ms);
 		const display = result.toLocaleTimeString("en-GB", {
 			hour: "2-digit",
@@ -180,15 +206,15 @@ function parseAtTime(
 		return { isoString: result.toISOString(), display };
 	}
 
-	// @6pm30, @6:30pm, @18:30, etc.
+	// @6am, @6pm, @6am30, @6pm30, @6:30am, @6:30pm, @18:30, @1800
 	const match = text.match(
-		/@(\\d{1,2})(?::(\\d{2})|h(\\d{2})|(?=am|pm))?(?:\\s*)?(am|pm)?(?=\\s|$)/i,
+		/@(\d{1,2})(?::(\d{2})|h(\d{2})|(\d{2})(?=am|pm))?\s*(am|pm)?(?=\s|$)/i,
 	);
 	if (!match) return null;
 
 	let hours = parseInt(match[1], 10);
-	const minutes = parseInt(match[2] ?? match[3] ?? "0", 10);
-	const meridiem = (match[4] ?? "").toLowerCase();
+	const minutes = parseInt(match[2] ?? match[3] ?? match[4] ?? "0", 10);
+	const meridiem = (match[5] ?? "").toLowerCase();
 	const rawToken = match[0].toLowerCase();
 	const hasPm = rawToken.includes("pm") || meridiem === "pm";
 	const hasAm = rawToken.includes("am") || meridiem === "am";
@@ -216,9 +242,15 @@ function parseAtTime(
 
 function stripAtTime(text: string): string {
 	return text
-		.replace(/@now(?=\\s|$)/gi, "")
-		.replace(/@\\d+\\s*(?:h|hr|m|min|mins)?ago(?=\\s|$)/gi, "")
-		.replace(/@\\d{1,2}(?::\\d{2}|h\\d{2})?(?:am|pm)?(?=\\s|$)/gi, "")
+		.replace(/@midnight(?=\s|$)/gi, "")
+		.replace(/@(?:midday|noon)(?=\s|$)/gi, "")
+		.replace(/@now(?=\s|$)/gi, "")
+		.replace(/@\d+\s*(?:h|hr|m|min|mins?)ago(?=\s|$)/gi, "")
+		.replace(
+			/@\d{1,2}(?::\d{2}|h\d{2}|\d{2}(?=am|pm))?\s*(?:am|pm)?(?=\s|$)/gi,
+			"",
+		)
+		.replace(/\s{2,}/g, " ")
 		.trim();
 }
 
