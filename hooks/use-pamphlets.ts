@@ -74,6 +74,8 @@ export function usePamphlets() {
 				const tasks = await getActiveTasksForPamphlet(pamphletId);
 				setActiveTasks(tasks);
 				setCachedTasks(pamphletId, tasks);
+			} catch (e) {
+				// offline — keep showing cached tasks silently
 			} finally {
 				if (!background) setIsLoadingTasks(false);
 			}

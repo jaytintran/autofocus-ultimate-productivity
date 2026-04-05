@@ -385,7 +385,10 @@ export function PageNav({
 						>
 							<ChevronLeft className="w-4.5 h-4.5" />
 						</button>
-						<span className="text-sm text-muted-foreground flex items-center gap-2">
+						<span
+							className="text-sm text-muted-foreground flex items-center gap-2"
+							suppressHydrationWarning
+						>
 							{currentPage} of {totalPages}
 							{isFiltered && (
 								<FunnelPlus className="w-6 h-6 border border-transparent p-1" />

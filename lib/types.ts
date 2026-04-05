@@ -21,6 +21,7 @@ export interface Task {
 	updated_at: string;
 	due_date: string | null;
 	pamphlet_id: string | null;
+	user_id: string;
 }
 
 export interface AppState {
@@ -35,6 +36,7 @@ export interface AppState {
 	default_filter: DefaultFilter;
 	created_at: string;
 	updated_at: string;
+	user_id: string;
 }
 
 export interface TaskWithTimer extends Task {
@@ -75,6 +77,7 @@ export interface Pamphlet {
 	position: number;
 	created_at: string;
 	updated_at: string;
+	user_id: string;
 }
 
 export const PAMPHLET_COLOR_VALUES = [

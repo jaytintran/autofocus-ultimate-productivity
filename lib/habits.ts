@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { db } from "@/lib/db";
+import { isOnline, queueWrite } from "@/lib/offline-guard";
 
 export type HabitFrequency = "daily" | "weekly";
 export type HabitStatus = "active" | "paused" | "archived";
@@ -16,6 +18,7 @@ export interface Habit {
 	position: number;
 	created_at: string;
 	updated_at: string;
+	user_id: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -122,27 +125,47 @@ export function getLast66Days(
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export async function getHabits(): Promise<Habit[]> {
+	if (!isOnline()) {
+		return db.habits.orderBy("position").toArray();
+	}
 	const supabase = createClient();
 	const { data, error } = await supabase
 		.from("habits")
 		.select("*")
 		.order("position", { ascending: true });
 	if (error) throw error;
-	return data || [];
+	const habits = data || [];
+	await db.habits.bulkPut(habits);
+	return habits;
 }
 
 export async function updateHabit(
 	id: string,
 	updates: Partial<Habit>,
 ): Promise<Habit> {
+	const now = new Date().toISOString();
+	const updatedFields = { ...updates, updated_at: now };
+
+	if (!isOnline()) {
+		await db.habits.update(id, updatedFields);
+		await queueWrite({
+			table: "habits",
+			action: "update",
+			payload: { id, ...updatedFields },
+		});
+		const habit = await db.habits.get(id);
+		return habit!;
+	}
+
 	const supabase = createClient();
 	const { data, error } = await supabase
 		.from("habits")
-		.update({ ...updates, updated_at: new Date().toISOString() })
+		.update(updatedFields)
 		.eq("id", id)
 		.select()
 		.single();
 	if (error) throw error;
+	await db.habits.put(data);
 	return data;
 }
 
@@ -158,7 +181,6 @@ export async function addHabit(
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
-	// Get current max position for this user
 	const { data: existing } = await supabase
 		.from("habits")
 		.select("position")
@@ -168,6 +190,26 @@ export async function addHabit(
 
 	const nextPosition =
 		existing && existing.length > 0 ? existing[0].position + 1 : 0;
+	const now = new Date().toISOString();
+
+	if (!isOnline()) {
+		const newHabit: Habit = {
+			...habit,
+			id: crypto.randomUUID(),
+			completions: [],
+			position: nextPosition,
+			user_id: user.id,
+			created_at: now,
+			updated_at: now,
+		};
+		await db.habits.put(newHabit);
+		await queueWrite({
+			table: "habits",
+			action: "insert",
+			payload: newHabit as unknown as Record<string, unknown>,
+		});
+		return newHabit;
+	}
 
 	const { data, error } = await supabase
 		.from("habits")
@@ -180,13 +222,21 @@ export async function addHabit(
 		.select()
 		.single();
 	if (error) throw error;
+	await db.habits.put(data);
 	return data;
 }
 
 export async function deleteHabit(id: string): Promise<void> {
+	if (!isOnline()) {
+		await db.habits.delete(id);
+		await queueWrite({ table: "habits", action: "delete", payload: { id } });
+		return;
+	}
+
 	const supabase = createClient();
 	const { error } = await supabase.from("habits").delete().eq("id", id);
 	if (error) throw error;
+	await db.habits.delete(id);
 }
 
 export async function toggleCompletion(
@@ -212,15 +262,33 @@ export async function toggleCompletion(
 export async function reorderHabits(
 	updates: Array<{ id: string; position: number }>,
 ): Promise<void> {
+	const now = new Date().toISOString();
+
+	if (!isOnline()) {
+		for (const update of updates) {
+			await db.habits.update(update.id, {
+				position: update.position,
+				updated_at: now,
+			});
+			await queueWrite({
+				table: "habits",
+				action: "update",
+				payload: { id: update.id, position: update.position, updated_at: now },
+			});
+		}
+		return;
+	}
+
 	const supabase = createClient();
 	for (const update of updates) {
 		const { error } = await supabase
 			.from("habits")
-			.update({
-				position: update.position,
-				updated_at: new Date().toISOString(),
-			})
+			.update({ position: update.position, updated_at: now })
 			.eq("id", update.id);
 		if (error) throw error;
+		await db.habits.update(update.id, {
+			position: update.position,
+			updated_at: now,
+		});
 	}
 }

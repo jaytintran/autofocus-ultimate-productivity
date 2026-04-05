@@ -3,6 +3,7 @@ import { Geist_Mono, Rubik } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/app/globals.css";
+import { SyncInitializer } from "@/components/sync-initializer";
 
 const geistMono = Geist_Mono({
 	subsets: ["latin"],
@@ -41,6 +42,7 @@ export default function RootLayout({
 					enableSystem={false}
 					disableTransitionOnChange
 				>
+					<SyncInitializer />
 					{children}
 				</ThemeProvider>
 				<Analytics />

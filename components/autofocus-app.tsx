@@ -89,6 +89,9 @@ import { useHabits } from "@/hooks/use-habits";
 import { HabitGrid } from "./habit-grid";
 import { createClient } from "@/lib/supabase/client";
 
+import { db } from "@/lib/db";
+import { isOnline } from "@/lib/offline-guard";
+
 // =============================================================================
 // TYPES & INTERFACES
 // =============================================================================
@@ -169,6 +172,22 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	// State - View & Filter
 	// -------------------------------------------------------------------------
+
+	const OFFLINE_APP_STATE: AppState = {
+		id: "",
+		user_id: userId ?? "",
+		current_page: 1,
+		page_size: 12,
+		last_pass_had_no_action: false,
+		working_on_task_id: null,
+		session_start_time: null,
+		timer_state: "idle",
+		current_session_ms: 0,
+		default_filter: "all",
+		created_at: "",
+		updated_at: "",
+	};
+
 	const {
 		pamphlets,
 		activePamphlet,
@@ -240,6 +259,37 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	const [activeTasks, setActiveTasks] = useState<Task[]>(pamphletActiveTasks);
 
+	// Seed IndexedDB on first load
+	useEffect(() => {
+		async function seedLocalDB() {
+			if (!isOnline() || !userId) return;
+
+			const alreadySeeded = await db.tasks.count();
+			if (alreadySeeded > 0) return; // already seeded, skip
+
+			const supabase = createClient();
+			const [tasks, habits, books, projects, pamphlets] = await Promise.all([
+				supabase.from("tasks").select("*"),
+				supabase.from("habits").select("*"),
+				supabase.from("books").select("*"),
+				supabase.from("projects").select("*"),
+				supabase.from("pamphlets").select("*"),
+			]);
+
+			await Promise.all([
+				db.tasks.bulkPut(tasks.data || []),
+				db.habits.bulkPut(habits.data || []),
+				db.books.bulkPut(books.data || []),
+				db.projects.bulkPut(projects.data || []),
+				db.pamphlets.bulkPut(pamphlets.data || []),
+			]);
+
+			console.log("IndexedDB seeded successfully");
+		}
+
+		seedLocalDB();
+	}, [userId]);
+
 	useEffect(() => {
 		setActiveTasks(pamphletActiveTasks);
 	}, [pamphletActiveTasks]);
@@ -250,16 +300,20 @@ export function AutofocusApp() {
 
 	const mutateCompleted = useCallback(async () => {
 		if (!activePamphletId) return;
-		const pagesToFetch = Array.from(
-			{ length: completedPageRef.current },
-			(_, i) => i + 1,
-		);
-		const results = await Promise.all(
-			pagesToFetch.map((p) => fetchCompletedTasks(activePamphletId, p)),
-		);
-		const merged = results.flat();
-		setAllCompletedTasks(merged);
-		setHasMoreCompleted(results[results.length - 1].length === 50);
+		try {
+			const pagesToFetch = Array.from(
+				{ length: completedPageRef.current },
+				(_, i) => i + 1,
+			);
+			const results = await Promise.all(
+				pagesToFetch.map((p) => fetchCompletedTasks(activePamphletId, p)),
+			);
+			const merged = results.flat();
+			setAllCompletedTasks(merged);
+			setHasMoreCompleted(results[results.length - 1].length === 50);
+		} catch (e) {
+			// offline — keep existing completed tasks
+		}
 	}, [activePamphletId, fetchCompletedTasks]);
 
 	// Initial load when pamphlet changes
@@ -269,21 +323,33 @@ export function AutofocusApp() {
 
 	const { data: appState, mutate: mutateAppState } = useSWR<AppState>(
 		userId ? `app-state-${userId}` : null,
-		getAppState,
-		{ refreshInterval: 1000 },
+		async () => {
+			if (!isOnline()) return undefined;
+			return getAppState();
+		},
+		{
+			refreshInterval: 1000,
+			onError: () => {},
+		},
 	);
 
 	const [totalPages, setTotalPages] = useState(1);
 
 	useEffect(() => {
 		if (!activePamphletId) return;
-		fetchTotalPages(activePamphletId).then(setTotalPages);
+		fetchTotalPages(activePamphletId)
+			.then(setTotalPages)
+			.catch(() => {});
 	}, [activePamphletId, activeTasks, fetchTotalPages]);
 
 	const mutateTotalPages = useCallback(async () => {
 		if (!activePamphletId) return;
-		const pages = await fetchTotalPages(activePamphletId);
-		setTotalPages(pages);
+		try {
+			const pages = await fetchTotalPages(activePamphletId);
+			setTotalPages(pages);
+		} catch (e) {
+			// offline — keep existing page count
+		}
 	}, [activePamphletId, fetchTotalPages]);
 
 	const { data: achievementTasks = [], mutate: mutateAchievements } = useSWR<
@@ -298,7 +364,8 @@ export function AutofocusApp() {
 	const displayedActiveTasks = optimisticState?.activeTasks ?? activeTasks;
 	const displayedCompletedTasks =
 		optimisticState?.completedTasks ?? allCompletedTasks;
-	const displayedAppState = optimisticState?.appState ?? appState;
+	const displayedAppState =
+		optimisticState?.appState ?? appState ?? OFFLINE_APP_STATE;
 	const displayedTotalPages = optimisticState?.totalPages ?? totalPages;
 
 	const isFilterActive = selectedTags.size > 0;
@@ -569,6 +636,7 @@ export function AutofocusApp() {
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
 				tracker_id: trackerId ?? null,
+				user_id: userId ?? "",
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -647,6 +715,7 @@ export function AutofocusApp() {
 				due_date: null,
 				pamphlet_id: activePamphletId,
 				tracker_id: null,
+				user_id: userId ?? "",
 			}));
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
@@ -1070,6 +1139,7 @@ export function AutofocusApp() {
 				added_at: now,
 				completed_at: null,
 				updated_at: now,
+				user_id: userId ?? "",
 			};
 
 			const completedTask: Task = {
@@ -1330,6 +1400,7 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
+				user_id: userId ?? "",
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -1556,6 +1627,7 @@ export function AutofocusApp() {
 				added_at: now,
 				completed_at: null,
 				updated_at: now,
+				user_id: userId ?? "",
 			};
 
 			const completedTask: Task = {
@@ -1694,6 +1766,7 @@ export function AutofocusApp() {
 					added_at: now,
 					completed_at: null,
 					updated_at: now,
+					user_id: userId ?? "",
 				};
 
 				const optimisticActiveTasks = [
@@ -1892,7 +1965,7 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	// Render
 	// -------------------------------------------------------------------------
-	if (!displayedAppState) {
+	if (!displayedAppState && isOnline()) {
 		return (
 			<div className="min-h-screen bg-background flex items-center justify-center">
 				<div className="text-muted-foreground">Loading...</div>
