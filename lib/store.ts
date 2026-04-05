@@ -18,8 +18,9 @@ async function getUserId(): Promise<string> {
 	if (cachedUserId) return cachedUserId;
 	const supabase = createClient();
 	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+		data: { session },
+	} = await supabase.auth.getSession();
+	const user = session?.user ?? null;
 	if (!user) throw new Error("Not authenticated");
 	cachedUserId = user.id;
 	return cachedUserId;

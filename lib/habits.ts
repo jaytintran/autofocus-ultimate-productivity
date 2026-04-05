@@ -189,8 +189,9 @@ export async function addHabit(
 		// Get user from cached auth session (available offline after first login)
 		const supabase = createClient();
 		const {
-			data: { user },
-		} = await supabase.auth.getUser();
+			data: { session },
+		} = await supabase.auth.getSession();
+		const user = session?.user ?? null;
 		if (!user) throw new Error("Not authenticated");
 
 		// Compute next position from IDB
@@ -221,8 +222,9 @@ export async function addHabit(
 
 	const supabase = createClient();
 	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+		data: { session },
+	} = await supabase.auth.getSession();
+	const user = session?.user ?? null;
 	if (!user) throw new Error("Not authenticated");
 
 	const { data: existing } = await supabase

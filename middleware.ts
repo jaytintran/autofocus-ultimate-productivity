@@ -26,8 +26,9 @@ export async function middleware(request: NextRequest) {
 	);
 
 	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+		data: { session },
+	} = await supabase.auth.getSession();
+	const user = session?.user ?? null;
 
 	// If not logged in and not already on login page, redirect
 	if (!user && !request.nextUrl.pathname.startsWith("/login")) {

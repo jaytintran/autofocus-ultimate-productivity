@@ -88,8 +88,9 @@ export async function addProject(
 	if (!isOnline()) {
 		const supabase = createClient();
 		const {
-			data: { user },
-		} = await supabase.auth.getUser();
+			data: { session },
+		} = await supabase.auth.getSession();
+		const user = session?.user ?? null;
 		if (!user) throw new Error("Not authenticated");
 
 		const newProject: Project = {
@@ -110,8 +111,9 @@ export async function addProject(
 
 	const supabase = createClient();
 	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+		data: { session },
+	} = await supabase.auth.getSession();
+	const user = session?.user ?? null;
 	if (!user) throw new Error("Not authenticated");
 
 	const { data, error } = await supabase
