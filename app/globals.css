@@ -187,6 +187,22 @@
 	--app-font-family: var(--font-rubik-family), sans-serif;
 }
 
+.font-ibm-plex-mono {
+	--app-font-family: var(--font-ibm-plex-mono), monospace;
+}
+
+.font-literata {
+	--app-font-family: var(--font-literata), serif;
+}
+
+.font-dm-sans {
+	--app-font-family: var(--font-dm-sans), sans-serif;
+}
+
+.font-playfair {
+	--app-font-family: var(--font-playfair), serif;
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

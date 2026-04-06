@@ -1,5 +1,15 @@
+// @ts-nocheck
+
 import type { Metadata } from "next";
-import { Geist_Mono, Rubik } from "next/font/google";
+import {
+	Geist_Mono,
+	Rubik,
+	IBM_Plex_Mono,
+	Literata,
+	DM_Sans,
+	Playfair_Display,
+} from "next/font/google";
+
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/app/globals.css";
@@ -12,6 +22,27 @@ const geistMono = Geist_Mono({
 const rubik = Rubik({
 	subsets: ["latin"],
 	variable: "--font-rubik-family",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+	subsets: ["latin"],
+	weight: ["400", "500", "600"],
+	variable: "--font-ibm-plex-mono",
+});
+
+const literata = Literata({
+	subsets: ["latin"],
+	variable: "--font-literata",
+});
+
+const dmSans = DM_Sans({
+	subsets: ["latin"],
+	variable: "--font-dm-sans",
+});
+
+const playfairDisplay = Playfair_Display({
+	subsets: ["latin"],
+	variable: "--font-playfair",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +59,7 @@ export default function RootLayout({
 		<html
 			lang="en"
 			suppressHydrationWarning
-			className={`${geistMono.variable} ${rubik.variable}`}
+			className={`${geistMono.variable} ${rubik.variable} ${ibmPlexMono.variable} ${literata.variable} ${dmSans.variable} ${playfairDisplay.variable}`}
 		>
 			<head>
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />

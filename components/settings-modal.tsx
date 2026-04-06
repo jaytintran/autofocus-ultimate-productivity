@@ -6,9 +6,10 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Moon, Sun, Type, Palette, TreePine } from "lucide-react";
+import { Moon, Sun, Type, Palette, TreePine, Download } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { ExportSection } from "@/components/export-section";
 
 const THEMES = [
 	{ value: "light", label: "Light", icon: Sun },
@@ -24,26 +25,47 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 	const { theme, setTheme } = useTheme();
-	const [fontFamily, setFontFamily] = useState<"default" | "rubik">("default");
 	const [mounted, setMounted] = useState(false);
 
+	type FontId =
+		| "default"
+		| "rubik"
+		| "ibm-plex-mono"
+		| "literata"
+		| "dm-sans"
+		| "playfair";
+	const FONTS: { id: FontId; label: string; className: string }[] = [
+		{ id: "default", label: "Geist Mono", className: "" },
+		{ id: "rubik", label: "Rubik", className: "font-rubik" },
+		{ id: "ibm-plex-mono", label: "IBM Plex", className: "font-ibm-plex-mono" },
+		{ id: "literata", label: "Literata", className: "font-literata" },
+		{ id: "dm-sans", label: "DM Sans", className: "font-dm-sans" },
+		{ id: "playfair", label: "Playfair", className: "font-playfair" },
+	];
+	const ALL_FONT_CLASSES = FONTS.map((f) => f.className).filter(Boolean);
+
+	const [fontFamily, setFontFamily] = useState<FontId>("default");
 	useEffect(() => {
 		setMounted(true);
 	}, []);
 
 	useEffect(() => {
-		const savedFont = localStorage.getItem("font-family") as
-			| "default"
-			| "rubik"
-			| null;
+		const savedFont = localStorage.getItem("font-family") as FontId | null;
 		if (savedFont) {
 			setFontFamily(savedFont);
-			document.documentElement.classList.toggle(
-				"font-rubik",
-				savedFont === "rubik",
-			);
+			const cls = FONTS.find((f) => f.id === savedFont)?.className;
+			document.documentElement.classList.remove(...ALL_FONT_CLASSES);
+			if (cls) document.documentElement.classList.add(cls);
 		}
 	}, []);
+
+	const selectFont = (id: FontId) => {
+		const font = FONTS.find((f) => f.id === id)!;
+		setFontFamily(id);
+		document.documentElement.classList.remove(...ALL_FONT_CLASSES);
+		if (font.className) document.documentElement.classList.add(font.className);
+		localStorage.setItem("font-family", id);
+	};
 
 	const handleThemeChange = (newTheme: string) => {
 		const root = document.documentElement;
@@ -57,16 +79,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
 		// sync with next-themes
 		setTheme(newTheme);
-	};
-
-	const toggleFont = () => {
-		const newFont = fontFamily === "default" ? "rubik" : "default";
-		setFontFamily(newFont);
-		document.documentElement.classList.toggle(
-			"font-rubik",
-			newFont === "rubik",
-		);
-		localStorage.setItem("font-family", newFont);
 	};
 
 	const getCurrentThemeIcon = () => {
@@ -128,29 +140,38 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 						</p>
 					</div>
 
-					<hr className="border-border" />
-
 					{/* Font Section */}
 					<div className="space-y-3">
 						<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
 							<Type className="w-3 h-3" />
 							<span>Typography</span>
 						</div>
-						<button
-							onClick={toggleFont}
-							className="flex items-center justify-between w-full px-3 py-2 text-sm rounded border border-border hover:border-muted-foreground/50 transition-all"
-						>
-							<div className="flex items-center gap-2">
-								<span className={fontFamily === "rubik" ? "font-rubik" : ""}>
-									{fontFamily === "default" ? "Geist Mono" : "Rubik"}
-								</span>
-							</div>
-							<span className="text-[0.625rem] text-muted-foreground">
-								{fontFamily === "default"
-									? "Switch to Rubik"
-									: "Switch to Geist Mono"}
-							</span>
-						</button>
+						<div className="grid grid-cols-3 gap-1">
+							{FONTS.map((font) => (
+								<button
+									key={font.id}
+									onClick={() => selectFont(font.id)}
+									className={`py-1.5 px-2 text-xs rounded border transition-colors ${
+										fontFamily === font.id
+											? "bg-af4-olive text-background border-af4-olive"
+											: "border-border text-muted-foreground hover:bg-accent"
+									}`}
+								>
+									{font.label}
+								</button>
+							))}
+						</div>
+					</div>
+
+					<hr className="border-border" />
+
+					{/* Export */}
+					<div className="space-y-3">
+						<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+							<Download className="w-3 h-3" />
+							<span>Export</span>
+						</div>
+						<ExportSection />
 					</div>
 				</div>
 			</DialogContent>

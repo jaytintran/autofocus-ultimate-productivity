@@ -12,8 +12,29 @@ import {
 import { useCallback } from "react";
 import { useUserId } from "./use-user-id";
 
+const CACHE_KEY = "af4_habits_cache";
+
+function getHabitsCache(): Habit[] | null {
+	try {
+		const raw = localStorage.getItem(CACHE_KEY);
+		return raw ? JSON.parse(raw) : null;
+	} catch {
+		return null;
+	}
+}
+
+function setHabitsCache(habits: Habit[]) {
+	try {
+		localStorage.setItem(CACHE_KEY, JSON.stringify(habits));
+	} catch {}
+}
+
 export function useHabits() {
 	const userId = useUserId();
+
+	const cachedHabits = getHabitsCache();
+	const hasCachedHabits =
+		Array.isArray(cachedHabits) && cachedHabits.length > 0;
 
 	const {
 		data: habits = [],
@@ -21,6 +42,13 @@ export function useHabits() {
 		isLoading,
 	} = useSWR<Habit[]>(userId ? `habits-${userId}` : null, getHabits, {
 		refreshInterval: 0,
+		fallbackData: cachedHabits ?? undefined,
+		onSuccess(data) {
+			setHabitsCache(data);
+		},
+		revalidateOnMount: !hasCachedHabits,
+		revalidateOnFocus: false,
+		revalidateOnReconnect: false,
 	});
 
 	const handleUpdate = useCallback(
@@ -65,7 +93,6 @@ export function useHabits() {
 			const today = getToday();
 			const wasCompleted = habit.completions.includes(today);
 
-			// Optimistic update
 			mutate(
 				habits.map((h) => {
 					if (h.id !== id) return h;
@@ -101,26 +128,23 @@ export function useHabits() {
 			)
 				return;
 
-			// Reorder array
 			const reordered = [...habits];
 			const [dragged] = reordered.splice(draggedIndex, 1);
 			reordered.splice(targetIndex, 0, dragged);
 
-			// Assign new positions
 			const updates = reordered.map((h, i) => ({ id: h.id, position: i }));
 			const reorderedWithPositions = reordered.map((h, i) => ({
 				...h,
 				position: i,
 			}));
 
-			// Optimistic update
 			mutate(reorderedWithPositions, false);
 
 			try {
 				await reorderHabits(updates);
 				await mutate();
 			} catch {
-				await mutate(); // revert on error
+				await mutate();
 			}
 		},
 		[habits, mutate],
@@ -128,7 +152,7 @@ export function useHabits() {
 
 	return {
 		habits,
-		isLoading,
+		isLoading: hasCachedHabits ? false : isLoading,
 		handleUpdate,
 		handleAdd,
 		handleDelete,

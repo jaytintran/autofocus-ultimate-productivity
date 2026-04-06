@@ -9,8 +9,29 @@ import {
 import { useCallback } from "react";
 import { useUserId } from "./use-user-id";
 
+const CACHE_KEY = "af4_projects_cache";
+
+function getProjectsCache(): Project[] | null {
+	try {
+		const raw = localStorage.getItem(CACHE_KEY);
+		return raw ? JSON.parse(raw) : null;
+	} catch {
+		return null;
+	}
+}
+
+function setProjectsCache(projects: Project[]) {
+	try {
+		localStorage.setItem(CACHE_KEY, JSON.stringify(projects));
+	} catch {}
+}
+
 export function useProjects() {
 	const userId = useUserId();
+
+	const cachedProjects = getProjectsCache();
+	const hasCachedProjects =
+		Array.isArray(cachedProjects) && cachedProjects.length > 0;
 
 	const {
 		data: projects = [],
@@ -18,6 +39,13 @@ export function useProjects() {
 		isLoading,
 	} = useSWR<Project[]>(userId ? `projects-${userId}` : null, getProjects, {
 		refreshInterval: 0,
+		fallbackData: cachedProjects ?? undefined,
+		onSuccess(data) {
+			setProjectsCache(data);
+		},
+		revalidateOnMount: !hasCachedProjects,
+		revalidateOnFocus: false,
+		revalidateOnReconnect: false,
 	});
 
 	const handleUpdate = useCallback(
@@ -61,7 +89,7 @@ export function useProjects() {
 
 	return {
 		projects,
-		isLoading,
+		isLoading: hasCachedProjects ? false : isLoading,
 		handleUpdate,
 		handleAdd,
 		handleDelete,

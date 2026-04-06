@@ -8,9 +8,14 @@ import {
 } from "@/lib/books";
 import { useCallback } from "react";
 import { useUserId } from "./use-user-id";
+import { getBooksCache, setBooksCache } from "./use-books-cache";
 
 export function useBooks() {
 	const userId = useUserId();
+
+	// Read cache once synchronously — this is the seed for SWR on revisit
+	const cachedBooks = getBooksCache();
+	const hasCachedBooks = Array.isArray(cachedBooks) && cachedBooks.length > 0;
 
 	const {
 		data: books = [],
@@ -18,15 +23,26 @@ export function useBooks() {
 		isLoading,
 	} = useSWR<Book[]>(userId ? `books-${userId}` : null, getBooks, {
 		refreshInterval: 0,
+		// Seed SWR with localStorage data — makes isLoading false immediately on revisit
+		fallbackData: cachedBooks ?? undefined,
+		// After every successful Supabase fetch, overwrite the cache entirely
+		onSuccess(data) {
+			setBooksCache(data);
+		},
+		// Only revalidate on mount when there's no cache — skip the fetch on revisit
+		revalidateOnMount: !hasCachedBooks,
+		revalidateOnFocus: false,
+		revalidateOnReconnect: false,
 	});
+
 	const handleUpdate = useCallback(
 		async (id: string, updates: Partial<Book>) => {
-			// Optimistic
 			mutate(
 				books.map((b) => (b.id === id ? { ...b, ...updates } : b)),
 				false,
 			);
 			await updateBook(id, updates);
+			// mutate() triggers refetch → onSuccess fires → cache overwritten
 			await mutate();
 		},
 		[books, mutate],
@@ -65,7 +81,8 @@ export function useBooks() {
 
 	return {
 		books,
-		isLoading,
+		// If we have cached data, never show loading — data is already there
+		isLoading: hasCachedBooks ? false : isLoading,
 		handleUpdate,
 		handleAdd,
 		handleDelete,
