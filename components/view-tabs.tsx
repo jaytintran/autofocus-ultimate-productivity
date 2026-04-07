@@ -478,7 +478,9 @@ export function ViewTabs({
 						onChange={onChangeContentFilter}
 					/>
 
-					<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
+					{activeView === "completed" && (
+						<TagFilter selectedTags={selectedTags} onToggleTag={onToggleTag} />
+					)}
 
 					{activeView === "completed" && (
 						<SortSelector

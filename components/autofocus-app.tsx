@@ -1968,6 +1968,8 @@ export function AutofocusApp() {
 					habitsViewActive={habitsViewActive}
 					onToggleHabitsView={() => setHabitsViewActive((v) => !v)}
 					activeHabitCount={activeHabitCount}
+					selectedTags={selectedTags}
+					onToggleTag={handleToggleTag}
 				/>
 			)}
 
