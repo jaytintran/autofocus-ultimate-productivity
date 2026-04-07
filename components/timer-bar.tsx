@@ -23,6 +23,12 @@ import {
 } from "@/lib/utils/due-date-parser";
 import { PAMPHLET_COLORS } from "@/lib/pamphlet-colors";
 import { TagPill } from "./tag-pill";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 // =============================================================================
 // TYPES
@@ -549,6 +555,7 @@ export function TimerBar({
 	const [noteType, setNoteType] = useState<"log" | "achievement" | "sidequest">(
 		"log",
 	);
+	const [mobileNotesOpen, setMobileNotesOpen] = useState(false);
 
 	// ── Sidequest entries ───────────────────────────────────────────────────────
 	const [sidequestInput, setSidequestInput] = useState("");
@@ -771,9 +778,9 @@ export function TimerBar({
 
 	return (
 		<div className="border-y border-border/80 bg-card px-4 py-3 md:px-10 md:py-4">
-			<div className="mx-auto flex max-w-6xl flex-col gap-3">
-				{/* Top row */}
-				<div className="flex flex-col gap-1.5">
+			<div className="mx-auto flex max-w-6xl flex-col gap-3 md:grid md:grid-cols-2 md:gap-6">
+				{/* LEFT COLUMN: Task info + Timer + Actions */}
+				<div className="flex flex-col gap-3">
 					{/* Title + X */}
 					<div className="flex items-start justify-between gap-3">
 						<p className="truncate text-base font-semibold tracking-tight text-foreground md:text-3xl md:tracking-[0.04em]">
@@ -788,7 +795,7 @@ export function TimerBar({
 						</button>
 					</div>
 
-					{/* Badges row: pamphlet + due date + tag */}
+					{/* Badges row */}
 					<div className="flex items-center gap-2 flex-wrap">
 						{workingPamphlet && (
 							<span
@@ -842,429 +849,457 @@ export function TimerBar({
 							className="scale-90 origin-left"
 						/>
 					</div>
-				</div>
 
-				{/* Timer + action buttons — inline on mobile, stacked on desktop */}
-				<div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-3">
-					{/* Timer */}
-					<span
-						className={`font-mono text-xl tracking-[0.12em] md:text-4xl md:tracking-[0.16em] ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
-					>
-						{formatTimerDisplay(totalDisplayTime)}
-					</span>
+					{/* Timer + action buttons */}
+					<div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-3">
+						{/* Timer */}
+						<span
+							className={`font-mono text-xl tracking-[0.12em] md:text-4xl md:tracking-[0.16em] ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
+						>
+							{formatTimerDisplay(totalDisplayTime)}
+						</span>
 
-					{/* Action buttons */}
-					<div className="flex items-center gap-1.5">
-						{isIdle && (
-							<>
-								{/* Mobile: icon only */}
-								<button
-									onClick={handleStartTimer}
-									className={`${primaryBtn} md:hidden`}
-									title="Start"
-								>
-									<Play className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${secondaryBtn} md:hidden`}
-									title="Complete"
-								>
-									<Check className="h-4 w-4 text-[#8b9a6b]" />
-								</button>
-								{/* Desktop: icon + text */}
-								<button
-									onClick={handleStartTimer}
-									className={`${primaryBtn} hidden md:inline-flex`}
-								>
-									<Play className="h-3.5 w-3.5" />
-									Start
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-									Complete
-								</button>
-							</>
-						)}
-						{isRunning && (
-							<>
-								<button
-									onClick={handlePause}
-									className={`${secondaryBtn} md:hidden`}
-									title="Pause"
-								>
-									<Pause className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleStop}
-									className={`${secondaryBtn} md:hidden`}
-									title="Stop"
-								>
-									<Square className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${primaryBtn} md:hidden`}
-									title="Complete"
-								>
-									<Check className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handlePause}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Pause className="h-3.5 w-3.5" />
-									Pause
-								</button>
-								<button
-									onClick={handleStop}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Square className="h-3.5 w-3.5" />
-									Stop
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${primaryBtn} hidden md:inline-flex`}
-								>
-									<Check className="h-3.5 w-3.5" />
-									Complete
-								</button>
-							</>
-						)}
-						{isPaused && (
-							<>
-								<button
-									onClick={handleResume}
-									className={`${primaryBtn} md:hidden`}
-									title="Resume"
-								>
-									<Play className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleStop}
-									className={`${secondaryBtn} md:hidden`}
-									title="Stop"
-								>
-									<Square className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${secondaryBtn} md:hidden`}
-									title="Complete"
-								>
-									<Check className="h-4 w-4 text-[#8b9a6b]" />
-								</button>
-								<button
-									onClick={handleResume}
-									className={`${primaryBtn} hidden md:inline-flex`}
-								>
-									<Play className="h-3.5 w-3.5" />
-									Resume
-								</button>
-								<button
-									onClick={handleStop}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Square className="h-3.5 w-3.5" />
-									Stop
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-									Complete
-								</button>
-							</>
-						)}
-						{isStopped && (
-							<>
-								<button
-									onClick={handleStartTimer}
-									className={`${secondaryBtn} md:hidden`}
-									title="Resume"
-								>
-									<Play className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${primaryBtn} md:hidden`}
-									title="Complete"
-								>
-									<Check className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleReenter}
-									className={`${secondaryBtn} md:hidden`}
-									title="Re-enter"
-								>
-									<RefreshCw className="h-4 w-4" />
-								</button>
-								<button
-									onClick={handleStartTimer}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<Play className="h-3.5 w-3.5" />
-									Resume
-								</button>
-								<button
-									onClick={handleComplete}
-									className={`${primaryBtn} hidden md:inline-flex`}
-								>
-									<Check className="h-3.5 w-3.5" />
-									Complete
-								</button>
-								<button
-									onClick={handleReenter}
-									className={`${secondaryBtn} hidden md:inline-flex`}
-								>
-									<RefreshCw className="h-3.5 w-3.5" />
-									Re-enter
-								</button>
-							</>
-						)}
+						{/* Action buttons */}
+						<div className="flex items-center gap-1.5">
+							{isIdle && (
+								<>
+									{/* Mobile: icon only */}
+									<button
+										onClick={handleStartTimer}
+										className={`${primaryBtn} md:hidden`}
+										title="Start"
+									>
+										<Play className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${secondaryBtn} md:hidden`}
+										title="Complete"
+									>
+										<Check className="h-4 w-4 text-[#8b9a6b]" />
+									</button>
+									{/* Desktop: icon + text */}
+									<button
+										onClick={handleStartTimer}
+										className={`${primaryBtn} hidden md:inline-flex`}
+									>
+										<Play className="h-3.5 w-3.5" />
+										Start
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
+										Complete
+									</button>
+								</>
+							)}
+							{isRunning && (
+								<>
+									<button
+										onClick={handlePause}
+										className={`${secondaryBtn} md:hidden`}
+										title="Pause"
+									>
+										<Pause className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleStop}
+										className={`${secondaryBtn} md:hidden`}
+										title="Stop"
+									>
+										<Square className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${primaryBtn} md:hidden`}
+										title="Complete"
+									>
+										<Check className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handlePause}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Pause className="h-3.5 w-3.5" />
+										Pause
+									</button>
+									<button
+										onClick={handleStop}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Square className="h-3.5 w-3.5" />
+										Stop
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${primaryBtn} hidden md:inline-flex`}
+									>
+										<Check className="h-3.5 w-3.5" />
+										Complete
+									</button>
+								</>
+							)}
+							{isPaused && (
+								<>
+									<button
+										onClick={handleResume}
+										className={`${primaryBtn} md:hidden`}
+										title="Resume"
+									>
+										<Play className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleStop}
+										className={`${secondaryBtn} md:hidden`}
+										title="Stop"
+									>
+										<Square className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${secondaryBtn} md:hidden`}
+										title="Complete"
+									>
+										<Check className="h-4 w-4 text-[#8b9a6b]" />
+									</button>
+									<button
+										onClick={handleResume}
+										className={`${primaryBtn} hidden md:inline-flex`}
+									>
+										<Play className="h-3.5 w-3.5" />
+										Resume
+									</button>
+									<button
+										onClick={handleStop}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Square className="h-3.5 w-3.5" />
+										Stop
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
+										Complete
+									</button>
+								</>
+							)}
+							{isStopped && (
+								<>
+									<button
+										onClick={handleStartTimer}
+										className={`${secondaryBtn} md:hidden`}
+										title="Resume"
+									>
+										<Play className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${primaryBtn} md:hidden`}
+										title="Complete"
+									>
+										<Check className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleReenter}
+										className={`${secondaryBtn} md:hidden`}
+										title="Re-enter"
+									>
+										<RefreshCw className="h-4 w-4" />
+									</button>
+									<button
+										onClick={handleStartTimer}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<Play className="h-3.5 w-3.5" />
+										Resume
+									</button>
+									<button
+										onClick={handleComplete}
+										className={`${primaryBtn} hidden md:inline-flex`}
+									>
+										<Check className="h-3.5 w-3.5" />
+										Complete
+									</button>
+									<button
+										onClick={handleReenter}
+										className={`${secondaryBtn} hidden md:inline-flex`}
+									>
+										<RefreshCw className="h-3.5 w-3.5" />
+										Re-enter
+									</button>
+								</>
+							)}
+						</div>
 					</div>
 				</div>
 
-				{/* Divider */}
-				<div className="h-px w-full bg-border/50" />
-
-				{/* Note input */}
-				{/* Mobile toggler — own row */}
-				<div className="flex md:hidden items-center gap-1.5 w-full">
-					<button
-						type="button"
-						onClick={() => setNoteType("log")}
-						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-							noteType === "log"
-								? "border-[#8b9a6b]/40 bg-[#8b9a6b]/10 text-[#8b9a6b]"
-								: "border-border text-muted-foreground/50"
-						}`}
-					>
-						<ClipboardList className="w-3.5 h-3.5" />
-						Log
-					</button>
-					<button
-						type="button"
-						onClick={() => setNoteType("achievement")}
-						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-							noteType === "achievement"
-								? "border-amber-500/40 bg-amber-500/10 text-amber-500"
-								: "border-border text-muted-foreground/50"
-						}`}
-					>
-						<Trophy className="w-3.5 h-3.5" />
-						Win
-					</button>
-					<button
-						type="button"
-						onClick={() => setNoteType("sidequest")}
-						className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-							noteType === "sidequest"
-								? "border-sky-500/40 bg-sky-500/10 text-sky-500"
-								: "border-border text-muted-foreground/50"
-						}`}
-					>
-						<CheckCheck className="w-3.5 h-3.5" />
-						Side Quest
-					</button>
-				</div>
-
-				{/* Input row — desktop toggler + input + send */}
-				<div className="flex items-center gap-2">
-					{/* Desktop toggler only */}
-					<div className="hidden md:flex items-center gap-0.5 rounded-md border border-border p-1 flex-shrink-0">
+				{/* RIGHT COLUMN: Note input + display */}
+				<div className="flex flex-col gap-3 md:border-l md:border-border/50 md:pl-6">
+					{/* Mobile toggler — own row */}
+					<div className="flex md:hidden items-center gap-1.5 w-full">
 						<button
 							type="button"
 							onClick={() => setNoteType("log")}
-							title="Session log — timestamped entry"
-							className={`rounded p-1.5 transition-colors ${
+							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
 								noteType === "log"
-									? "bg-[#8b9a6b]/20 text-[#8b9a6b]"
-									: "text-muted-foreground/40 hover:text-muted-foreground"
+									? "border-[#8b9a6b]/40 bg-[#8b9a6b]/10 text-[#8b9a6b]"
+									: "border-border text-muted-foreground/50"
 							}`}
 						>
 							<ClipboardList className="w-3.5 h-3.5" />
+							Log
 						</button>
 						<button
 							type="button"
 							onClick={() => setNoteType("achievement")}
-							title="Achievement — completion reflection"
-							className={`rounded p-1.5 transition-colors ${
+							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
 								noteType === "achievement"
-									? "bg-amber-500/20 text-amber-500"
-									: "text-muted-foreground/40 hover:text-muted-foreground"
+									? "border-amber-500/40 bg-amber-500/10 text-amber-500"
+									: "border-border text-muted-foreground/50"
 							}`}
 						>
 							<Trophy className="w-3.5 h-3.5" />
+							Win
 						</button>
 						<button
 							type="button"
 							onClick={() => setNoteType("sidequest")}
-							title="Side completion — knocked off another task"
-							className={`rounded p-1.5 transition-colors ${
+							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
 								noteType === "sidequest"
-									? "bg-sky-500/20 text-sky-500"
-									: "text-muted-foreground/40 hover:text-muted-foreground"
+									? "border-sky-500/40 bg-sky-500/10 text-sky-500"
+									: "border-border text-muted-foreground/50"
 							}`}
 						>
 							<CheckCheck className="w-3.5 h-3.5" />
+							Side Quest
 						</button>
 					</div>
 
-					{noteType === "sidequest" ? (
-						<div className="flex-1 relative">
-							<input
-								type="text"
-								value={sidequestInput}
-								onChange={(e) => handleSidequestChange(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && !sidequestSubmitting) {
-										if (sidequestMatches.length === 1) {
-											handleSidequestSubmit(
-												sidequestMatches[0].id,
-												sidequestMatches[0].text,
-											);
-										} else {
-											handleSidequestSubmit(null, sidequestInput);
-										}
-									}
-									if (e.key === "Escape") setSidequestMatches([]);
-								}}
-								placeholder="What did you knock off?"
-								disabled={sidequestSubmitting}
-								className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
-							/>
-							{sidequestMatches.length > 0 && (
-								<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
-									{sidequestMatches.map((task) => (
-										<button
-											key={task.id}
-											type="button"
-											onMouseDown={(e) => {
-												e.preventDefault();
-												handleSidequestSubmit(task.id, task.text);
-											}}
-											className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
-										>
-											<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-											<span className="truncate text-foreground">
-												{task.text}
-											</span>
-										</button>
-									))}
-									{sidequestInput.trim() && (
-										<button
-											type="button"
-											onMouseDown={(e) => {
-												e.preventDefault();
-												handleSidequestSubmit(null, sidequestInput);
-											}}
-											className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left border-t border-border text-muted-foreground"
-										>
-											<CheckCheck className="w-3 h-3 flex-shrink-0" />
-											<span>Complete "{sidequestInput.trim()}" as new</span>
-										</button>
-									)}
-								</div>
-							)}
-						</div>
-					) : (
-						<input
-							type="text"
-							value={noteInput}
-							onChange={(e) => setNoteInput(e.target.value)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter") handleNoteSubmit();
-							}}
-							placeholder={
-								noteType === "log"
-									? "Log a note, hit Enter..."
-									: "What did you achieve?"
-							}
-							className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
-						/>
-					)}
-					{noteType !== "sidequest" && noteInput && (
-						<button
-							type="button"
-							onClick={handleNoteSubmit}
-							className="text-muted-foreground/40 hover:text-[#8b9a6b] transition-colors"
-						>
-							<Send className="w-3 h-3" />
-						</button>
-					)}
-					{noteType === "sidequest" &&
-						sidequestInput &&
-						!sidequestSubmitting && (
+					{/* Input row — desktop toggler + input + send */}
+					<div className="flex items-center gap-2">
+						{/* Desktop toggler only */}
+						<div className="hidden md:flex items-center gap-0.5 rounded-md border border-border p-1 flex-shrink-0">
 							<button
 								type="button"
-								onMouseDown={(e) => {
-									e.preventDefault();
-									handleSidequestSubmit(null, sidequestInput);
-								}}
-								className="text-muted-foreground/40 hover:text-sky-500 transition-colors"
+								onClick={() => setNoteType("log")}
+								title="Session log — timestamped entry"
+								className={`rounded p-1.5 transition-colors ${
+									noteType === "log"
+										? "bg-[#8b9a6b]/20 text-[#8b9a6b]"
+										: "text-muted-foreground/40 hover:text-muted-foreground"
+								}`}
+							>
+								<ClipboardList className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								onClick={() => setNoteType("achievement")}
+								title="Achievement — completion reflection"
+								className={`rounded p-1.5 transition-colors ${
+									noteType === "achievement"
+										? "bg-amber-500/20 text-amber-500"
+										: "text-muted-foreground/40 hover:text-muted-foreground"
+								}`}
+							>
+								<Trophy className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								onClick={() => setNoteType("sidequest")}
+								title="Side completion — knocked off another task"
+								className={`rounded p-1.5 transition-colors ${
+									noteType === "sidequest"
+										? "bg-sky-500/20 text-sky-500"
+										: "text-muted-foreground/40 hover:text-muted-foreground"
+								}`}
+							>
+								<CheckCheck className="w-3.5 h-3.5" />
+							</button>
+						</div>
+
+						{noteType === "sidequest" ? (
+							<div className="flex-1 relative">
+								<input
+									type="text"
+									value={sidequestInput}
+									onChange={(e) => handleSidequestChange(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" && !sidequestSubmitting) {
+											if (sidequestMatches.length === 1) {
+												handleSidequestSubmit(
+													sidequestMatches[0].id,
+													sidequestMatches[0].text,
+												);
+											} else {
+												handleSidequestSubmit(null, sidequestInput);
+											}
+										}
+										if (e.key === "Escape") setSidequestMatches([]);
+									}}
+									placeholder="What did you knock off?"
+									disabled={sidequestSubmitting}
+									className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
+								/>
+								{sidequestMatches.length > 0 && (
+									<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
+										{sidequestMatches.map((task) => (
+											<button
+												key={task.id}
+												type="button"
+												onMouseDown={(e) => {
+													e.preventDefault();
+													handleSidequestSubmit(task.id, task.text);
+												}}
+												className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+											>
+												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+												<span className="truncate text-foreground">
+													{task.text}
+												</span>
+											</button>
+										))}
+										{sidequestInput.trim() && (
+											<button
+												type="button"
+												onMouseDown={(e) => {
+													e.preventDefault();
+													handleSidequestSubmit(null, sidequestInput);
+												}}
+												className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left border-t border-border text-muted-foreground"
+											>
+												<CheckCheck className="w-3 h-3 flex-shrink-0" />
+												<span>Complete "{sidequestInput.trim()}" as new</span>
+											</button>
+										)}
+									</div>
+								)}
+							</div>
+						) : (
+							<div className="flex-1 relative">
+								<input
+									type="text"
+									value={noteInput}
+									onChange={(e) => setNoteInput(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") handleNoteSubmit();
+									}}
+									placeholder={
+										noteType === "log"
+											? "Log a note, hit Enter..."
+											: "What did you achieve?"
+									}
+									className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
+								/>
+							</div>
+						)}
+						{noteType !== "sidequest" && noteInput && (
+							<button
+								type="button"
+								onClick={handleNoteSubmit}
+								className="text-muted-foreground/40 hover:text-[#8b9a6b] transition-colors"
 							>
 								<Send className="w-3 h-3" />
 							</button>
 						)}
-				</div>
+						{noteType === "sidequest" &&
+							sidequestInput &&
+							!sidequestSubmitting && (
+								<button
+									type="button"
+									onMouseDown={(e) => {
+										e.preventDefault();
+										handleSidequestSubmit(null, sidequestInput);
+									}}
+									className="text-muted-foreground/40 hover:text-sky-500 transition-colors"
+								>
+									<Send className="w-3 h-3" />
+								</button>
+							)}
+					</div>
 
-				{/* Note log zone */}
-				<div className="flex flex-col gap-1.5">
-					{/* Scrollable bullet list — achievements pinned top, logs below, max ~4 lines */}
-					{noteEntries.length > 0 && (
-						<div
-							className="flex flex-col gap-0.5 overflow-y-auto max-h-[88px]"
-							style={{
-								scrollbarWidth: "thin",
-								scrollbarColor: "hsl(var(--border)) transparent",
-							}}
+					{/* Mobile collapsible */}
+					<Collapsible
+						open={mobileNotesOpen}
+						onOpenChange={setMobileNotesOpen}
+						className="md:hidden -mb-2.5"
+					>
+						<CollapsibleContent
+							className={`${noteEntries.length > 2 ? "border border-border" : ""} pt-0 pb-1 px-2 rounded-[0.25rem]`}
 						>
-							{[
-								...noteEntries.filter((e) => e.type === "achievement"),
-								...noteEntries.filter((e) => e.type === "sidequest"),
-								...noteEntries.filter((e) => e.type === "log"),
-							].map((entry) => {
-								const isAchievement = entry.type === "achievement";
-								const isSidequest = entry.type === "sidequest";
-								return (
-									<div
-										key={entry.id}
-										className="flex items-baseline gap-2 text-xs"
-									>
-										{/* Bullet / icon */}
-										{isAchievement ? (
-											<span className="text-amber-500 flex-shrink-0 text-[11px]">
-												🏆
-											</span>
-										) : isSidequest ? (
-											<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-										) : (
-											<span className="text-[#8b9a6b] font-mono flex-shrink-0">
-												•
-											</span>
-										)}
+							<div
+								className="flex flex-col gap-0.5 overflow-y-auto max-h-[88px] mt-1.5"
+								style={{
+									scrollbarWidth: "thin",
+									scrollbarColor: "hsl(var(--border)) transparent",
+								}}
+							>
+								{[
+									...noteEntries.filter((e) => e.type === "achievement"),
+									...noteEntries.filter((e) => e.type === "sidequest"),
+									...noteEntries.filter((e) => e.type === "log"),
+								].map((entry) => {
+									const isAchievement = entry.type === "achievement";
+									const isSidequest = entry.type === "sidequest";
+									return (
+										<div
+											key={entry.id}
+											className="flex items-baseline gap-2 text-xs"
+										>
+											{/* Bullet / icon */}
+											{isAchievement ? (
+												<span className="text-amber-500 flex-shrink-0 text-[11px]">
+													🏆
+												</span>
+											) : isSidequest ? (
+												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+											) : (
+												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
+													•
+												</span>
+											)}
 
-										{/* Timestamp — only for logs */}
-										{!isAchievement && !isSidequest && (
-											<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
-												{formatTimeCompact(entry.elapsedMs)}
-											</span>
-										)}
+											{/* Timestamp — only for logs */}
+											{!isAchievement && !isSidequest && (
+												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
+													{formatTimeCompact(entry.elapsedMs)}
+												</span>
+											)}
 
-										{/* Inline edit */}
-										{editingNoteId === entry.id ? (
-											<input
-												autoFocus
-												value={editingNoteText}
-												onChange={(e) => setEditingNoteText(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
+											{/* Inline edit */}
+											{editingNoteId === entry.id ? (
+												<input
+													autoFocus
+													value={editingNoteText}
+													onChange={(e) => setEditingNoteText(e.target.value)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") {
+															const trimmed = editingNoteText.trim();
+															if (trimmed) {
+																setNoteEntries((prev) =>
+																	prev.map((n) =>
+																		n.id === entry.id
+																			? { ...n, text: trimmed }
+																			: n,
+																	),
+																);
+															} else {
+																setNoteEntries((prev) =>
+																	prev.filter((n) => n.id !== entry.id),
+																);
+															}
+															setEditingNoteId(null);
+															setEditingNoteText("");
+														}
+														if (e.key === "Escape") {
+															setEditingNoteId(null);
+															setEditingNoteText("");
+														}
+													}}
+													onBlur={() => {
 														const trimmed = editingNoteText.trim();
 														if (trimmed) {
 															setNoteEntries((prev) =>
@@ -1281,58 +1316,172 @@ export function TimerBar({
 														}
 														setEditingNoteId(null);
 														setEditingNoteText("");
-													}
-													if (e.key === "Escape") {
+													}}
+													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
+														isAchievement
+															? "text-amber-400"
+															: isSidequest
+																? "text-sky-400"
+																: "text-foreground"
+													}`}
+												/>
+											) : (
+												<span
+													onClick={() => {
+														setEditingNoteId(entry.id);
+														setEditingNoteText(entry.text);
+													}}
+													className={`cursor-pointer hover:text-foreground transition-colors ${
+														isAchievement
+															? "text-amber-500 dark:text-amber-400"
+															: isSidequest
+																? "text-sky-500 dark:text-sky-400"
+																: "text-foreground/70"
+													}`}
+												>
+													{entry.text}
+												</span>
+											)}
+										</div>
+									);
+								})}
+							</div>
+						</CollapsibleContent>
+
+						{noteEntries.length > 0 && (
+							<CollapsibleTrigger className="flex items-center justify-center w-full py-1 px-2 rounded-lg hover:bg-accent transition-colors">
+								<ChevronDown
+									className={`w-5 h-5 text-muted-foreground transition-transform ${
+										mobileNotesOpen ? "rotate-180" : ""
+									}`}
+								/>
+							</CollapsibleTrigger>
+						)}
+					</Collapsible>
+
+					{/* Desktop: Note log zone */}
+					<div
+						className={`flex flex-col gap-1.5 border border-border rounded-[0.25rem] py-1 px-2 h-full max-sm:hidden`}
+					>
+						{noteEntries.length > 0 && (
+							<div
+								className="flex flex-col gap-0.5 overflow-y-auto max-h-[110px]"
+								style={{
+									scrollbarWidth: "thin",
+									scrollbarColor: "hsl(var(--border)) transparent",
+								}}
+							>
+								{[
+									...noteEntries.filter((e) => e.type === "achievement"),
+									...noteEntries.filter((e) => e.type === "sidequest"),
+									...noteEntries.filter((e) => e.type === "log"),
+								].map((entry) => {
+									const isAchievement = entry.type === "achievement";
+									const isSidequest = entry.type === "sidequest";
+									return (
+										<div
+											key={entry.id}
+											className="flex items-baseline gap-2 text-xs"
+										>
+											{/* Bullet / icon */}
+											{isAchievement ? (
+												<span className="text-amber-500 flex-shrink-0 text-[11px]">
+													🏆
+												</span>
+											) : isSidequest ? (
+												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+											) : (
+												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
+													•
+												</span>
+											)}
+
+											{/* Timestamp — only for logs */}
+											{!isAchievement && !isSidequest && (
+												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
+													{formatTimeCompact(entry.elapsedMs)}
+												</span>
+											)}
+
+											{/* Inline edit */}
+											{editingNoteId === entry.id ? (
+												<input
+													autoFocus
+													value={editingNoteText}
+													onChange={(e) => setEditingNoteText(e.target.value)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") {
+															const trimmed = editingNoteText.trim();
+															if (trimmed) {
+																setNoteEntries((prev) =>
+																	prev.map((n) =>
+																		n.id === entry.id
+																			? { ...n, text: trimmed }
+																			: n,
+																	),
+																);
+															} else {
+																setNoteEntries((prev) =>
+																	prev.filter((n) => n.id !== entry.id),
+																);
+															}
+															setEditingNoteId(null);
+															setEditingNoteText("");
+														}
+														if (e.key === "Escape") {
+															setEditingNoteId(null);
+															setEditingNoteText("");
+														}
+													}}
+													onBlur={() => {
+														const trimmed = editingNoteText.trim();
+														if (trimmed) {
+															setNoteEntries((prev) =>
+																prev.map((n) =>
+																	n.id === entry.id
+																		? { ...n, text: trimmed }
+																		: n,
+																),
+															);
+														} else {
+															setNoteEntries((prev) =>
+																prev.filter((n) => n.id !== entry.id),
+															);
+														}
 														setEditingNoteId(null);
 														setEditingNoteText("");
-													}
-												}}
-												onBlur={() => {
-													const trimmed = editingNoteText.trim();
-													if (trimmed) {
-														setNoteEntries((prev) =>
-															prev.map((n) =>
-																n.id === entry.id ? { ...n, text: trimmed } : n,
-															),
-														);
-													} else {
-														setNoteEntries((prev) =>
-															prev.filter((n) => n.id !== entry.id),
-														);
-													}
-													setEditingNoteId(null);
-													setEditingNoteText("");
-												}}
-												className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-													isAchievement
-														? "text-amber-400"
-														: isSidequest
-															? "text-sky-400"
-															: "text-foreground"
-												}`}
-											/>
-										) : (
-											<span
-												onClick={() => {
-													setEditingNoteId(entry.id);
-													setEditingNoteText(entry.text);
-												}}
-												className={`cursor-pointer hover:text-foreground transition-colors ${
-													isAchievement
-														? "text-amber-500 dark:text-amber-400"
-														: isSidequest
-															? "text-sky-500 dark:text-sky-400"
-															: "text-foreground/70"
-												}`}
-											>
-												{entry.text}
-											</span>
-										)}
-									</div>
-								);
-							})}
-						</div>
-					)}
+													}}
+													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
+														isAchievement
+															? "text-amber-400"
+															: isSidequest
+																? "text-sky-400"
+																: "text-foreground"
+													}`}
+												/>
+											) : (
+												<span
+													onClick={() => {
+														setEditingNoteId(entry.id);
+														setEditingNoteText(entry.text);
+													}}
+													className={`cursor-pointer hover:text-foreground transition-colors ${
+														isAchievement
+															? "text-amber-500 dark:text-amber-400"
+															: isSidequest
+																? "text-sky-500 dark:text-sky-400"
+																: "text-foreground/70"
+													}`}
+												>
+													{entry.text}
+												</span>
+											)}
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
 				</div>
 			</div>
 		</div>
