@@ -184,10 +184,17 @@ function getTaskScheduledTime(task: Task): Date | null {
 }
 
 function isTaskInBlock(task: Task, block: TimeBlock): boolean {
-	const scheduled = getTaskScheduledTime(task);
-	if (!scheduled) return false;
 	const blockStart = new Date(block.start_time);
 	const blockEnd = new Date(block.end_time);
+
+	if (task.status === "completed") {
+		if (!task.completed_at) return false;
+		const completedAt = new Date(task.completed_at);
+		return completedAt >= blockStart && completedAt < blockEnd;
+	}
+
+	const scheduled = getTaskScheduledTime(task);
+	if (!scheduled) return false;
 	return scheduled >= blockStart && scheduled < blockEnd;
 }
 
@@ -308,6 +315,7 @@ function TimeBlockCard({
 		number | null
 	>(null);
 
+	const didMoveRef = useRef(false);
 	const moveStartRef = useRef<{
 		y: number;
 		startMinutes: number;
@@ -508,6 +516,7 @@ function TimeBlockCard({
 		// Only trigger on the label/grip area, not on input or buttons
 		if ((e.target as HTMLElement).closest("input, button")) return;
 		e.preventDefault();
+		didMoveRef.current = false;
 
 		const blockStart = new Date(block.start_time);
 		const blockEnd = new Date(block.end_time);
@@ -525,6 +534,8 @@ function TimeBlockCard({
 
 		const onMove = (ev: PointerEvent) => {
 			if (!moveStartRef.current) return;
+			if (Math.abs(ev.clientY - moveStartRef.current.y) > 5)
+				didMoveRef.current = true; // add this
 			const deltaY = ev.clientY - moveStartRef.current.y;
 			const rawDelta = deltaY / PIXELS_PER_MINUTE;
 			const snapped = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES;
@@ -612,7 +623,7 @@ function TimeBlockCard({
 			}}
 			onPointerDown={handleMovePointerDown}
 			onClick={() => {
-				if (moveStartRef.current === null) onSelect(block.id);
+				if (!didMoveRef.current) onSelect(block.id);
 			}}
 		>
 			{/* Top resize handle */}
@@ -893,7 +904,7 @@ function BlockDetailPanel({
 	}, [tasks, completedTasks, block]);
 
 	return (
-		<div className="w-80 shrink-0 flex flex-col min-h-0 border-l border-border">
+		<div className="w-full md:w-80 shrink-0 flex flex-col min-h-0 border-l border-border">
 			{/* Panel header */}
 			<div
 				className="px-4 py-3 shrink-0 flex items-center justify-between"
@@ -914,12 +925,18 @@ function BlockDetailPanel({
 						{format(new Date(block.end_time), "h:mm a")}
 					</span>
 				</div>
-				<button
-					onClick={onClose}
-					className="p-1 rounded text-sm shrink-0 hover:bg-card/10"
-				>
-					<X className="w-3.5 h-3.5 text-muted" />
-				</button>
+				<div className="flex gap-1">
+					{/* <button
+						onClick={onClose}
+						className="p-1 rounded text-sm shrink-0 hover:bg-card/10 max-sm:hidden"
+					>
+						<X className="w-3.5 h-3.5 text-muted" />
+					</button> */}
+					{/* Mobile back button */}
+					<button onClick={onClose} className="p-1 rounded hover:bg-card/10">
+						<ChevronLeft className="w-4 h-4 text-muted" />
+					</button>
+				</div>
 			</div>
 
 			{/* Task count subheader */}
@@ -1131,13 +1148,13 @@ export function ScheduleView({
 		const task = event.active.data.current?.task as Task | undefined;
 		if (task) {
 			setActiveDragTask(task);
-			setMobileTab("timeline");
 		}
 	}, []);
 
 	const handleDragEnd = useCallback(
 		async (event: DragEndEvent) => {
 			setActiveDragTask(null);
+			setMobileTab("timeline");
 			const { active, over } = event;
 			if (!over) {
 				// Dropped outside any block — go back to unscheduled
@@ -1235,6 +1252,13 @@ export function ScheduleView({
 							Today
 						</button>
 					)}
+
+					<button
+						onClick={() => handleCreateBlock(new Date().getHours())}
+						className="ml-auto flex md:hidden px-2 gap-1 py-1 w-fit items-center text-sm text-card rounded-[3px] bg-af4-olive hover:bg-af4-olive-muted shadow-md font-medium"
+					>
+						<Plus className="w-3 h-3" /> <span>Block</span>
+					</button>
 				</div>
 
 				{/* Body — min-h-0 is critical so flex children can shrink and scroll */}
@@ -1242,8 +1266,8 @@ export function ScheduleView({
 					{/* Timeline column — full width on mobile, flex-1 on desktop */}
 					<div
 						className={`
-							flex flex-1 border-r border-border min-h-0
-							${mobileTab === "timeline" ? "flex" : "hidden"} md:flex
+							flex flex-1 border-r border-border min-h-0 md:flex
+							${mobileTab === "timeline" || activeDragTask ? "flex" : "hidden"}
 						`}
 					>
 						{/* Time labels — hidden scrollbar, driven by timeline scroll */}
@@ -1357,23 +1381,27 @@ export function ScheduleView({
 					{/* Sidebar — full width on mobile as tabs, w-80 on desktop */}
 					<div
 						className={`
-						flex-1 md:flex-none md:w-80 flex flex-col min-h-0
-						${mobileTab !== "timeline" ? "flex" : "hidden"} md:flex
-					`}
+							w-full md:flex-none md:w-80 flex flex-col min-h-0 md:flex
+							${mobileTab !== "timeline" ? "flex" : "hidden"}
+							${activeDragTask ? "fixed inset-0 z-40 pointer-events-none opacity-0" : ""}
+						`}
 					>
 						{selectedBlock ? (
 							<BlockDetailPanel
 								block={selectedBlock}
 								tasks={dayTasks}
 								completedTasks={dayCompletedTasks}
-								onClose={() => setSelectedBlockId(null)}
+								onClose={() => {
+									setMobileTab("timeline");
+									setSelectedBlockId(null);
+								}}
 								onStartTask={onStartTask}
 								onUnscheduleTask={onUnscheduleTask}
 								onUpdateBlock={onUpdateBlock}
 								onDeleteBlock={onDeleteBlock}
 							/>
 						) : (
-							<div className="w-80 shrink-0 flex flex-col min-h-0 bg-card">
+							<div className="w-full md:w-80 flex flex-col min-h-0 bg-card">
 								<div className="p-4 border-b border-border shrink-0">
 									<h3 className="font-medium">Unscheduled</h3>
 									<p className="text-sm text-muted-foreground">
@@ -1434,19 +1462,6 @@ export function ScheduleView({
 							</span>
 						)}
 					</button>
-					{selectedBlock && (
-						<button
-							onClick={() => setMobileTab("block")}
-							className={`flex-1 py-3 text-xs font-medium transition-colors
-							${
-								mobileTab === "block"
-									? "text-foreground border-t-2 border-foreground -mt-px"
-									: "text-muted-foreground"
-							}`}
-						>
-							{selectedBlock.label}
-						</button>
-					)}
 				</div>
 			</div>
 

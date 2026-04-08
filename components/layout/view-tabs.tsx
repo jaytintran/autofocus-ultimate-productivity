@@ -19,6 +19,7 @@ import {
 	SlidersHorizontal,
 	PanelRightClose,
 	PanelRightOpen,
+	Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -377,7 +378,7 @@ function MainViewToggle({ activeView, onChange }: MainViewToggleProps) {
 				}`}
 			>
 				<span className="hidden sm:inline">Schedule</span>
-				<SquareCheck className="w-3.5 h-3.5 sm:hidden" />
+				<Calendar className="w-3.5 h-3.5 sm:hidden" />
 			</Button>
 		</div>
 	);

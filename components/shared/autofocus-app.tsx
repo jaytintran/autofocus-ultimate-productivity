@@ -608,6 +608,7 @@ export function AutofocusApp() {
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
 				tracker_id: trackerId ?? null,
+				scheduled_at: null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
@@ -686,6 +687,7 @@ export function AutofocusApp() {
 				due_date: null,
 				pamphlet_id: activePamphletId,
 				tracker_id: null,
+				scheduled_at: null,
 			}));
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => {
@@ -1369,6 +1371,7 @@ export function AutofocusApp() {
 				tag: tag ?? null,
 				due_date: dueDate ?? null,
 				pamphlet_id: activePamphletId,
+				scheduled_at: null,
 			};
 
 			const shiftedTasks = displayedActiveTasks.map((task, index) => ({
