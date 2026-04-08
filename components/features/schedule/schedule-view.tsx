@@ -27,6 +27,7 @@ import {
 	ChevronRight,
 	X,
 	Play,
+	Pencil,
 } from "lucide-react";
 
 // =============================================================================
@@ -201,80 +202,183 @@ function isTaskInBlock(task: Task, block: TimeBlock): boolean {
 }
 
 // =============================================================================
-// DRAGGABLE TASK ITEM
+// SCHEDULABLE TASK ITEM (for Unscheduled Tasks view - no drag-drop)
 // =============================================================================
 
-function DraggableTaskItem({
+function SchedulableTaskItem({
 	task,
-	isOverlay = false,
 	onStart,
-	onTapAssign,
+	onSchedule,
+	isPending = false,
 }: {
 	task: Task;
-	isOverlay?: boolean;
 	onStart?: (task: Task) => void;
-	onTapAssign?: (task: Task) => void;
+	onSchedule?: (task: Task) => void;
+	isPending?: boolean;
 }) {
-	const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-		id: task.id,
-		disabled: isOverlay,
-		data: { task },
-	});
-
 	const isCompleted = task.status === "completed";
-	const scheduledTime = getTaskScheduledTime(task);
 
 	return (
 		<div
-			ref={setNodeRef}
-			{...attributes}
-			{...listeners}
-			style={{ opacity: isDragging ? 0.35 : 1, touchAction: "none" }}
-			onClick={() => {
-				const isTouch = window.matchMedia("(pointer: coarse)").matches;
-				if (isTouch && onTapAssign) onTapAssign(task);
-			}}
 			className={`
-        		group flex items-center gap-2 p-2 rounded-md border text-sm
-        		cursor-grab active:cursor-grabbing select-none
-			${
-				isOverlay
-					? "shadow-xl bg-background border-[#8b9a6b]"
-					: "bg-card hover:bg-accent/50 border-border"
-			}
-        	${isCompleted ? "opacity-60" : ""}
+				group flex items-center gap-2 p-2 rounded-md border text-sm
+				${
+					isPending
+						? "bg-[#8b9a6b]/10 border-[#8b9a6b] ring-1 ring-[#8b9a6b]"
+						: "bg-card border-border hover:bg-accent/50"
+				}
+        		${isCompleted ? "opacity-60" : ""}
       		`}
 		>
-			<GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+			{/* Schedule button - tap to select block */}
+			<button
+				onClick={() => onSchedule?.(task)}
+				className={`
+					p-1.5 rounded-md shrink-0 transition-colors
+					${
+						isPending
+							? "bg-[#8b9a6b] text-white"
+							: "bg-muted hover:bg-[#8b9a6b] hover:text-white text-muted-foreground"
+					}
+				`}
+				title="Schedule task"
+			>
+				<Clock className="w-4 h-4" />
+			</button>
+
 			<div className="flex-1 min-w-0">
 				<p
 					className={`truncate ${isCompleted ? "line-through text-muted-foreground" : ""}`}
 				>
 					{task.text}
 				</p>
-				{scheduledTime && (
-					<p className="text-xs text-muted-foreground">
-						{format(scheduledTime, "h:mm a")}
-					</p>
-				)}
 			</div>
-			{isCompleted ? (
-				<CheckCircle2 className="w-4 h-4 text-[#8b9a6b] shrink-0" />
-			) : (
-				<Circle className="w-4 h-4 text-muted-foreground shrink-0" />
-			)}
-			{onStart && !isCompleted && (
+
+			{/* Play button - always visible for unscheduled tasks */}
+			{!isCompleted && onStart && (
 				<button
-					onClick={(e) => {
-						e.stopPropagation();
-						onStart(task);
-					}}
-					className="p-1 hover:bg-accent rounded opacity-0 group-hover:opacity-100 transition-opacity"
+					onClick={() => onStart(task)}
+					className="p-1.5 hover:bg-accent rounded-md shrink-0 text-[#8b9a6b]"
+					title="Start task now"
 				>
-					<Clock className="w-3.5 h-3.5 text-[#8b9a6b]" />
+					<Play className="w-4 h-4 fill-current" />
 				</button>
 			)}
 		</div>
+	);
+}
+
+// =============================================================================
+// CONTEXT MENU
+// =============================================================================
+
+interface ContextMenuState {
+	x: number;
+	y: number;
+	block: TimeBlock | null;
+}
+
+function BlockContextMenu({
+	menu,
+	onClose,
+	onUpdateBlock,
+}: {
+	menu: ContextMenuState;
+	onClose: () => void;
+	onUpdateBlock: (id: string, updates: Partial<TimeBlock>) => void;
+}) {
+	const [editTitle, setEditTitle] = useState("");
+	const [showColorPicker, setShowColorPicker] = useState(false);
+
+	useEffect(() => {
+		if (menu.block) {
+			setEditTitle(menu.block.label);
+		}
+	}, [menu.block]);
+
+	if (!menu.block) return null;
+
+	const handleSaveTitle = () => {
+		const trimmed = editTitle.trim();
+		if (trimmed && trimmed !== menu.block!.label) {
+			onUpdateBlock(menu.block!.id, { label: trimmed });
+		}
+		onClose();
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === "Enter") handleSaveTitle();
+		if (e.key === "Escape") onClose();
+	};
+
+	return (
+		<>
+			{/* Backdrop to close on click outside */}
+			<div className="fixed inset-0 z-40" onClick={onClose} />
+
+			{/* Context menu */}
+			<div
+				className="fixed z-50 min-w-[200px] bg-popover border border-border rounded-lg shadow-xl py-2"
+				style={{ left: menu.x, top: menu.y }}
+			>
+				{/* Title edit section */}
+				<div className="px-3 py-2 border-b border-border">
+					<label className="text-xs text-muted-foreground block mb-1.5">
+						Block Title
+					</label>
+					<input
+						type="text"
+						value={editTitle}
+						onChange={(e) => setEditTitle(e.target.value)}
+						onKeyDown={handleKeyDown}
+						onClick={(e) => e.stopPropagation()}
+						className="w-full text-sm px-2 py-1.5 rounded border border-input bg-background focus:outline-none focus:ring-2 focus:ring-[#8b9a6b]"
+						autoFocus
+					/>
+					<div className="flex gap-2 mt-2">
+						<button
+							onClick={handleSaveTitle}
+							className="flex-1 text-xs bg-[#8b9a6b] text-white px-2 py-1 rounded hover:bg-[#8b9a6b]/90"
+						>
+							Save
+						</button>
+						<button
+							onClick={onClose}
+							className="flex-1 text-xs bg-muted px-2 py-1 rounded hover:bg-muted/80"
+						>
+							Cancel
+						</button>
+					</div>
+				</div>
+
+				{/* Color picker section */}
+				<div className="px-3 py-2">
+					<label className="text-xs text-muted-foreground block mb-1.5">
+						Color
+					</label>
+					<div className="grid grid-cols-5 gap-1.5">
+						{BLOCK_COLORS.map((color) => (
+							<button
+								key={color}
+								onClick={() => {
+									onUpdateBlock(menu.block!.id, { color });
+									onClose();
+								}}
+								className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110"
+								style={{
+									backgroundColor: color,
+									borderColor:
+										color === menu.block!.color ? "white" : "transparent",
+									boxShadow:
+										color === menu.block!.color ? "0 0 0 1px #8b9a6b" : "none",
+								}}
+								title={color}
+							/>
+						))}
+					</div>
+				</div>
+			</div>
+		</>
 	);
 }
 
@@ -296,6 +400,7 @@ function TimeBlockCard({
 	pendingTask,
 	column,
 	totalColumns,
+	onContextMenu,
 }: {
 	block: TimeBlock;
 	tasks: Task[];
@@ -310,6 +415,7 @@ function TimeBlockCard({
 	pendingTask: Task | null;
 	column: number;
 	totalColumns: number;
+	onContextMenu?: (e: React.MouseEvent, block: TimeBlock) => void;
 }) {
 	const [isPressing, setIsPressing] = useState(false);
 	const resizeStartRef = useRef<{
@@ -329,6 +435,8 @@ function TimeBlockCard({
 	>(null);
 
 	const didMoveRef = useRef(false);
+	const didLongPressRef = useRef(false);
+
 	const moveStartRef = useRef<{
 		y: number;
 		startMinutes: number;
@@ -387,6 +495,13 @@ function TimeBlockCard({
 	const [editingStart, setEditingStart] = useState(false);
 	const [editingEnd, setEditingEnd] = useState(false);
 	const [showColorPicker, setShowColorPicker] = useState(false);
+
+	const [titleValue, setTitleValue] = useState(block.label);
+
+	// Keep local title in sync with prop updates
+	useEffect(() => {
+		setTitleValue(block.label);
+	}, [block.label]);
 
 	const [startVal, setStartVal] = useState(
 		format(new Date(block.start_time), "HH:mm"),
@@ -526,81 +641,117 @@ function TimeBlockCard({
 	};
 
 	const handleMovePointerDown = (e: React.PointerEvent) => {
-		// Only trigger on the label/grip area, not on input or buttons
-		if ((e.target as HTMLElement).closest("input, button")) return;
+		if ((e.target as HTMLElement).closest("input, button, [data-no-move]"))
+			return;
 		e.preventDefault();
 		didMoveRef.current = false;
 
-		const blockStart = new Date(block.start_time);
-		const blockEnd = new Date(block.end_time);
-		const startMinutes = blockStart.getHours() * 60 + blockStart.getMinutes();
-		const endMinutes = blockEnd.getHours() * 60 + blockEnd.getMinutes();
+		const LONG_PRESS_MS = 200;
 
-		moveStartRef.current = {
-			y: e.clientY,
-			startMinutes,
-			endMinutes,
-			duration: endMinutes - startMinutes,
+		// Capture initial pointer position for move handlers
+		const startClientY = e.clientY;
+
+		const cancel = () => {
+			clearTimeout(timer);
+			window.removeEventListener("pointerup", cancel);
+			window.removeEventListener("pointercancel", cancel);
 		};
 
-		onDragBlockStart();
+		const timer = setTimeout(() => {
+			setIsPressing(true);
+			didLongPressRef.current = true;
+			// Clean up the cancel listeners — long press confirmed
+			window.removeEventListener("pointerup", cancel);
+			window.removeEventListener("pointercancel", cancel);
 
-		const onMove = (ev: PointerEvent) => {
-			if (!moveStartRef.current) return;
-			if (Math.abs(ev.clientY - moveStartRef.current.y) > 5)
-				didMoveRef.current = true; // add this
-			const deltaY = ev.clientY - moveStartRef.current.y;
-			const rawDelta = deltaY / PIXELS_PER_MINUTE;
-			const snapped = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES;
-			const newStart = Math.max(
-				0,
-				Math.min(
-					1440 - moveStartRef.current.duration,
-					moveStartRef.current.startMinutes + snapped,
-				),
-			);
-			setMovingTopMinutes(newStart);
-		};
+			const blockStart = new Date(block.start_time);
+			const blockEnd = new Date(block.end_time);
+			const startMinutes = blockStart.getHours() * 60 + blockStart.getMinutes();
+			const endMinutes = blockEnd.getHours() * 60 + blockEnd.getMinutes();
 
-		const onUp = (ev: PointerEvent) => {
-			if (!moveStartRef.current) return;
-			const deltaY = ev.clientY - moveStartRef.current.y;
-			const rawDelta = deltaY / PIXELS_PER_MINUTE;
-			const snapped = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES;
-			const newStartMinutes = Math.max(
-				0,
-				Math.min(
-					1440 - moveStartRef.current.duration,
-					moveStartRef.current.startMinutes + snapped,
-				),
-			);
-			const newEndMinutes = newStartMinutes + moveStartRef.current.duration;
+			moveStartRef.current = {
+				y: startClientY,
+				startMinutes,
+				endMinutes,
+				duration: endMinutes - startMinutes,
+			};
 
-			const newStart = new Date(block.start_time);
-			newStart.setHours(
-				Math.floor(newStartMinutes / 60),
-				newStartMinutes % 60,
-				0,
-				0,
-			);
+			onDragBlockStart();
 
-			const newEnd = new Date(block.end_time);
-			newEnd.setHours(Math.floor(newEndMinutes / 60), newEndMinutes % 60, 0, 0);
+			const onMove = (ev: PointerEvent) => {
+				if (!moveStartRef.current) return;
+				if (Math.abs(ev.clientY - moveStartRef.current.y) > 5)
+					didMoveRef.current = true;
+				const deltaY = ev.clientY - moveStartRef.current.y;
+				const rawDelta = deltaY / PIXELS_PER_MINUTE;
+				const snapped = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES;
+				const newStart = Math.max(
+					0,
+					Math.min(
+						1440 - moveStartRef.current.duration,
+						moveStartRef.current.startMinutes + snapped,
+					),
+				);
+				// Direct DOM — no re-render
+				if (blockDivRef.current) {
+					blockDivRef.current.style.top = `${newStart * PIXELS_PER_MINUTE}px`;
+				}
+			};
 
-			onUpdateBlock(block.id, {
-				start_time: newStart.toISOString(),
-				end_time: newEnd.toISOString(),
-			});
+			const onUp = (ev: PointerEvent) => {
+				if (!moveStartRef.current) return;
+				const deltaY = ev.clientY - moveStartRef.current.y;
+				const rawDelta = deltaY / PIXELS_PER_MINUTE;
+				const snapped = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES;
+				const newStartMinutes = Math.max(
+					0,
+					Math.min(
+						1440 - moveStartRef.current.duration,
+						moveStartRef.current.startMinutes + snapped,
+					),
+				);
+				const newEndMinutes = newStartMinutes + moveStartRef.current.duration;
 
-			moveStartRef.current = null;
-			setMovingTopMinutes(null);
-			onDragBlockEnd();
-			window.removeEventListener("pointermove", onMove);
-			window.removeEventListener("pointerup", onUp);
-		};
+				const newStart = new Date(block.start_time);
+				newStart.setHours(
+					Math.floor(newStartMinutes / 60),
+					newStartMinutes % 60,
+					0,
+					0,
+				);
 
-		window.addEventListener("pointermove", onMove);
-		window.addEventListener("pointerup", onUp);
+				const newEnd = new Date(block.end_time);
+				newEnd.setHours(
+					Math.floor(newEndMinutes / 60),
+					newEndMinutes % 60,
+					0,
+					0,
+				);
+
+				onUpdateBlock(block.id, {
+					start_time: newStart.toISOString(),
+					end_time: newEnd.toISOString(),
+				});
+
+				moveStartRef.current = null;
+				setMovingTopMinutes(null);
+				onDragBlockEnd();
+				didMoveRef.current = false;
+				setTimeout(() => {
+					didLongPressRef.current = false;
+				}, 0);
+
+				window.removeEventListener("pointermove", onMove);
+				window.removeEventListener("pointerup", onUp);
+			};
+
+			// Register move listeners AFTER long press confirmed
+			window.addEventListener("pointermove", onMove);
+			window.addEventListener("pointerup", onUp);
+		}, LONG_PRESS_MS);
+
+		window.addEventListener("pointerup", cancel);
+		window.addEventListener("pointercancel", cancel);
 	};
 
 	useEffect(() => {
@@ -616,9 +767,15 @@ function TimeBlockCard({
 		};
 	}, [showColorPicker]);
 
+	const blockDivRef = useRef<HTMLDivElement>(null);
+
 	return (
 		<div
-			ref={setNodeRef}
+			ref={(el) => {
+				setNodeRef(el);
+				(blockDivRef as React.MutableRefObject<HTMLDivElement | null>).current =
+					el;
+			}}
 			className="group absolute border border-border rounded-md overflow-hidden cursor-grab active:cursor-grabbing"
 			style={{
 				top: position.top,
@@ -626,7 +783,11 @@ function TimeBlockCard({
 				backgroundColor: blockColor,
 				opacity: isOver ? 0.85 : movingTopMinutes !== null ? 0.85 : 1,
 				outline:
-					isOver || pendingTask ? "2px solid rgba(255,255,255,0.6)" : "none",
+					isOver || pendingTask
+						? "2px solid rgba(255,255,255,0.6)"
+						: isPressing
+							? "2px solid rgba(255,255,255,0.3)"
+							: "none",
 				transition:
 					movingTopMinutes !== null
 						? "none"
@@ -637,22 +798,31 @@ function TimeBlockCard({
 				left: `calc(${(column / totalColumns) * 100}% + 4px)`,
 				width: `calc(${(1 / totalColumns) * 100}% - 8px)`,
 				transform: isPressing ? "scale(1.02)" : "scale(1)",
-				ring: isPressing ? "2px solid rgba(255,255,255,0.3)" : "none",
+				touchAction: "none",
 			}}
 			onPointerDown={(e) => {
-				setIsPressing(true);
 				handleMovePointerDown(e);
 			}}
 			onPointerUp={() => setIsPressing(false)}
-			onPointerCancel={() => setIsPressing(false)}
+			onPointerCancel={() => {
+				setIsPressing(false);
+				didMoveRef.current = false;
+				setTimeout(() => {
+					didLongPressRef.current = false;
+				}, 0);
+				moveStartRef.current = null;
+				setMovingTopMinutes(null);
+				onDragBlockEnd();
+			}}
 			onClick={() => {
-				if (didMoveRef.current) return;
+				if (didLongPressRef.current) return;
 				if (pendingTask) {
 					onAssignPendingTask(block);
 				} else {
 					onSelect(block.id);
 				}
 			}}
+			onContextMenu={(e) => onContextMenu?.(e, block)}
 		>
 			{/* Top resize handle */}
 			<div
@@ -670,7 +840,7 @@ function TimeBlockCard({
 			</div>
 			{/* Single row layout for short blocks, two-row for taller */}
 			<div
-				className={`flex items-start justify-between px-2 gap-2 h-full ${isShort ? "" : "py-1.5 flex-wrap"}`}
+				className={`flex items-start justify-between px-2 gap-2 h-full touch-none ${isShort ? "" : "py-1.5 flex-wrap"}`}
 			>
 				{/* Left: label input + task count */}
 				<div
@@ -678,16 +848,22 @@ function TimeBlockCard({
 					onClick={(e) => e.stopPropagation()}
 				>
 					<input
-						className="font-semibold text-xs"
+						className="font-semibold text-xs bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-white/50 rounded px-1 -ml-1"
 						style={{ color: "var(--primary-foreground)" }}
-						defaultValue={block.label}
-						onBlur={(e) => {
-							const newLabel = e.target.value.trim();
-							if (newLabel && newLabel !== block.label)
+						value={titleValue}
+						onChange={(e) => setTitleValue(e.target.value)}
+						onBlur={() => {
+							const newLabel = titleValue.trim();
+							if (newLabel && newLabel !== block.label) {
 								onUpdateBlock(block.id, { label: newLabel });
+							} else {
+								setTitleValue(block.label); // Reset if invalid
+							}
 						}}
 						onKeyDown={(e) => {
-							if (e.key === "Enter") e.currentTarget.blur();
+							if (e.key === "Enter") {
+								e.currentTarget.blur();
+							}
 							e.stopPropagation();
 						}}
 					/>
@@ -698,68 +874,23 @@ function TimeBlockCard({
 					)}
 				</div>
 
-				{/* Right: time chips + delete */}
+				{/* Right: color-picker + time chips + delete */}
 				{!isShort && (
 					<div
 						className="flex flex-col items-end justify-between h-full gap-1 shrink-0"
-						onClick={(e) => e.stopPropagation()} // don't open panel when clicking chips
+						data-no-move
+						onClick={(e) => e.stopPropagation()}
 					>
-						{/* Color picker + delete button */}
-						<div className="flex items-center gap-2 justify-center">
-							<div className="relative flex items-center justify-center">
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										setShowColorPicker((v) => !v);
-									}}
-									onMouseDown={(e) => e.stopPropagation()}
-									className="flex items-center hover:bg-card/10 transition-opacity p-2 rounded"
-									title="Change color"
-								>
-									<div
-										className="w-3 h-3 rounded-full border border-white/40"
-										style={{ backgroundColor: blockColor }}
-									/>
-								</button>
-
-								{showColorPicker && (
-									<div
-										className="absolute right-0 top-6 z-30 p-2 rounded-lg shadow-xl border border-border bg-popover"
-										style={{ width: 120 }}
-										onClick={(e) => e.stopPropagation()}
-										onMouseDown={(e) => e.stopPropagation()}
-									>
-										<div className="grid grid-cols-5 gap-1.5">
-											{BLOCK_COLORS.map((color) => (
-												<button
-													key={color}
-													onClick={() => {
-														onUpdateBlock(block.id, { color });
-														setShowColorPicker(false);
-													}}
-													className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-													style={{
-														backgroundColor: color,
-														borderColor:
-															color === blockColor ? "white" : "transparent",
-													}}
-												/>
-											))}
-										</div>
-									</div>
-								)}
-							</div>
-
-							<button
-								onClick={() => onDeleteBlock(block.id)}
-								className="hover:bg-card/10 transition-opacity text-xs p-1 rounded"
-							>
-								<X className="w-4 h-4 text-muted" />
-							</button>
-						</div>
+						{/* Delete button */}
+						<button
+							onClick={() => onDeleteBlock(block.id)}
+							className="hover:bg-card/10 transition-opacity text-xs p-1 rounded"
+						>
+							<X className="w-4 h-4 text-muted" />
+						</button>
 
 						{/* Time Chip */}
-						<div className="p-3">
+						<div className="p-3 flex gap-3 items-center">
 							{/* Start time chip */}
 							{editingStart ? (
 								<input
@@ -802,7 +933,7 @@ function TimeBlockCard({
 								className="text-xs"
 								style={{ color: "var(--primary-foreground)", opacity: 0.6 }}
 							>
-								–
+								to
 							</span>
 
 							{/* End time chip */}
@@ -898,6 +1029,17 @@ function BlockDetailPanel({
 	onUpdateBlock: (id: string, updates: Partial<TimeBlock>) => Promise<void>;
 	onDeleteBlock: (id: string) => Promise<void>;
 }) {
+	const [isEditing, setIsEditing] = useState(false);
+	const [editLabel, setEditLabel] = useState(block.label);
+	const [editColor, setEditColor] = useState(block.color);
+
+	// Sync edit state when block changes
+	useEffect(() => {
+		setEditLabel(block.label);
+		setEditColor(block.color);
+		setIsEditing(false);
+	}, [block.id, block.label, block.color]);
+
 	const blockTasks = useMemo(() => {
 		return [...tasks, ...completedTasks]
 			.filter((t) => isTaskInBlock(t, block))
@@ -931,27 +1073,89 @@ function BlockDetailPanel({
 					</span>
 				</div>
 				<div className="flex gap-1">
-					{/* <button
-						onClick={onClose}
-						className="p-1 rounded text-sm shrink-0 hover:bg-card/10 max-sm:hidden"
+					{/* Edit button */}
+					<button
+						onClick={() => setIsEditing(true)}
+						className="p-1.5 rounded hover:bg-white/20 transition-colors"
+						style={{ color: "var(--primary-foreground)" }}
+						title="Edit block"
 					>
-						<X className="w-3.5 h-3.5 text-muted" />
-					</button> */}
-					{/* Mobile back button */}
+						<Pencil className="w-4 h-4" />
+					</button>
 					<button onClick={onClose} className="p-1 rounded hover:bg-card/10">
 						<ChevronLeft className="w-4 h-4 text-muted" />
 					</button>
 				</div>
 			</div>
 
-			{/* Task count subheader */}
-			<div className="px-4 py-2 border-b border-border shrink-0">
-				<p className="text-xs text-muted-foreground">
-					{blockTasks.length === 0
-						? "No tasks — drag tasks here"
-						: `${blockTasks.length} task${blockTasks.length > 1 ? "s" : ""}`}
-				</p>
-			</div>
+			{/* Edit form or task count */}
+			{isEditing ? (
+				<div className="px-4 py-3 space-y-3 border-b border-border shrink-0 bg-card">
+					<div>
+						<label className="text-xs text-muted-foreground block mb-1.5">
+							Title
+						</label>
+						<input
+							type="text"
+							value={editLabel}
+							onChange={(e) => setEditLabel(e.target.value)}
+							className="w-full text-sm px-2 py-1.5 rounded border border-input bg-background"
+							autoFocus
+						/>
+					</div>
+					<div>
+						<label className="text-xs text-muted-foreground block mb-1.5">
+							Color
+						</label>
+						<div className="flex flex-wrap gap-1.5">
+							{BLOCK_COLORS.map((color) => (
+								<button
+									key={color}
+									onClick={() => setEditColor(color)}
+									className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110"
+									style={{
+										backgroundColor: color,
+										borderColor:
+											editColor === color ? "var(--foreground)" : "transparent",
+									}}
+								/>
+							))}
+						</div>
+					</div>
+					<div className="flex gap-2 pt-1">
+						<button
+							onClick={() => {
+								const trimmed = editLabel.trim();
+								if (trimmed) {
+									onUpdateBlock(block.id, { label: trimmed, color: editColor });
+								}
+								setIsEditing(false);
+							}}
+							className="flex-1 bg-[#8b9a6b] text-white text-xs font-medium py-1.5 rounded hover:bg-[#8b9a6b]/90"
+						>
+							Save
+						</button>
+						<button
+							onClick={() => {
+								setEditLabel(block.label);
+								setEditColor(block.color);
+								setIsEditing(false);
+							}}
+							className="flex-1 bg-muted text-xs font-medium py-1.5 rounded hover:bg-muted/80"
+						>
+							Cancel
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="px-4 py-2 border-b border-border shrink-0">
+					<p className="text-xs text-muted-foreground">
+						{blockTasks.length === 0
+							? "No tasks — drag tasks here"
+							: `${blockTasks.length} task${blockTasks.length > 1 ? "s" : ""}`}
+					</p>
+				</div>
+			)}
 
 			{/* Task list */}
 			<div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -1068,6 +1272,11 @@ export function ScheduleView({
 	const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
 	const [isDraggingBlock, setIsDraggingBlock] = useState(false);
 	const [pendingTask, setPendingTask] = useState<Task | null>(null);
+	const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+		x: 0,
+		y: 0,
+		block: null,
+	});
 
 	const [mobileTab, setMobileTab] = useState<
 		"timeline" | "unscheduled" | "block"
@@ -1227,6 +1436,27 @@ export function ScheduleView({
 		[date, onCreateBlock],
 	);
 
+	const handleBlockContextMenu = useCallback(
+		(e: React.MouseEvent, block: TimeBlock) => {
+			// Disable on touch devices - use edit button in panel instead
+			const isTouch = window.matchMedia("(pointer: coarse)").matches;
+			if (isTouch) return;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			const x = Math.min(e.clientX, window.innerWidth - 220);
+			const y = Math.min(e.clientY, window.innerHeight - 200);
+
+			setContextMenu({ x, y, block });
+		},
+		[],
+	);
+
+	const closeContextMenu = useCallback(() => {
+		setContextMenu((prev) => ({ ...prev, block: null }));
+	}, []);
+
 	return (
 		// h-full — fills whatever <main> gives it, no hardcoded viewport math
 		<DndContext
@@ -1267,22 +1497,12 @@ export function ScheduleView({
 							Today
 						</button>
 					)}
-
-					<button
-						onClick={() => handleCreateBlock(new Date().getHours())}
-						className="ml-auto flex md:hidden px-2 gap-1 py-1 w-fit items-center text-sm text-card rounded-[3px] bg-af4-olive hover:bg-af4-olive-muted shadow-md font-medium"
-					>
-						<Plus className="w-3 h-3" /> <span>Block</span>
-					</button>
 				</div>
 
 				{/* Pending task banner */}
 				{pendingTask && (
-					<div className="flex items-center justify-between px-4 py-2 bg-[#8b9a6b] text-white text-sm shrink-0">
-						<span>
-							Tap a block to schedule
-							<strong className="truncate">{pendingTask.text}</strong>
-						</span>
+					<div className="w-full flex items-center justify-between px-4 py-2 bg-[#8b9a6b] text-white text-sm shrink-0">
+						<span>Tap a block to schedule</span>
 						<button
 							onClick={() => setPendingTask(null)}
 							className="ml-2 shrink-0"
@@ -1297,7 +1517,7 @@ export function ScheduleView({
 					{/* Timeline column — full width on mobile, flex-1 on desktop */}
 					<div
 						className={`
-							flex flex-1 border-r border-border min-h-0 md:flex
+							flex flex-1 relative border-r border-border min-h-0 md:flex
 							${mobileTab === "timeline" || activeDragTask ? "flex" : "hidden"}
 						`}
 					>
@@ -1340,10 +1560,11 @@ export function ScheduleView({
 								})}
 							</div>
 						</div>
+
 						{/* Scrollable timeline */}
 						<div
 							ref={timelineScrollRef}
-							className="flex-1 overflow-y-auto"
+							className="flex-1 overflow-y-auto overflow-x-hidden"
 							onScroll={handleTimelineScroll}
 						>
 							<div className="relative" style={{ height: TOTAL_HEIGHT }}>
@@ -1392,10 +1613,19 @@ export function ScheduleView({
 											);
 											setPendingTask(null);
 										}}
+										onContextMenu={handleBlockContextMenu}
 									/>
 								))}
 							</div>
 						</div>
+
+						{/* Add time block button */}
+						<button
+							onClick={() => handleCreateBlock(new Date().getHours())}
+							className="absolute right-8 bottom-3 max-sm:right-3 ml-auto flex px-2 gap-1 py-1 w-fit items-center text-sm text-card rounded-[3px] bg-af4-olive hover:bg-af4-olive-muted shadow-md font-medium"
+						>
+							<Plus className="w-3 h-3" /> <span>Block</span>
+						</button>
 					</div>
 
 					{/* Mobile bottom sheet — block detail only */}
@@ -1443,7 +1673,7 @@ export function ScheduleView({
 								<div className="p-4 border-b border-border shrink-0">
 									<h3 className="font-medium">Unscheduled</h3>
 									<p className="text-sm text-muted-foreground">
-										{unscheduledTasks.length} tasks • Drag to schedule
+										{unscheduledTasks.length} tasks • Tap clock to schedule
 									</p>
 								</div>
 								<div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -1453,14 +1683,15 @@ export function ScheduleView({
 										</p>
 									) : (
 										unscheduledTasks.map((task) => (
-											<DraggableTaskItem
+											<SchedulableTaskItem
 												key={task.id}
 												task={task}
 												onStart={onStartTask}
-												onTapAssign={(task) => {
-													setPendingTask(task);
+												onSchedule={(t) => {
+													setPendingTask(t);
 													setMobileTab("timeline");
 												}}
+												isPending={pendingTask?.id === task.id}
 											/>
 										))
 									)}
@@ -1472,15 +1703,14 @@ export function ScheduleView({
 					{/* Mobile unscheduled panel */}
 					<div
 						className={`
-    w-full flex flex-col min-h-0 md:hidden
-    ${mobileTab === "unscheduled" && !selectedBlock ? "flex" : "hidden"}
-    ${activeDragTask ? "pointer-events-none opacity-0" : ""}
-  `}
+							w-full flex flex-col min-h-0 md:hidden
+							${mobileTab === "unscheduled" && !selectedBlock ? "flex" : "hidden"}
+						`}
 					>
 						<div className="p-4 border-b border-border shrink-0">
 							<h3 className="font-medium">Unscheduled</h3>
 							<p className="text-sm text-muted-foreground">
-								{unscheduledTasks.length} tasks • Tap to schedule
+								{unscheduledTasks.length} tasks • Tap clock to schedule
 							</p>
 						</div>
 						<div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -1490,14 +1720,15 @@ export function ScheduleView({
 								</p>
 							) : (
 								unscheduledTasks.map((task) => (
-									<DraggableTaskItem
+									<SchedulableTaskItem
 										key={task.id}
 										task={task}
 										onStart={onStartTask}
-										onTapAssign={(task) => {
-											setPendingTask(task);
+										onSchedule={(t) => {
+											setPendingTask(t);
 											setMobileTab("timeline");
 										}}
+										isPending={pendingTask?.id === task.id}
 									/>
 								))
 							)}
@@ -1542,17 +1773,17 @@ export function ScheduleView({
 				</div>
 			</div>
 
-			{/* Drag overlay — renders outside the scroll container so it's never clipped */}
+			{/* Drag overlay for time block dragging only */}
 			<DragOverlay dropAnimation={{ duration: 150, easing: "ease-out" }}>
-				{activeDragTask && (
-					<div className="w-64 shadow-2xl rounded-md border border-[#8b9a6b] bg-background px-3 py-2 text-sm font-medium text-foreground rotate-1 opacity-95 pointer-events-none">
-						<div className="flex items-center gap-2">
-							<div className="w-2 h-2 rounded-full bg-[#8b9a6b] shrink-0" />
-							<span className="truncate">{activeDragTask.text}</span>
-						</div>
-					</div>
-				)}
+				{/* Task drag overlay removed - now using tap-to-schedule flow */}
 			</DragOverlay>
+
+			{/* Context Menu */}
+			<BlockContextMenu
+				menu={contextMenu}
+				onClose={closeContextMenu}
+				onUpdateBlock={onUpdateBlock}
+			/>
 		</DndContext>
 	);
 }
