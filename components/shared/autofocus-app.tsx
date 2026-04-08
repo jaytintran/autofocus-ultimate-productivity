@@ -50,8 +50,14 @@ import {
 	createAndCompleteTask,
 	reindexActiveTasks,
 	reenterAndComplete,
-} from "@/lib/db/store-v1";
-import { moveTaskToPamphlet } from "@/lib/db/store-v1";
+	getTimeBlocksForDate,
+	createTimeBlock,
+	updateTimeBlock,
+	deleteTimeBlock,
+	scheduleTask,
+	unscheduleTask,
+} from "@/lib/db/store";
+import { moveTaskToPamphlet } from "@/lib/db/store";
 
 import type {
 	Task,
@@ -61,6 +67,7 @@ import type {
 	PagedTaskLike,
 	TaskPlacement,
 	TaskReorderUpdate,
+	TimeBlock,
 } from "@/lib/types";
 import {
 	type CompletedSortKey,
@@ -93,6 +100,7 @@ import { useDebouncedValue } from "@/hooks/state/use-debounced-value";
 import { useHabits } from "@/hooks/data/use-habits";
 import { HabitGrid } from "@/components/features/habits/habit-grid";
 import { createClient } from "@/lib/supabase/client";
+import { ScheduleView } from "../features/schedule/schedule-view";
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -190,7 +198,9 @@ export function AutofocusApp() {
 		reorderPamphletsList,
 	} = usePamphlets();
 
-	const [activeView, setActiveView] = useState<"tasks" | "completed">("tasks");
+	const [activeView, setActiveView] = useState<
+		"tasks" | "completed" | "schedule"
+	>("tasks");
 	const [habitsViewActive, setHabitsViewActive] = useState(false);
 	const {
 		habits,
@@ -241,6 +251,13 @@ export function AutofocusApp() {
 	const [hasInitializedFilter, setHasInitializedFilter] = useState(false);
 
 	// -------------------------------------------------------------------------
+	// State - Schedule
+	// -------------------------------------------------------------------------
+	const [scheduleDate, setScheduleDate] = useState<Date>(new Date());
+	const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
+	const [isLoadingBlocks, setIsLoadingBlocks] = useState(false);
+
+	// -------------------------------------------------------------------------
 	// Data Fetching
 	// -------------------------------------------------------------------------
 	const [activeTasks, setActiveTasks] = useState<Task[]>(pamphletActiveTasks);
@@ -248,6 +265,15 @@ export function AutofocusApp() {
 	useEffect(() => {
 		setActiveTasks(pamphletActiveTasks);
 	}, [pamphletActiveTasks]);
+
+	useEffect(() => {
+		if (activeView !== "schedule") return;
+		setIsLoadingBlocks(true);
+		getTimeBlocksForDate(scheduleDate)
+			.then(setTimeBlocks)
+			.catch(console.error)
+			.finally(() => setIsLoadingBlocks(false));
+	}, [scheduleDate, activeView]);
 
 	const mutateActive = useCallback(async () => {
 		await invalidateAndRefetch();
@@ -1904,6 +1930,49 @@ export function AutofocusApp() {
 	const [buJoWidth, setBuJoWidth] = useState<"full" | "narrow">("full");
 
 	// -------------------------------------------------------------------------
+	// Callbacks - Schedule
+	// -------------------------------------------------------------------------
+	const handleScheduleTask = useCallback(
+		async (taskId: string, scheduledAt: string) => {
+			await scheduleTask(taskId, scheduledAt);
+			await mutateActive();
+		},
+		[mutateActive],
+	);
+
+	const handleUnscheduleTask = useCallback(
+		async (taskId: string) => {
+			await unscheduleTask(taskId);
+			await mutateActive();
+		},
+		[mutateActive],
+	);
+
+	const handleCreateBlock = useCallback(
+		async (
+			block: Omit<TimeBlock, "id" | "user_id" | "created_at" | "updated_at">,
+		) => {
+			const newBlock = await createTimeBlock(block);
+			setTimeBlocks((prev) => [...prev, newBlock]);
+			return newBlock;
+		},
+		[],
+	);
+
+	const handleUpdateBlock = useCallback(
+		async (id: string, updates: Partial<TimeBlock>) => {
+			const updated = await updateTimeBlock(id, updates);
+			setTimeBlocks((prev) => prev.map((b) => (b.id === id ? updated : b)));
+		},
+		[],
+	);
+
+	const handleDeleteBlock = useCallback(async (id: string) => {
+		await deleteTimeBlock(id);
+		setTimeBlocks((prev) => prev.filter((b) => b.id !== id));
+	}, []);
+
+	// -------------------------------------------------------------------------
 	// Render
 	// -------------------------------------------------------------------------
 	if (!displayedAppState) {
@@ -1985,7 +2054,9 @@ export function AutofocusApp() {
 				/>
 			)}
 
-			<main className="flex-1 flex flex-col min-h-0 pb-24">
+			<main
+				className={`flex-1 flex flex-col min-h-0 ${activeView !== "schedule" ? "pb-24" : ""}`}
+			>
 				{activeView === "tasks" &&
 					(habitsViewActive ? (
 						<div className="flex-1 overflow-y-auto min-h-0">
@@ -2039,6 +2110,24 @@ export function AutofocusApp() {
 						activePamphletId={activePamphletId}
 						buJoWidth={buJoWidth}
 					/>
+				)}
+
+				{activeView === "schedule" && (
+					<div className="flex-1 min-h-0 h-full overflow-hidden">
+						<ScheduleView
+							date={scheduleDate}
+							timeBlocks={timeBlocks}
+							tasks={displayedActiveTasks} // all active, not just current page
+							completedTasks={filteredCompletedTasks}
+							onScheduleTask={handleScheduleTask}
+							onUnscheduleTask={handleUnscheduleTask}
+							onCreateBlock={handleCreateBlock}
+							onUpdateBlock={handleUpdateBlock}
+							onDeleteBlock={handleDeleteBlock}
+							onStartTask={handleStartTask}
+							onDateChange={setScheduleDate} // so the view can navigate days
+						/>
+					</div>
 				)}
 			</main>
 

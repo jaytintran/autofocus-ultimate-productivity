@@ -333,8 +333,8 @@ function MobileViewTypeToggle({ value, onChange }: ViewTypeToggleProps) {
 // =============================================================================
 
 interface MainViewToggleProps {
-	activeView: "tasks" | "completed";
-	onChange: (view: "tasks" | "completed") => void;
+	activeView: "tasks" | "completed" | "schedule";
+	onChange: (view: "tasks" | "completed" | "schedule") => void;
 }
 
 function MainViewToggle({ activeView, onChange }: MainViewToggleProps) {
@@ -366,6 +366,19 @@ function MainViewToggle({ activeView, onChange }: MainViewToggleProps) {
 				<span className="hidden sm:inline">Completed</span>
 				<SquareCheck className="w-3.5 h-3.5 sm:hidden" />
 			</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={() => onChange("schedule")}
+				className={`h-8 rounded text-xs transition-colors ${
+					activeView === "schedule"
+						? "bg-accent! text-foreground"
+						: "text-muted-foreground hover:text-foreground"
+				}`}
+			>
+				<span className="hidden sm:inline">Schedule</span>
+				<SquareCheck className="w-3.5 h-3.5 sm:hidden" />
+			</Button>
 		</div>
 	);
 }
@@ -375,8 +388,8 @@ function MainViewToggle({ activeView, onChange }: MainViewToggleProps) {
 // =============================================================================
 
 interface ViewTabsProps {
-	activeView: "tasks" | "completed";
-	onViewChange: (view: "tasks" | "completed") => void;
+	activeView: "tasks" | "completed" | "schedule";
+	onViewChange: (view: "tasks" | "completed" | "schedule") => void;
 	selectedTags: Set<TagId | "none">;
 	onToggleTag: (tag: TagId | "none" | "all") => void;
 	onAddTasks: (tasks: string[], tag?: TagId | null) => Promise<void>;
