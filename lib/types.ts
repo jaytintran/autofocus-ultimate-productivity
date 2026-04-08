@@ -21,6 +21,7 @@ export interface Task {
 	updated_at: string;
 	due_date: string | null;
 	pamphlet_id: string | null;
+	scheduled_at: string | null;
 }
 
 export interface AppState {
@@ -91,3 +92,14 @@ export const PAMPHLET_COLOR_VALUES = [
 ] as const;
 
 export type PamphletColor = (typeof PAMPHLET_COLOR_VALUES)[number];
+
+export interface TimeBlock {
+	id: string;
+	user_id: string;
+	start_time: string; // ISO datetime
+	end_time: string; // calculated or stored
+	label: string; // "Deep Work", "Meetings", "Admin"
+	color?: string; // optional theming
+	created_at: string;
+	updated_at: string; // add this
+}

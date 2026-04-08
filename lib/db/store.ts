@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Task, AppState, TaskStatus, Pamphlet } from "@/lib/types";
 import { TagId } from "@/lib/tags";
 import type { PamphletColor } from "@/lib/features/pamphlet-colors";
+import { startOfDay, endOfDay } from "date-fns";
 
 // =============================================================================
 // TASK FETCHING
@@ -1230,6 +1231,103 @@ export async function createAndCompleteTask(
 			pamphlet_id: pamphletId ?? null,
 			user_id: user.id,
 		})
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+// =============================================================================
+// TIME BLOCK OPERATIONS
+// =============================================================================
+
+import type { TimeBlock } from "@/lib/types";
+
+export async function getTimeBlocksForDate(date: Date): Promise<TimeBlock[]> {
+	const supabase = createClient();
+	const start = startOfDay(date).toISOString();
+	const end = endOfDay(date).toISOString();
+
+	const { data, error } = await supabase
+		.from("time_blocks")
+		.select("*")
+		.gte("start_time", start)
+		.lte("start_time", end)
+		.order("start_time", { ascending: true });
+
+	if (error) throw error;
+	return data || [];
+}
+
+export async function createTimeBlock(
+	block: Omit<TimeBlock, "id" | "user_id" | "created_at" | "updated_at">,
+): Promise<TimeBlock> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	const { data, error } = await supabase
+		.from("time_blocks")
+		.insert({ ...block, user_id: user.id })
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function updateTimeBlock(
+	id: string,
+	updates: Partial<TimeBlock>,
+): Promise<TimeBlock> {
+	const supabase = createClient();
+	const { data, error } = await supabase
+		.from("time_blocks")
+		.update({ ...updates, updated_at: new Date().toISOString() })
+		.eq("id", id)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function deleteTimeBlock(id: string): Promise<void> {
+	const supabase = createClient();
+	const { error } = await supabase.from("time_blocks").delete().eq("id", id);
+
+	if (error) throw error;
+}
+
+// =============================================================================
+// TASK SCHEDULING
+// =============================================================================
+
+export async function scheduleTask(
+	taskId: string,
+	scheduledAt: string,
+): Promise<Task> {
+	const supabase = createClient();
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({ scheduled_at: scheduledAt, updated_at: new Date().toISOString() })
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function unscheduleTask(taskId: string): Promise<Task> {
+	const supabase = createClient();
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({ scheduled_at: null, updated_at: new Date().toISOString() })
+		.eq("id", taskId)
 		.select()
 		.single();
 
