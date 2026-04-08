@@ -48,6 +48,8 @@ import {
 	updateTaskTag,
 	revertTask,
 	createAndCompleteTask,
+	reindexActiveTasks,
+	reenterAndComplete,
 } from "@/lib/db/store";
 import { moveTaskToPamphlet } from "@/lib/db/store";
 
@@ -536,7 +538,11 @@ export function AutofocusApp() {
 				await refreshAll();
 				throw error;
 			} finally {
-				setOptimisticState(null);
+				// Delay one frame so React has committed the SWR state update
+				// before we drop the optimistic overlay
+				requestAnimationFrame(() => {
+					setOptimisticState(null);
+				});
 			}
 		},
 		[refreshAll],
@@ -742,7 +748,8 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
+					await markTaskDone(task.id, task.total_time_ms);
+					await reindexActiveTasks(activePamphletId);
 				},
 			);
 		},
@@ -1094,7 +1101,7 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					await reenterTask(
+					await reenterAndComplete(
 						task.id,
 						task.text,
 						reindexedPlacement.pageNumber,
@@ -1103,7 +1110,6 @@ export function AutofocusApp() {
 						task.tag,
 						activePamphletId,
 					);
-					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
 				},
 			);
 		},
@@ -1376,12 +1382,12 @@ export function AutofocusApp() {
 					mutateAppState(),
 					mutateTotalPages(),
 				]);
-				setOptimisticState(null);
+				requestAnimationFrame(() => setOptimisticState(null));
 				return createdTask;
 			} catch (error) {
 				console.error("Failed to add and start task:", error);
 				await refreshAll();
-				setOptimisticState(null);
+				requestAnimationFrame(() => setOptimisticState(null));
 				return null;
 			}
 		},
@@ -1449,6 +1455,7 @@ export function AutofocusApp() {
 						await updateTask(task.id, { note: note.trim() });
 					}
 					await completeTask(task.id, totalTime);
+					await reindexActiveTasks(activePamphletId);
 					await stopWorkingOnTask();
 				},
 			);
@@ -1590,7 +1597,7 @@ export function AutofocusApp() {
 					if (note?.trim()) {
 						await updateTask(task.id, { note: note.trim() });
 					}
-					await reenterTask(
+					await reenterAndComplete(
 						task.id,
 						task.text,
 						placement.pageNumber,
@@ -1599,7 +1606,6 @@ export function AutofocusApp() {
 						task.tag,
 						activePamphletId,
 					);
-					await markTaskDone(task.id, task.total_time_ms, activePamphletId);
 					await stopWorkingOnTask();
 				},
 			);
@@ -1733,7 +1739,7 @@ export function AutofocusApp() {
 						totalPages: getVisibleTotalPages(optimisticActiveTasks),
 					},
 					async () => {
-						await reenterTask(
+						await reenterAndComplete(
 							workingTask.id,
 							workingTask.text,
 							placement.pageNumber,
@@ -1742,7 +1748,6 @@ export function AutofocusApp() {
 							workingTask.tag,
 							activePamphletId,
 						);
-						await markTaskDone(workingTask.id, totalTime, activePamphletId);
 						await startTask(newTask.id);
 					},
 				);

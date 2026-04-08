@@ -274,37 +274,6 @@ export async function completeTask(
 		.single();
 
 	if (error) throw error;
-
-	let reindexQuery = supabase
-		.from("tasks")
-		.select("id, page_number, position")
-		.in("status", ["active", "in-progress"]);
-
-	if (pamphletId) reindexQuery = reindexQuery.eq("pamphlet_id", pamphletId);
-
-	const { data: remainingTasks, error: fetchError } = await reindexQuery
-		.order("page_number", { ascending: true })
-		.order("position", { ascending: true });
-
-	if (fetchError) throw fetchError;
-	if (!remainingTasks || remainingTasks.length === 0) return data;
-
-	const PAGE_SIZE = 12;
-	const now = new Date().toISOString();
-
-	for (const [index, task] of remainingTasks.entries()) {
-		const { error: updateError } = await supabase
-			.from("tasks")
-			.update({
-				page_number: Math.floor(index / PAGE_SIZE) + 1,
-				position: index % PAGE_SIZE,
-				updated_at: now,
-			})
-			.eq("id", task.id);
-
-		if (updateError) throw updateError;
-	}
-
 	return data;
 }
 
@@ -869,38 +838,42 @@ export async function markTaskDone(
 		.single();
 
 	if (error) throw error;
+	return data;
+}
 
-	let reindexQuery = supabase
+export async function reindexActiveTasks(
+	pamphletId?: string | null,
+): Promise<void> {
+	const supabase = createClient();
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+
+	let query = supabase
 		.from("tasks")
 		.select("id, page_number, position")
 		.in("status", ["active", "in-progress"]);
 
-	if (pamphletId) reindexQuery = reindexQuery.eq("pamphlet_id", pamphletId);
+	if (pamphletId) query = query.eq("pamphlet_id", pamphletId);
 
-	const { data: remainingTasks, error: fetchError } = await reindexQuery
+	const { data: tasks, error } = await query
 		.order("page_number", { ascending: true })
 		.order("position", { ascending: true });
 
-	if (fetchError) throw fetchError;
-	if (!remainingTasks || remainingTasks.length === 0) return data;
+	if (error) throw error;
+	if (!tasks || tasks.length === 0) return;
 
-	const PAGE_SIZE = 12;
-	const now = new Date().toISOString();
+	const updates = tasks.map((task, index) => ({
+		id: task.id,
+		page_number: Math.floor(index / PAGE_SIZE) + 1,
+		position: index % PAGE_SIZE,
+		updated_at: now,
+	}));
 
-	for (const [index, task] of remainingTasks.entries()) {
-		const { error: updateError } = await supabase
-			.from("tasks")
-			.update({
-				page_number: Math.floor(index / PAGE_SIZE) + 1,
-				position: index % PAGE_SIZE,
-				updated_at: now,
-			})
-			.eq("id", task.id);
+	const { error: upsertError } = await supabase
+		.from("tasks")
+		.upsert(updates, { onConflict: "id" });
 
-		if (updateError) throw updateError;
-	}
-
-	return data;
+	if (upsertError) throw upsertError;
 }
 
 export async function startTask(taskId: string): Promise<AppState> {
@@ -1132,6 +1105,63 @@ export async function reorderPamphlets(
 			.eq("id", update.id);
 		if (error) throw error;
 	}
+}
+
+export async function reenterAndComplete(
+	originalTaskId: string,
+	newText: string,
+	pageNumber: number,
+	position: number,
+	totalTimeMs: number,
+	tag: TagId | null,
+	pamphletId: string | null,
+): Promise<Task> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	const now = new Date().toISOString();
+
+	// 1. Mark original as completed — no reindex
+	const { error: completeError } = await supabase
+		.from("tasks")
+		.update({
+			status: "completed",
+			completed_at: now,
+			total_time_ms: totalTimeMs,
+			updated_at: now,
+		})
+		.eq("id", originalTaskId);
+
+	if (completeError) throw completeError;
+
+	// 2. Insert re-entered task at the computed position
+	// Instead of inserting at the computed pageNumber/position,
+	// insert at a position that guarantees it sorts last
+	const { data: newTask, error: insertError } = await supabase
+		.from("tasks")
+		.insert({
+			text: newText,
+			page_number: 9999, // sentinel — reindex will correct this
+			position: 9999, // sentinel — reindex will correct this
+			status: "active",
+			total_time_ms: totalTimeMs,
+			re_entered_from: originalTaskId,
+			tag: tag ?? null,
+			pamphlet_id: pamphletId ?? null,
+			user_id: user.id,
+		})
+		.select()
+		.single();
+
+	if (insertError) throw insertError;
+
+	// NOW reindex — new task sorts last because 9999 > everything else
+	await reindexActiveTasks(pamphletId);
+
+	return newTask;
 }
 
 // =============================================================================
