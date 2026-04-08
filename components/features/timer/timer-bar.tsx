@@ -1,3 +1,4 @@
+// timer-bar.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -13,6 +14,7 @@ import {
 	ClipboardList,
 	Trophy,
 	CheckCheck,
+	Loader2,
 } from "lucide-react";
 import type { Task, AppState, Pamphlet } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
@@ -107,7 +109,6 @@ function capitalizeText(text: string): string {
 		.join(" ");
 }
 
-// Defined outside component — stable reference, no recreation on render
 const TAG_MENTION_MAP: Record<string, TagId> = Object.fromEntries(
 	TAG_DEFINITIONS.map((tag) => [`#${tag.id}`, tag.id]),
 );
@@ -127,7 +128,7 @@ function parseTagMention(text: string): {
 }
 
 // =============================================================================
-// BUTTON STYLES
+// STYLES
 // =============================================================================
 
 const primaryBtn =
@@ -138,7 +139,7 @@ const iconBtn =
 	"inline-flex items-center justify-center rounded-sm border border-transparent p-2 text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
 // =============================================================================
-// IDLE INPUT (no working task)
+// IDLE INPUT COMPONENT
 // =============================================================================
 
 function IdleInput({
@@ -206,7 +207,6 @@ function IdleInput({
 		const finalTag = focusInlineTag ?? tag;
 		const finalText = capitalizeText(cleanText || tagClean || trimmed);
 
-		// Clear input immediately — no waiting
 		setFocusQuery("");
 		setFocusInlineTag(null);
 		setFocusMentionQuery(null);
@@ -263,7 +263,6 @@ function IdleInput({
 		<div className="border-y border-border/80 bg-card px-6 py-6 md:px-10">
 			<div className="mx-auto flex max-w-6xl flex-col items-center w-full">
 				<div className="relative w-full max-w-2xl">
-					{/* Tag mention dropdown */}
 					{focusMentionQuery !== null && focusMentionResults.length > 0 && (
 						<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg p-1.5 z-50 min-w-[160px]">
 							<p className="text-[10px] text-muted-foreground px-2 py-1">
@@ -330,13 +329,11 @@ function IdleInput({
 								<Send className="w-4 h-4 text-[#8b9a6b]" />
 							</button>
 						)}
-
 						{submitting && (
 							<div className="w-4 h-4 border-2 border-[#8b9a6b]/30 border-t-[#8b9a6b] rounded-full animate-spin flex-shrink-0" />
 						)}
 					</div>
 
-					{/* Existing task matches */}
 					{focusMatches.length > 0 && (
 						<div className="absolute top-full mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50">
 							{focusMatches.map((task) => {
@@ -377,10 +374,11 @@ function IdleInput({
 		</div>
 	);
 }
+
 // =============================================================================
-// DUE DATE POP UP PICKER
+// DUE DATE PICKER COMPONENT
 // =============================================================================
-// Popup picker for setting/changing due date on the working task
+
 function DueDatePicker({
 	currentDueDate,
 	onSet,
@@ -394,7 +392,6 @@ function DueDatePicker({
 	const [customError, setCustomError] = useState(false);
 	const menuRef = useRef<HTMLDivElement>(null);
 
-	// Presets — reuse parseDueDateShortcut with shortcut strings
 	const PRESETS = [
 		{ label: "15m", shortcut: "!15m" },
 		{ label: "30m", shortcut: "!30m" },
@@ -404,7 +401,6 @@ function DueDatePicker({
 		{ label: "1d", shortcut: "!1d" },
 	];
 
-	// Close on outside click
 	useEffect(() => {
 		const handler = (e: MouseEvent | TouchEvent) => {
 			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -429,7 +425,6 @@ function DueDatePicker({
 
 	const handleCustomSubmit = () => {
 		const input = customInput.trim();
-		// Prepend ! if user forgot it
 		const normalized = input.startsWith("!") ? input : `!${input}`;
 		const { dueDate } = parseDueDateShortcut(normalized);
 		if (dueDate) {
@@ -437,7 +432,6 @@ function DueDatePicker({
 			onSet(dueDate.toISOString());
 			onClose();
 		} else {
-			// Flash error state briefly
 			setCustomError(true);
 			setTimeout(() => setCustomError(false), 1200);
 		}
@@ -448,7 +442,6 @@ function DueDatePicker({
 			ref={menuRef}
 			className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-xl p-3 w-56 flex flex-col gap-2"
 		>
-			{/* Preset buttons */}
 			<div className="grid grid-cols-3 gap-1.5">
 				{PRESETS.map((p) => (
 					<button
@@ -463,7 +456,6 @@ function DueDatePicker({
 
 			<div className="h-px bg-border" />
 
-			{/* Custom shortcut input — same syntax as task input */}
 			<div className="flex gap-1.5">
 				<input
 					autoFocus
@@ -474,8 +466,9 @@ function DueDatePicker({
 						if (e.key === "Escape") onClose();
 					}}
 					placeholder="e.g. 2h30m or 3d"
-					className={`flex-1 bg-background border rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring transition-colors
-            ${customError ? "border-destructive" : "border-input"}`}
+					className={`flex-1 bg-background border rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring transition-colors ${
+						customError ? "border-destructive" : "border-input"
+					}`}
 				/>
 				<button
 					onClick={handleCustomSubmit}
@@ -485,7 +478,6 @@ function DueDatePicker({
 				</button>
 			</div>
 
-			{/* Show current due date with a clear option if one is set */}
 			{currentDueDate && (
 				<button
 					onClick={() => {
@@ -502,7 +494,55 @@ function DueDatePicker({
 }
 
 // =============================================================================
-// MAIN COMPONENT
+// ACTION BUTTON COMPONENT
+// =============================================================================
+
+/**
+ * Single action button with loading state.
+ * When active, shows spinner and hides other buttons.
+ */
+function ActionButton({
+	onClick,
+	disabled,
+	loading,
+	variant = "primary",
+	icon,
+	label,
+	title,
+	className = "",
+}: {
+	onClick?: () => void;
+	disabled?: boolean;
+	loading?: boolean;
+	variant?: "primary" | "secondary";
+	icon: React.ReactNode;
+	label?: string;
+	title?: string;
+	className?: string;
+}) {
+	const baseClasses = variant === "primary" ? primaryBtn : secondaryBtn;
+
+	return (
+		<button
+			onClick={onClick}
+			disabled={disabled || loading}
+			title={title}
+			className={`${baseClasses} ${className} ${loading ? "relative" : ""}`}
+		>
+			{loading ? (
+				<Loader2
+					className={`${label ? "h-3.5 w-3.5" : "h-4 w-4"} animate-spin`}
+				/>
+			) : (
+				icon
+			)}
+			{label && <span>{label}</span>}
+		</button>
+	);
+}
+
+// =============================================================================
+// MAIN TIMER BAR COMPONENT
 // =============================================================================
 
 export function TimerBar({
@@ -523,17 +563,37 @@ export function TimerBar({
 	onUpdateTaskTag,
 	onCompleteAdjacentTask,
 }: TimerBarProps) {
-	// ── Optimistic timer state ─────────────────────────────────────────────────
-	// Instead of isLoading blocking everything, we track optimistic timer state
-	// locally so the UI updates instantly on button press.
+	// ── Optimistic Working Task State ─────────────────────────────────────────
+	// Immediately clears working task on destructive actions (complete/reenter/cancel)
+	// to prevent any possibility of double-clicks. Server catch-up happens in background.
+	const [optimisticWorkingTask, setOptimisticWorkingTask] = useState<
+		Task | null | undefined
+	>(undefined);
+
+	const effectiveWorkingTask =
+		optimisticWorkingTask !== undefined ? optimisticWorkingTask : workingTask;
+
+	useEffect(() => {
+		if (optimisticWorkingTask !== undefined) {
+			if (
+				workingTask === null ||
+				(optimisticWorkingTask === null && workingTask === null)
+			) {
+				setOptimisticWorkingTask(undefined);
+			}
+		}
+	}, [workingTask, optimisticWorkingTask]);
+
+	// ── Active Operation Tracking ─────────────────────────────────────────────
+	// Only for showing spinner on clicked button. UI is already optimistic, so this
+	// is just visual feedback, not a lock.
+	const [activeOperation, setActiveOperation] = useState<string | null>(null);
+
+	// ── Optimistic Timer State ─────────────────────────────────────────────────
 	type OptimisticTimer = "idle" | "running" | "paused" | "stopped" | null;
 	const [optimisticTimerState, setOptimisticTimerState] =
 		useState<OptimisticTimer>(null);
 
-	const [dueDatePickerOpen, setDueDatePickerOpen] = useState(false);
-	const [note, setNote] = useState("");
-
-	// Clear optimistic state when real appState catches up
 	useEffect(() => {
 		setOptimisticTimerState(null);
 	}, [appState.timer_state]);
@@ -544,29 +604,33 @@ export function TimerBar({
 	const isPaused = timerState === "paused";
 	const isStopped = timerState === "stopped";
 
-	// ── Session timer ──────────────────────────────────────────────────────────
+	// ── Session Timer State ────────────────────────────────────────────────────
 	const [sessionMs, setSessionMs] = useState(0);
 	const sessionStartRef = useRef<number | null>(null);
 	const baseSessionMsRef = useRef(0);
 
-	// ── Note entries ───────────────────────────────────────────────────────────
+	// ── Notes State ─────────────────────────────────────────────────────────────
 	const [noteEntries, setNoteEntries] = useState<NoteEntry[]>([]);
 	const [noteInput, setNoteInput] = useState("");
 	const [noteType, setNoteType] = useState<"log" | "achievement" | "sidequest">(
 		"log",
 	);
 	const [mobileNotesOpen, setMobileNotesOpen] = useState(false);
+	const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+	const [editingNoteText, setEditingNoteText] = useState("");
 
-	// ── Sidequest entries ───────────────────────────────────────────────────────
+	// ── Sidequest State ─────────────────────────────────────────────────────────
 	const [sidequestInput, setSidequestInput] = useState("");
 	const [sidequestMatches, setSidequestMatches] = useState<Task[]>([]);
 	const [sidequestSubmitting, setSidequestSubmitting] = useState(false);
 
-	const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-	const [editingNoteText, setEditingNoteText] = useState("");
+	// ── UI State ────────────────────────────────────────────────────────────────
+	const [dueDatePickerOpen, setDueDatePickerOpen] = useState(false);
+	const [note, setNote] = useState("");
 
+	// ── Timer Interval Effect ───────────────────────────────────────────────────
 	useEffect(() => {
-		if (!workingTask) {
+		if (!effectiveWorkingTask) {
 			setSessionMs(0);
 			sessionStartRef.current = null;
 			baseSessionMsRef.current = 0;
@@ -596,53 +660,77 @@ export function TimerBar({
 			setSessionMs(0);
 		}
 	}, [
-		workingTask,
+		effectiveWorkingTask,
 		appState.timer_state,
 		appState.session_start_time,
 		appState.current_session_ms,
 	]);
 
-	// ── Handlers — optimistic first, then async ───────────────────────────────
+	// ── Timer Control Handlers ───────────────────────────────────────────────────
+	// Non-destructive: just show spinner on button, no optimistic UI needed
 
 	const handleStartTimer = useCallback(async () => {
 		setOptimisticTimerState("running");
+		setActiveOperation("start");
 		try {
 			await onStartTimer();
 		} catch {
 			setOptimisticTimerState(null);
+		} finally {
+			setActiveOperation(null);
 		}
 	}, [onStartTimer]);
 
 	const handlePause = useCallback(async () => {
 		setOptimisticTimerState("paused");
+		setActiveOperation("pause");
 		try {
 			await onPauseTimer(sessionMs);
 		} catch {
 			setOptimisticTimerState(null);
+		} finally {
+			setActiveOperation(null);
 		}
 	}, [sessionMs, onPauseTimer]);
 
 	const handleResume = useCallback(async () => {
 		setOptimisticTimerState("running");
+		setActiveOperation("resume");
 		try {
 			await onResumeTimer();
 		} catch {
 			setOptimisticTimerState(null);
+		} finally {
+			setActiveOperation(null);
 		}
 	}, [onResumeTimer]);
 
 	const handleStop = useCallback(async () => {
-		if (!workingTask) return;
+		if (!effectiveWorkingTask) return;
 		setOptimisticTimerState("stopped");
+		setActiveOperation("stop");
 		try {
-			await onStopTimer(workingTask, sessionMs);
+			await onStopTimer(effectiveWorkingTask, sessionMs);
 		} catch {
 			setOptimisticTimerState(null);
+		} finally {
+			setActiveOperation(null);
 		}
-	}, [workingTask, sessionMs, onStopTimer]);
+	}, [effectiveWorkingTask, sessionMs, onStopTimer]);
+
+	// ── Destructive Action Handlers ─────────────────────────────────────────────
+	// These clear the UI instantly (optimistic) and sync in background
+
+	const clearNotesAndReset = () => {
+		setNote("");
+		setNoteEntries([]);
+		setNoteType("log");
+		setSidequestInput("");
+		setSidequestMatches([]);
+	};
 
 	const handleComplete = useCallback(async () => {
-		if (!workingTask) return;
+		if (!effectiveWorkingTask) return;
 
 		let combinedNote = "";
 		if (noteEntries.length > 0) {
@@ -652,20 +740,29 @@ export function TimerBar({
 			const logs = noteEntries
 				.filter((e) => e.type === "log")
 				.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`);
-			// sidequest entries excluded — they're already completed tasks
 			combinedNote = [...achievements, ...logs].join("\n");
 		} else {
 			combinedNote = note;
 		}
 
-		setNote("");
-		setNoteEntries([]);
-		setNoteType("log");
-		await onCompleteTask(workingTask, sessionMs, combinedNote);
-	}, [workingTask, sessionMs, note, noteEntries, onCompleteTask]);
+		// INSTANT: Clear UI immediately
+		setOptimisticWorkingTask(null);
+		clearNotesAndReset();
+		setActiveOperation("complete");
+
+		try {
+			await onCompleteTask(effectiveWorkingTask, sessionMs, combinedNote);
+		} catch {
+			// Restore on error so user can retry
+			setOptimisticWorkingTask(effectiveWorkingTask);
+		} finally {
+			setActiveOperation(null);
+		}
+	}, [effectiveWorkingTask, sessionMs, note, noteEntries, onCompleteTask]);
 
 	const handleReenter = useCallback(async () => {
-		if (!workingTask) return;
+		if (!effectiveWorkingTask) return;
+
 		const combinedNote =
 			noteEntries.length > 0
 				? [
@@ -675,21 +772,43 @@ export function TimerBar({
 						...noteEntries
 							.filter((e) => e.type === "log")
 							.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`),
-						// sidequest entries excluded — they're already completed tasks
 					].join("\n")
 				: note;
-		setNote("");
-		setNoteEntries([]);
-		setNoteType("log");
-		setSidequestInput("");
-		setSidequestMatches([]);
-		await onReenterTask(workingTask, combinedNote);
-	}, [workingTask, noteEntries, note, onReenterTask]);
+
+		// INSTANT: Clear UI immediately
+		setOptimisticWorkingTask(null);
+		clearNotesAndReset();
+		setActiveOperation("reenter");
+
+		try {
+			await onReenterTask(effectiveWorkingTask, combinedNote);
+		} catch {
+			// Restore on error so user can retry
+			setOptimisticWorkingTask(effectiveWorkingTask);
+		} finally {
+			setActiveOperation(null);
+		}
+	}, [effectiveWorkingTask, noteEntries, note, onReenterTask]);
 
 	const handleCancelTask = useCallback(async () => {
-		if (!workingTask) return;
-		await onCancelTask(workingTask, sessionMs);
-	}, [workingTask, sessionMs, onCancelTask]);
+		if (!effectiveWorkingTask) return;
+
+		// INSTANT: Clear UI immediately
+		setOptimisticWorkingTask(null);
+		clearNotesAndReset();
+		setActiveOperation("cancel");
+
+		try {
+			await onCancelTask(effectiveWorkingTask, sessionMs);
+		} catch {
+			// Restore on error so user can retry
+			setOptimisticWorkingTask(effectiveWorkingTask);
+		} finally {
+			setActiveOperation(null);
+		}
+	}, [effectiveWorkingTask, sessionMs, onCancelTask]);
+
+	// ── Sidequest & Note Handlers ───────────────────────────────────────────────
 
 	const handleSidequestChange = useCallback(
 		(value: string) => {
@@ -700,7 +819,7 @@ export function TimerBar({
 						.filter(
 							(t) =>
 								t.text.toLowerCase().includes(value.toLowerCase()) &&
-								t.id !== workingTask?.id,
+								t.id !== effectiveWorkingTask?.id,
 						)
 						.slice(0, 5),
 				);
@@ -708,7 +827,7 @@ export function TimerBar({
 				setSidequestMatches([]);
 			}
 		},
-		[activeTasks, workingTask],
+		[activeTasks, effectiveWorkingTask],
 	);
 
 	const handleSidequestSubmit = useCallback(
@@ -722,7 +841,7 @@ export function TimerBar({
 					...prev,
 					{
 						id: crypto.randomUUID(),
-						elapsedMs: (workingTask?.total_time_ms ?? 0) + sessionMs,
+						elapsedMs: (effectiveWorkingTask?.total_time_ms ?? 0) + sessionMs,
 						text: trimmed,
 						type: "sidequest",
 					},
@@ -733,13 +852,18 @@ export function TimerBar({
 				setSidequestSubmitting(false);
 			}
 		},
-		[sidequestSubmitting, onCompleteAdjacentTask, workingTask, sessionMs],
+		[
+			sidequestSubmitting,
+			onCompleteAdjacentTask,
+			effectiveWorkingTask,
+			sessionMs,
+		],
 	);
 
 	const handleNoteSubmit = useCallback(() => {
 		const trimmed = noteInput.trim();
 		if (!trimmed) return;
-		const elapsed = (workingTask?.total_time_ms ?? 0) + sessionMs;
+		const elapsed = (effectiveWorkingTask?.total_time_ms ?? 0) + sessionMs;
 		setNoteEntries((prev) => [
 			...prev,
 			{
@@ -750,10 +874,10 @@ export function TimerBar({
 			},
 		]);
 		setNoteInput("");
-	}, [noteInput, workingTask, sessionMs, noteType]);
+	}, [noteInput, effectiveWorkingTask, sessionMs, noteType]);
 
-	// ── Idle state — delegate to extracted component ───────────────────────────
-	if (!workingTask) {
+	// ── Render: Idle State ──────────────────────────────────────────────────────
+	if (!effectiveWorkingTask) {
 		return (
 			<IdleInput
 				activeTasks={activeTasks}
@@ -763,39 +887,44 @@ export function TimerBar({
 		);
 	}
 
-	// ── Working state ──────────────────────────────────────────────────────────
-	const totalDisplayTime = workingTask.total_time_ms + sessionMs;
-	const statusText = isRunning
-		? "Timer running"
-		: isPaused
-			? "Timer paused"
-			: isStopped
-				? "Session saved"
-				: "Ready to start";
-
+	// ── Render: Working State ───────────────────────────────────────────────────
+	const totalDisplayTime = effectiveWorkingTask.total_time_ms + sessionMs;
 	const workingPamphlet =
-		pamphlets.find((p) => p.id === workingTask.pamphlet_id) ?? null;
+		pamphlets.find((p) => p.id === effectiveWorkingTask.pamphlet_id) ?? null;
+
+	// Determine which button is active to show only that one during operation
+	const showOnlyActiveButton = activeOperation !== null;
+	const isCompleting = activeOperation === "complete";
+	const isReentering = activeOperation === "reenter";
+	const isCancelling = activeOperation === "cancel";
 
 	return (
 		<div className="border-y border-border/80 bg-card px-4 py-3 md:px-10 md:py-4">
 			<div className="mx-auto flex max-w-6xl flex-col gap-3 md:grid md:grid-cols-2 md:gap-6">
 				{/* LEFT COLUMN: Task info + Timer + Actions */}
 				<div className="flex flex-col gap-3">
-					{/* Title + X */}
+					{/* Task Title + Cancel */}
 					<div className="flex items-start justify-between gap-3">
 						<p className="truncate text-base font-semibold tracking-tight text-foreground md:text-3xl md:tracking-[0.04em]">
-							{workingTask.text}
+							{effectiveWorkingTask.text}
 						</p>
-						<button
-							onClick={handleCancelTask}
-							className={iconBtn}
-							title="Remove from working panel"
-						>
-							<X className="h-4 w-4" />
-						</button>
+						{!showOnlyActiveButton && (
+							<button
+								onClick={handleCancelTask}
+								disabled={isCancelling}
+								className={iconBtn}
+								title="Remove from working panel"
+							>
+								{isCancelling ? (
+									<Loader2 className="h-4 w-4 animate-spin" />
+								) : (
+									<X className="h-4 w-4" />
+								)}
+							</button>
+						)}
 					</div>
 
-					{/* Badges row */}
+					{/* Metadata Row */}
 					<div className="flex items-center gap-2 flex-wrap">
 						{workingPamphlet && (
 							<span
@@ -805,685 +934,846 @@ export function TimerBar({
 							</span>
 						)}
 
-						{/* Due date chip */}
 						<div className="relative">
 							<button
 								onClick={() => setDueDatePickerOpen((prev) => !prev)}
-								className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors
-                    ${
-											workingTask.due_date
-												? (() => {
-														const { urgency } = formatDueDate(
-															workingTask.due_date,
-														);
-														const urgencyClasses: Record<string, string> = {
-															overdue:
-																"border-red-500/40 bg-red-500/10 text-red-500",
-															soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
-															normal:
-																"border-muted-foreground/30 bg-muted/50 text-muted-foreground",
-															far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
-														};
-														return urgencyClasses[urgency];
-													})()
-												: "border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground/60 hover:text-muted-foreground"
-										}`}
+								disabled={showOnlyActiveButton}
+								className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors ${
+									effectiveWorkingTask.due_date
+										? (() => {
+												const { urgency } = formatDueDate(
+													effectiveWorkingTask.due_date,
+												);
+												const urgencyClasses: Record<string, string> = {
+													overdue:
+														"border-red-500/40 bg-red-500/10 text-red-500",
+													soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+													normal:
+														"border-muted-foreground/30 bg-muted/50 text-muted-foreground",
+													far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
+												};
+												return urgencyClasses[urgency];
+											})()
+										: "border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground/60 hover:text-muted-foreground"
+								}`}
 							>
-								{workingTask.due_date
-									? `⏰ ${formatDueDate(workingTask.due_date).label}`
+								{effectiveWorkingTask.due_date
+									? `⏰ ${formatDueDate(effectiveWorkingTask.due_date).label}`
 									: "+ due date"}
 							</button>
 							{dueDatePickerOpen && (
 								<DueDatePicker
-									currentDueDate={workingTask.due_date}
-									onSet={(isoDate) => onUpdateDueDate(workingTask.id, isoDate)}
+									currentDueDate={effectiveWorkingTask.due_date}
+									onSet={(isoDate) =>
+										onUpdateDueDate(effectiveWorkingTask.id, isoDate)
+									}
 									onClose={() => setDueDatePickerOpen(false)}
 								/>
 							)}
 						</div>
 
-						{/* Tag pill */}
 						<TagPill
-							tagId={workingTask.tag}
-							onSelectTag={(tag) => onUpdateTaskTag(workingTask.id, tag)}
+							tagId={effectiveWorkingTask.tag}
+							onSelectTag={(tag) =>
+								onUpdateTaskTag(effectiveWorkingTask.id, tag)
+							}
 							className="scale-90 origin-left"
 						/>
 					</div>
 
-					{/* Timer + action buttons */}
+					{/* Timer + Actions */}
 					<div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-3">
-						{/* Timer */}
 						<span
 							className={`font-mono text-xl tracking-[0.12em] md:text-4xl md:tracking-[0.16em] ${isRunning ? "text-af4-highlight" : "text-foreground"}`}
 						>
 							{formatTimerDisplay(totalDisplayTime)}
 						</span>
 
-						{/* Action buttons */}
+						{/* Action Buttons - Only show active one during operation */}
 						<div className="flex items-center gap-1.5">
 							{isIdle && (
 								<>
-									{/* Mobile: icon only */}
-									<button
-										onClick={handleStartTimer}
-										className={`${primaryBtn} md:hidden`}
-										title="Start"
-									>
-										<Play className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${secondaryBtn} md:hidden`}
-										title="Complete"
-									>
-										<Check className="h-4 w-4 text-[#8b9a6b]" />
-									</button>
-									{/* Desktop: icon + text */}
-									<button
-										onClick={handleStartTimer}
-										className={`${primaryBtn} hidden md:inline-flex`}
-									>
-										<Play className="h-3.5 w-3.5" />
-										Start
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-										Complete
-									</button>
+									{showOnlyActiveButton ? (
+										isCompleting ? (
+											<ActionButton
+												loading
+												variant="secondary"
+												icon={<Check className="h-4 w-4" />}
+											/>
+										) : null
+									) : (
+										<>
+											<ActionButton
+												onClick={handleStartTimer}
+												loading={activeOperation === "start"}
+												variant="primary"
+												icon={<Play className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Start"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="secondary"
+												icon={<Check className="h-4 w-4 text-[#8b9a6b]" />}
+												label="Complete"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleStartTimer}
+												loading={activeOperation === "start"}
+												variant="primary"
+												icon={<Play className="h-3.5 w-3.5" />}
+												label="Start"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="secondary"
+												icon={<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />}
+												label="Complete"
+												className="hidden md:inline-flex"
+											/>
+										</>
+									)}
 								</>
 							)}
+
 							{isRunning && (
 								<>
-									<button
-										onClick={handlePause}
-										className={`${secondaryBtn} md:hidden`}
-										title="Pause"
-									>
-										<Pause className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleStop}
-										className={`${secondaryBtn} md:hidden`}
-										title="Stop"
-									>
-										<Square className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${primaryBtn} md:hidden`}
-										title="Complete"
-									>
-										<Check className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handlePause}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Pause className="h-3.5 w-3.5" />
-										Pause
-									</button>
-									<button
-										onClick={handleStop}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Square className="h-3.5 w-3.5" />
-										Stop
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${primaryBtn} hidden md:inline-flex`}
-									>
-										<Check className="h-3.5 w-3.5" />
-										Complete
-									</button>
+									{showOnlyActiveButton ? null : (
+										<>
+											<ActionButton
+												onClick={handlePause}
+												loading={activeOperation === "pause"}
+												variant="secondary"
+												icon={<Pause className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Pause"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleStop}
+												loading={activeOperation === "stop"}
+												variant="secondary"
+												icon={<Square className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Stop"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="primary"
+												icon={<Check className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Complete"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handlePause}
+												loading={activeOperation === "pause"}
+												variant="secondary"
+												icon={<Pause className="h-3.5 w-3.5" />}
+												label="Pause"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleStop}
+												loading={activeOperation === "stop"}
+												variant="secondary"
+												icon={<Square className="h-3.5 w-3.5" />}
+												label="Stop"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="primary"
+												icon={<Check className="h-3.5 w-3.5" />}
+												label="Complete"
+												className="hidden md:inline-flex"
+											/>
+										</>
+									)}
 								</>
 							)}
+
 							{isPaused && (
 								<>
-									<button
-										onClick={handleResume}
-										className={`${primaryBtn} md:hidden`}
-										title="Resume"
-									>
-										<Play className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleStop}
-										className={`${secondaryBtn} md:hidden`}
-										title="Stop"
-									>
-										<Square className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${secondaryBtn} md:hidden`}
-										title="Complete"
-									>
-										<Check className="h-4 w-4 text-[#8b9a6b]" />
-									</button>
-									<button
-										onClick={handleResume}
-										className={`${primaryBtn} hidden md:inline-flex`}
-									>
-										<Play className="h-3.5 w-3.5" />
-										Resume
-									</button>
-									<button
-										onClick={handleStop}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Square className="h-3.5 w-3.5" />
-										Stop
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />
-										Complete
-									</button>
+									{showOnlyActiveButton ? null : (
+										<>
+											<ActionButton
+												onClick={handleResume}
+												loading={activeOperation === "resume"}
+												variant="primary"
+												icon={<Play className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Resume"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleStop}
+												loading={activeOperation === "stop"}
+												variant="secondary"
+												icon={<Square className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Stop"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="secondary"
+												icon={
+													<Check className="h-4 w-4 text-[#8b9a6b] md:h-3.5 md:w-3.5" />
+												}
+												label="Complete"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleResume}
+												loading={activeOperation === "resume"}
+												variant="primary"
+												icon={<Play className="h-3.5 w-3.5" />}
+												label="Resume"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleStop}
+												loading={activeOperation === "stop"}
+												variant="secondary"
+												icon={<Square className="h-3.5 w-3.5" />}
+												label="Stop"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="secondary"
+												icon={<Check className="h-3.5 w-3.5 text-[#8b9a6b]" />}
+												label="Complete"
+												className="hidden md:inline-flex"
+											/>
+										</>
+									)}
 								</>
 							)}
+
 							{isStopped && (
 								<>
-									<button
-										onClick={handleStartTimer}
-										className={`${secondaryBtn} md:hidden`}
-										title="Resume"
-									>
-										<Play className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${primaryBtn} md:hidden`}
-										title="Complete"
-									>
-										<Check className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleReenter}
-										className={`${secondaryBtn} md:hidden`}
-										title="Re-enter"
-									>
-										<RefreshCw className="h-4 w-4" />
-									</button>
-									<button
-										onClick={handleStartTimer}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<Play className="h-3.5 w-3.5" />
-										Resume
-									</button>
-									<button
-										onClick={handleComplete}
-										className={`${primaryBtn} hidden md:inline-flex`}
-									>
-										<Check className="h-3.5 w-3.5" />
-										Complete
-									</button>
-									<button
-										onClick={handleReenter}
-										className={`${secondaryBtn} hidden md:inline-flex`}
-									>
-										<RefreshCw className="h-3.5 w-3.5" />
-										Re-enter
-									</button>
+									{showOnlyActiveButton ? (
+										isReentering ? (
+											<ActionButton
+												loading
+												variant="secondary"
+												icon={
+													<RefreshCw className="h-4 w-4 md:h-3.5 md:w-3.5" />
+												}
+												label="Re-entering..."
+											/>
+										) : isCompleting ? (
+											<ActionButton
+												loading
+												variant="primary"
+												icon={<Check className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Completing..."
+											/>
+										) : null
+									) : (
+										<>
+											<ActionButton
+												onClick={handleStartTimer}
+												loading={activeOperation === "start"}
+												variant="secondary"
+												icon={<Play className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Resume"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="primary"
+												icon={<Check className="h-4 w-4 md:h-3.5 md:w-3.5" />}
+												label="Complete"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleReenter}
+												loading={isReentering}
+												variant="secondary"
+												icon={
+													<RefreshCw
+														className={`h-4 w-4 md:h-3.5 md:w-3.5 ${isReentering ? "animate-spin" : ""}`}
+													/>
+												}
+												label="Re-enter"
+												className="md:hidden"
+											/>
+											<ActionButton
+												onClick={handleStartTimer}
+												loading={activeOperation === "start"}
+												variant="secondary"
+												icon={<Play className="h-3.5 w-3.5" />}
+												label="Resume"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleComplete}
+												loading={isCompleting}
+												variant="primary"
+												icon={<Check className="h-3.5 w-3.5" />}
+												label="Complete"
+												className="hidden md:inline-flex"
+											/>
+											<ActionButton
+												onClick={handleReenter}
+												loading={isReentering}
+												variant="secondary"
+												icon={
+													<RefreshCw
+														className={`h-3.5 w-3.5 ${isReentering ? "animate-spin" : ""}`}
+													/>
+												}
+												label="Re-enter"
+												className="hidden md:inline-flex"
+											/>
+										</>
+									)}
 								</>
 							)}
 						</div>
 					</div>
 				</div>
 
-				{/* RIGHT COLUMN: Note input + display */}
+				{/* RIGHT COLUMN: Notes */}
 				<div className="flex flex-col gap-3 md:border-l md:border-border/50 md:pl-6">
-					{/* Mobile toggler — own row */}
+					{/* Mobile Note Type Toggler */}
 					<div className="flex md:hidden items-center gap-1.5 w-full">
-						<button
-							type="button"
-							onClick={() => setNoteType("log")}
-							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-								noteType === "log"
-									? "border-[#8b9a6b]/40 bg-[#8b9a6b]/10 text-[#8b9a6b]"
-									: "border-border text-muted-foreground/50"
-							}`}
-						>
-							<ClipboardList className="w-3.5 h-3.5" />
-							Log
-						</button>
-						<button
-							type="button"
-							onClick={() => setNoteType("achievement")}
-							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-								noteType === "achievement"
-									? "border-amber-500/40 bg-amber-500/10 text-amber-500"
-									: "border-border text-muted-foreground/50"
-							}`}
-						>
-							<Trophy className="w-3.5 h-3.5" />
-							Win
-						</button>
-						<button
-							type="button"
-							onClick={() => setNoteType("sidequest")}
-							className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-								noteType === "sidequest"
-									? "border-sky-500/40 bg-sky-500/10 text-sky-500"
-									: "border-border text-muted-foreground/50"
-							}`}
-						>
-							<CheckCheck className="w-3.5 h-3.5" />
-							Side Quest
-						</button>
+						<NoteTypeButton
+							type="log"
+							current={noteType}
+							onClick={setNoteType}
+							icon={<ClipboardList className="w-3.5 h-3.5" />}
+							label="Log"
+							color="[#8b9a6b]"
+							disabled={showOnlyActiveButton}
+						/>
+						<NoteTypeButton
+							type="achievement"
+							current={noteType}
+							onClick={setNoteType}
+							icon={<Trophy className="w-3.5 h-3.5" />}
+							label="Win"
+							color="amber-500"
+							disabled={showOnlyActiveButton}
+						/>
+						<NoteTypeButton
+							type="sidequest"
+							current={noteType}
+							onClick={setNoteType}
+							icon={<CheckCheck className="w-3.5 h-3.5" />}
+							label="Side Quest"
+							color="sky-500"
+							disabled={showOnlyActiveButton}
+						/>
 					</div>
 
-					{/* Input row — desktop toggler + input + send */}
+					{/* Desktop Note Type Toggler + Input */}
 					<div className="flex items-center gap-2">
-						{/* Desktop toggler only */}
 						<div className="hidden md:flex items-center gap-0.5 rounded-md border border-border p-1 flex-shrink-0">
-							<button
-								type="button"
-								onClick={() => setNoteType("log")}
+							<NoteTypeIconButton
+								type="log"
+								current={noteType}
+								onClick={setNoteType}
+								icon={<ClipboardList className="w-3.5 h-3.5" />}
 								title="Session log — timestamped entry"
-								className={`rounded p-1.5 transition-colors ${
-									noteType === "log"
-										? "bg-[#8b9a6b]/20 text-[#8b9a6b]"
-										: "text-muted-foreground/40 hover:text-muted-foreground"
-								}`}
-							>
-								<ClipboardList className="w-3.5 h-3.5" />
-							</button>
-							<button
-								type="button"
-								onClick={() => setNoteType("achievement")}
+								color="[#8b9a6b]"
+								disabled={showOnlyActiveButton}
+							/>
+							<NoteTypeIconButton
+								type="achievement"
+								current={noteType}
+								onClick={setNoteType}
+								icon={<Trophy className="w-3.5 h-3.5" />}
 								title="Achievement — completion reflection"
-								className={`rounded p-1.5 transition-colors ${
-									noteType === "achievement"
-										? "bg-amber-500/20 text-amber-500"
-										: "text-muted-foreground/40 hover:text-muted-foreground"
-								}`}
-							>
-								<Trophy className="w-3.5 h-3.5" />
-							</button>
-							<button
-								type="button"
-								onClick={() => setNoteType("sidequest")}
+								color="amber-500"
+								disabled={showOnlyActiveButton}
+							/>
+							<NoteTypeIconButton
+								type="sidequest"
+								current={noteType}
+								onClick={setNoteType}
+								icon={<CheckCheck className="w-3.5 h-3.5" />}
 								title="Side completion — knocked off another task"
-								className={`rounded p-1.5 transition-colors ${
-									noteType === "sidequest"
-										? "bg-sky-500/20 text-sky-500"
-										: "text-muted-foreground/40 hover:text-muted-foreground"
-								}`}
-							>
-								<CheckCheck className="w-3.5 h-3.5" />
-							</button>
+								color="sky-500"
+								disabled={showOnlyActiveButton}
+							/>
 						</div>
 
 						{noteType === "sidequest" ? (
-							<div className="flex-1 relative">
-								<input
-									type="text"
-									value={sidequestInput}
-									onChange={(e) => handleSidequestChange(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" && !sidequestSubmitting) {
-											if (sidequestMatches.length === 1) {
-												handleSidequestSubmit(
-													sidequestMatches[0].id,
-													sidequestMatches[0].text,
-												);
-											} else {
-												handleSidequestSubmit(null, sidequestInput);
-											}
-										}
-										if (e.key === "Escape") setSidequestMatches([]);
-									}}
-									placeholder="What did you knock off?"
-									disabled={sidequestSubmitting}
-									className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
-								/>
-								{sidequestMatches.length > 0 && (
-									<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
-										{sidequestMatches.map((task) => (
-											<button
-												key={task.id}
-												type="button"
-												onMouseDown={(e) => {
-													e.preventDefault();
-													handleSidequestSubmit(task.id, task.text);
-												}}
-												className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
-											>
-												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-												<span className="truncate text-foreground">
-													{task.text}
-												</span>
-											</button>
-										))}
-										{sidequestInput.trim() && (
-											<button
-												type="button"
-												onMouseDown={(e) => {
-													e.preventDefault();
-													handleSidequestSubmit(null, sidequestInput);
-												}}
-												className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left border-t border-border text-muted-foreground"
-											>
-												<CheckCheck className="w-3 h-3 flex-shrink-0" />
-												<span>Complete "{sidequestInput.trim()}" as new</span>
-											</button>
-										)}
-									</div>
-								)}
-							</div>
+							<SidequestInput
+								value={sidequestInput}
+								onChange={handleSidequestChange}
+								onSubmit={handleSidequestSubmit}
+								matches={sidequestMatches}
+								submitting={sidequestSubmitting}
+								disabled={showOnlyActiveButton}
+							/>
 						) : (
-							<div className="flex-1 relative">
-								<input
-									type="text"
-									value={noteInput}
-									onChange={(e) => setNoteInput(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") handleNoteSubmit();
-									}}
-									placeholder={
-										noteType === "log"
-											? "Log a note, hit Enter..."
-											: "What did you achieve?"
-									}
-									className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors"
-								/>
-							</div>
+							<NoteInput
+								value={noteInput}
+								onChange={setNoteInput}
+								onSubmit={handleNoteSubmit}
+								placeholder={
+									noteType === "log"
+										? "Log a note, hit Enter..."
+										: "What did you achieve?"
+								}
+								disabled={showOnlyActiveButton}
+							/>
 						)}
-						{noteType !== "sidequest" && noteInput && (
-							<button
-								type="button"
-								onClick={handleNoteSubmit}
-								className="text-muted-foreground/40 hover:text-[#8b9a6b] transition-colors"
-							>
-								<Send className="w-3 h-3" />
-							</button>
-						)}
-						{noteType === "sidequest" &&
-							sidequestInput &&
-							!sidequestSubmitting && (
-								<button
-									type="button"
-									onMouseDown={(e) => {
-										e.preventDefault();
-										handleSidequestSubmit(null, sidequestInput);
-									}}
-									className="text-muted-foreground/40 hover:text-sky-500 transition-colors"
-								>
-									<Send className="w-3 h-3" />
-								</button>
-							)}
 					</div>
 
-					{/* Mobile collapsible */}
-					<Collapsible
+					<MobileNotesList
+						entries={noteEntries}
+						editingId={editingNoteId}
+						editingText={editingNoteText}
+						onStartEdit={(id, text) => {
+							setEditingNoteId(id);
+							setEditingNoteText(text);
+						}}
+						onSaveEdit={(id, text) => {
+							if (text.trim()) {
+								setNoteEntries((prev) =>
+									prev.map((n) => (n.id === id ? { ...n, text } : n)),
+								);
+							} else {
+								setNoteEntries((prev) => prev.filter((n) => n.id !== id));
+							}
+							setEditingNoteId(null);
+							setEditingNoteText("");
+						}}
+						onCancelEdit={() => {
+							setEditingNoteId(null);
+							setEditingNoteText("");
+						}}
 						open={mobileNotesOpen}
 						onOpenChange={setMobileNotesOpen}
-						className="md:hidden -mb-2.5"
-					>
-						<CollapsibleContent
-							className={`${noteEntries.length > 2 ? "border border-border" : ""} pt-0 pb-1 px-2 rounded-[0.25rem]`}
-						>
-							<div
-								className="flex flex-col gap-0.5 overflow-y-auto max-h-[88px] mt-1.5"
-								style={{
-									scrollbarWidth: "thin",
-									scrollbarColor: "hsl(var(--border)) transparent",
-								}}
-							>
-								{[
-									...noteEntries.filter((e) => e.type === "achievement"),
-									...noteEntries.filter((e) => e.type === "sidequest"),
-									...noteEntries.filter((e) => e.type === "log"),
-								].map((entry) => {
-									const isAchievement = entry.type === "achievement";
-									const isSidequest = entry.type === "sidequest";
-									return (
-										<div
-											key={entry.id}
-											className="flex items-baseline gap-2 text-xs"
-										>
-											{/* Bullet / icon */}
-											{isAchievement ? (
-												<span className="text-amber-500 flex-shrink-0 text-[11px]">
-													🏆
-												</span>
-											) : isSidequest ? (
-												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-											) : (
-												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
-													•
-												</span>
-											)}
+					/>
 
-											{/* Timestamp — only for logs */}
-											{!isAchievement && !isSidequest && (
-												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
-													{formatTimeCompact(entry.elapsedMs)}
-												</span>
-											)}
-
-											{/* Inline edit */}
-											{editingNoteId === entry.id ? (
-												<input
-													autoFocus
-													value={editingNoteText}
-													onChange={(e) => setEditingNoteText(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") {
-															const trimmed = editingNoteText.trim();
-															if (trimmed) {
-																setNoteEntries((prev) =>
-																	prev.map((n) =>
-																		n.id === entry.id
-																			? { ...n, text: trimmed }
-																			: n,
-																	),
-																);
-															} else {
-																setNoteEntries((prev) =>
-																	prev.filter((n) => n.id !== entry.id),
-																);
-															}
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-														if (e.key === "Escape") {
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-													}}
-													onBlur={() => {
-														const trimmed = editingNoteText.trim();
-														if (trimmed) {
-															setNoteEntries((prev) =>
-																prev.map((n) =>
-																	n.id === entry.id
-																		? { ...n, text: trimmed }
-																		: n,
-																),
-															);
-														} else {
-															setNoteEntries((prev) =>
-																prev.filter((n) => n.id !== entry.id),
-															);
-														}
-														setEditingNoteId(null);
-														setEditingNoteText("");
-													}}
-													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-400"
-															: isSidequest
-																? "text-sky-400"
-																: "text-foreground"
-													}`}
-												/>
-											) : (
-												<span
-													onClick={() => {
-														setEditingNoteId(entry.id);
-														setEditingNoteText(entry.text);
-													}}
-													className={`cursor-pointer hover:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-500 dark:text-amber-400"
-															: isSidequest
-																? "text-sky-500 dark:text-sky-400"
-																: "text-foreground/70"
-													}`}
-												>
-													{entry.text}
-												</span>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						</CollapsibleContent>
-
-						{noteEntries.length > 0 && (
-							<CollapsibleTrigger className="flex items-center justify-center w-full py-1 px-2 rounded-lg hover:bg-accent transition-colors">
-								<ChevronDown
-									className={`w-5 h-5 text-muted-foreground transition-transform ${
-										mobileNotesOpen ? "rotate-180" : ""
-									}`}
-								/>
-							</CollapsibleTrigger>
-						)}
-					</Collapsible>
-
-					{/* Desktop: Note log zone */}
-					<div
-						className={`flex flex-col gap-1.5 border border-border rounded-[0.25rem] py-1 px-2 h-full max-sm:hidden`}
-					>
-						{noteEntries.length > 0 && (
-							<div
-								className="flex flex-col gap-0.5 overflow-y-auto max-h-[110px]"
-								style={{
-									scrollbarWidth: "thin",
-									scrollbarColor: "hsl(var(--border)) transparent",
-								}}
-							>
-								{[
-									...noteEntries.filter((e) => e.type === "achievement"),
-									...noteEntries.filter((e) => e.type === "sidequest"),
-									...noteEntries.filter((e) => e.type === "log"),
-								].map((entry) => {
-									const isAchievement = entry.type === "achievement";
-									const isSidequest = entry.type === "sidequest";
-									return (
-										<div
-											key={entry.id}
-											className="flex items-baseline gap-2 text-xs"
-										>
-											{/* Bullet / icon */}
-											{isAchievement ? (
-												<span className="text-amber-500 flex-shrink-0 text-[11px]">
-													🏆
-												</span>
-											) : isSidequest ? (
-												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-											) : (
-												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
-													•
-												</span>
-											)}
-
-											{/* Timestamp — only for logs */}
-											{!isAchievement && !isSidequest && (
-												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
-													{formatTimeCompact(entry.elapsedMs)}
-												</span>
-											)}
-
-											{/* Inline edit */}
-											{editingNoteId === entry.id ? (
-												<input
-													autoFocus
-													value={editingNoteText}
-													onChange={(e) => setEditingNoteText(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") {
-															const trimmed = editingNoteText.trim();
-															if (trimmed) {
-																setNoteEntries((prev) =>
-																	prev.map((n) =>
-																		n.id === entry.id
-																			? { ...n, text: trimmed }
-																			: n,
-																	),
-																);
-															} else {
-																setNoteEntries((prev) =>
-																	prev.filter((n) => n.id !== entry.id),
-																);
-															}
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-														if (e.key === "Escape") {
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-													}}
-													onBlur={() => {
-														const trimmed = editingNoteText.trim();
-														if (trimmed) {
-															setNoteEntries((prev) =>
-																prev.map((n) =>
-																	n.id === entry.id
-																		? { ...n, text: trimmed }
-																		: n,
-																),
-															);
-														} else {
-															setNoteEntries((prev) =>
-																prev.filter((n) => n.id !== entry.id),
-															);
-														}
-														setEditingNoteId(null);
-														setEditingNoteText("");
-													}}
-													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-400"
-															: isSidequest
-																? "text-sky-400"
-																: "text-foreground"
-													}`}
-												/>
-											) : (
-												<span
-													onClick={() => {
-														setEditingNoteId(entry.id);
-														setEditingNoteText(entry.text);
-													}}
-													className={`cursor-pointer hover:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-500 dark:text-amber-400"
-															: isSidequest
-																? "text-sky-500 dark:text-sky-400"
-																: "text-foreground/70"
-													}`}
-												>
-													{entry.text}
-												</span>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						)}
-					</div>
+					<DesktopNotesList
+						entries={noteEntries}
+						editingId={editingNoteId}
+						editingText={editingNoteText}
+						onStartEdit={(id, text) => {
+							setEditingNoteId(id);
+							setEditingNoteText(text);
+						}}
+						onSaveEdit={(id, text) => {
+							if (text.trim()) {
+								setNoteEntries((prev) =>
+									prev.map((n) => (n.id === id ? { ...n, text } : n)),
+								);
+							} else {
+								setNoteEntries((prev) => prev.filter((n) => n.id !== id));
+							}
+							setEditingNoteId(null);
+							setEditingNoteText("");
+						}}
+						onCancelEdit={() => {
+							setEditingNoteId(null);
+							setEditingNoteText("");
+						}}
+					/>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+// =============================================================================
+// SUB-COMPONENTS
+// =============================================================================
+
+function NoteTypeButton({
+	type,
+	current,
+	onClick,
+	icon,
+	label,
+	color,
+	disabled,
+}: {
+	type: "log" | "achievement" | "sidequest";
+	current: string;
+	onClick: (t: typeof type) => void;
+	icon: React.ReactNode;
+	label: string;
+	color: string;
+	disabled: boolean;
+}) {
+	const isActive = current === type;
+	return (
+		<button
+			type="button"
+			onClick={() => onClick(type)}
+			disabled={disabled}
+			className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+				isActive
+					? `border-${color}/40 bg-${color}/10 text-${color}`
+					: "border-border text-muted-foreground/50"
+			} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+		>
+			{icon}
+			{label}
+		</button>
+	);
+}
+
+function NoteTypeIconButton({
+	type,
+	current,
+	onClick,
+	icon,
+	title,
+	color,
+	disabled,
+}: {
+	type: "log" | "achievement" | "sidequest";
+	current: string;
+	onClick: (t: typeof type) => void;
+	icon: React.ReactNode;
+	title: string;
+	color: string;
+	disabled: boolean;
+}) {
+	const isActive = current === type;
+	return (
+		<button
+			type="button"
+			onClick={() => onClick(type)}
+			disabled={disabled}
+			title={title}
+			className={`rounded p-1.5 transition-colors ${
+				isActive
+					? `bg-${color}/20 text-${color}`
+					: "text-muted-foreground/40 hover:text-muted-foreground"
+			} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+		>
+			{icon}
+		</button>
+	);
+}
+
+function NoteInput({
+	value,
+	onChange,
+	onSubmit,
+	placeholder,
+	disabled,
+}: {
+	value: string;
+	onChange: (v: string) => void;
+	onSubmit: () => void;
+	placeholder: string;
+	disabled: boolean;
+}) {
+	return (
+		<div className="flex-1 relative flex items-center gap-2">
+			<input
+				type="text"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter") onSubmit();
+				}}
+				placeholder={placeholder}
+				disabled={disabled}
+				className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors disabled:opacity-50"
+			/>
+			{value && !disabled && (
+				<button
+					type="button"
+					onClick={onSubmit}
+					className="text-muted-foreground/40 hover:text-[#8b9a6b] transition-colors"
+				>
+					<Send className="w-3 h-3" />
+				</button>
+			)}
+		</div>
+	);
+}
+
+function SidequestInput({
+	value,
+	onChange,
+	onSubmit,
+	matches,
+	submitting,
+	disabled,
+}: {
+	value: string;
+	onChange: (v: string) => void;
+	onSubmit: (taskId: string | null, text: string) => void;
+	matches: Task[];
+	submitting: boolean;
+	disabled: boolean;
+}) {
+	return (
+		<div className="flex-1 relative flex items-center gap-2">
+			<input
+				type="text"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" && !submitting && !disabled) {
+						if (matches.length === 1) {
+							onSubmit(matches[0].id, matches[0].text);
+						} else {
+							onSubmit(null, value);
+						}
+					}
+					if (e.key === "Escape") onChange("");
+				}}
+				placeholder="What did you knock off?"
+				disabled={submitting || disabled}
+				className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground transition-colors disabled:opacity-50"
+			/>
+			{value && !submitting && !disabled && (
+				<button
+					type="button"
+					onMouseDown={(e) => {
+						e.preventDefault();
+						onSubmit(null, value);
+					}}
+					className="text-muted-foreground/40 hover:text-sky-500 transition-colors"
+				>
+					<Send className="w-3 h-3" />
+				</button>
+			)}
+
+			{matches.length > 0 && (
+				<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 w-72">
+					{matches.map((task) => (
+						<button
+							key={task.id}
+							type="button"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								onSubmit(task.id, task.text);
+							}}
+							className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+						>
+							<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+							<span className="truncate text-foreground">{task.text}</span>
+						</button>
+					))}
+					{value.trim() && (
+						<button
+							type="button"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								onSubmit(null, value);
+							}}
+							className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left border-t border-border text-muted-foreground"
+						>
+							<CheckCheck className="w-3 h-3 flex-shrink-0" />
+							<span>Complete "{value.trim()}" as new</span>
+						</button>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function MobileNotesList({
+	entries,
+	editingId,
+	editingText,
+	onStartEdit,
+	onSaveEdit,
+	onCancelEdit,
+	open,
+	onOpenChange,
+}: {
+	entries: NoteEntry[];
+	editingId: string | null;
+	editingText: string;
+	onStartEdit: (id: string, text: string) => void;
+	onSaveEdit: (id: string, text: string) => void;
+	onCancelEdit: () => void;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const sortedEntries = [
+		...entries.filter((e) => e.type === "achievement"),
+		...entries.filter((e) => e.type === "sidequest"),
+		...entries.filter((e) => e.type === "log"),
+	];
+
+	return (
+		<Collapsible
+			open={open}
+			onOpenChange={onOpenChange}
+			className="md:hidden -mb-2.5"
+		>
+			<CollapsibleContent
+				className={`${entries.length > 2 ? "border border-border" : ""} pt-0 pb-1 px-2 rounded-[0.25rem]`}
+			>
+				<NotesListContent
+					entries={sortedEntries}
+					editingId={editingId}
+					editingText={editingText}
+					onStartEdit={onStartEdit}
+					onSaveEdit={onSaveEdit}
+					onCancelEdit={onCancelEdit}
+					maxHeight="88px"
+					className="mt-1.5"
+				/>
+			</CollapsibleContent>
+
+			{entries.length > 0 && (
+				<CollapsibleTrigger className="flex items-center justify-center w-full py-1 px-2 rounded-lg hover:bg-accent transition-colors">
+					<ChevronDown
+						className={`w-5 h-5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+					/>
+				</CollapsibleTrigger>
+			)}
+		</Collapsible>
+	);
+}
+
+function DesktopNotesList({
+	entries,
+	editingId,
+	editingText,
+	onStartEdit,
+	onSaveEdit,
+	onCancelEdit,
+}: {
+	entries: NoteEntry[];
+	editingId: string | null;
+	editingText: string;
+	onStartEdit: (id: string, text: string) => void;
+	onSaveEdit: (id: string, text: string) => void;
+	onCancelEdit: () => void;
+}) {
+	const sortedEntries = [
+		...entries.filter((e) => e.type === "achievement"),
+		...entries.filter((e) => e.type === "sidequest"),
+		...entries.filter((e) => e.type === "log"),
+	];
+
+	return (
+		<div className="flex flex-col gap-1.5 border border-border rounded-[0.25rem] py-1 px-2 h-full max-sm:hidden min-h-[40px]">
+			<NotesListContent
+				entries={sortedEntries}
+				editingId={editingId}
+				editingText={editingText}
+				onStartEdit={onStartEdit}
+				onSaveEdit={onSaveEdit}
+				onCancelEdit={onCancelEdit}
+				maxHeight="110px"
+			/>
+		</div>
+	);
+}
+
+function NotesListContent({
+	entries,
+	editingId,
+	editingText,
+	onStartEdit,
+	onSaveEdit,
+	onCancelEdit,
+	maxHeight,
+	className = "",
+}: {
+	entries: NoteEntry[];
+	editingId: string | null;
+	editingText: string;
+	onStartEdit: (id: string, text: string) => void;
+	onSaveEdit: (id: string, text: string) => void;
+	onCancelEdit: () => void;
+	maxHeight: string;
+	className?: string;
+}) {
+	if (entries.length === 0) {
+		return (
+			<div className="text-xs text-muted-foreground/30 italic px-1">
+				No notes yet...
+			</div>
+		);
+	}
+
+	return (
+		<div
+			className={`flex flex-col gap-0.5 overflow-y-auto ${className}`}
+			style={{
+				maxHeight,
+				scrollbarWidth: "thin",
+				scrollbarColor: "hsl(var(--border)) transparent",
+			}}
+		>
+			{entries.map((entry) => {
+				const isAchievement = entry.type === "achievement";
+				const isSidequest = entry.type === "sidequest";
+				const isEditing = editingId === entry.id;
+
+				return (
+					<div
+						key={entry.id}
+						className="flex items-baseline gap-2 text-xs group"
+					>
+						{isAchievement ? (
+							<span className="text-amber-500 flex-shrink-0 text-[11px]">
+								🏆
+							</span>
+						) : isSidequest ? (
+							<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
+						) : (
+							<span className="text-[#8b9a6b] font-mono flex-shrink-0">•</span>
+						)}
+
+						{!isAchievement && !isSidequest && (
+							<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
+								{formatTimeCompact(entry.elapsedMs)}
+							</span>
+						)}
+
+						{isEditing ? (
+							<input
+								autoFocus
+								value={editingText}
+								onChange={(e) => onStartEdit(entry.id, e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") onSaveEdit(entry.id, editingText);
+									if (e.key === "Escape") onCancelEdit();
+								}}
+								onBlur={() => onSaveEdit(entry.id, editingText)}
+								className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
+									isAchievement
+										? "text-amber-400"
+										: isSidequest
+											? "text-sky-400"
+											: "text-foreground"
+								}`}
+							/>
+						) : (
+							<span
+								onClick={() => onStartEdit(entry.id, entry.text)}
+								className={`cursor-pointer hover:text-foreground transition-colors flex-1 ${
+									isAchievement
+										? "text-amber-500 dark:text-amber-400"
+										: isSidequest
+											? "text-sky-500 dark:text-sky-400"
+											: "text-foreground/70"
+								}`}
+							>
+								{entry.text}
+							</span>
+						)}
+					</div>
+				);
+			})}
 		</div>
 	);
 }

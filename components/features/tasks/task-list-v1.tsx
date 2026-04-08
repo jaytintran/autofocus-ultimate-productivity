@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect, memo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
 	GripVertical,
 	Play,
@@ -17,10 +17,12 @@ import {
 	getTaskAge,
 	formatDueDateVerbose,
 } from "@/lib/utils/time-utils";
+
 import {
 	formatDueDate,
 	parseDueDateShortcut,
 } from "@/lib/utils/due-date-parser";
+
 import {
 	Dialog,
 	DialogContent,
@@ -43,8 +45,10 @@ import {
 	verticalListSortingStrategy,
 	arrayMove,
 } from "@dnd-kit/sortable";
+
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { TagPicker } from "@/components/shared/tag-picker";
 import { TagPill } from "@/components/shared/tag-pill";
 import { TagFilter } from "@/components/shared/tag-filter";
 import { updateTaskTag } from "@/lib/db/store-v1";
@@ -53,9 +57,205 @@ import { TaskContextMenu } from "@/components/features/tasks/task-context-menu";
 import { useLongPress } from "@/hooks/ui/use-long-press";
 import { DueDatePicker } from "@/components/shared/due-date-picker";
 
-// =============================================================================
-// TYPES
-// =============================================================================
+function useIsMobile() {
+	const [isMobile, setIsMobile] = useState(false);
+	useEffect(() => {
+		const check = () => setIsMobile(window.innerWidth < 768);
+		check();
+		window.addEventListener("resize", check);
+		return () => window.removeEventListener("resize", check);
+	}, []);
+	return isMobile;
+}
+
+function useSwipeReveal(isFirst: boolean, isLast: boolean) {
+	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
+		null,
+	);
+	const [committedOffset, setCommittedOffset] = useState(0); // final snapped position
+
+	const startXRef = useRef<number | null>(null);
+	const startYRef = useRef<number | null>(null);
+	const isEdgeSwipeRef = useRef(false);
+	const currentOffsetRef = useRef(0); // ← live offset (smooth)
+	const slidingRef = useRef<HTMLDivElement | null>(null); // we'll attach this later
+
+	const LEFT_TRAY_WIDTH = isFirst ? 96 : 144;
+	const RIGHT_TRAY_WIDTH = isLast ? 96 : 144;
+	const EDGE_THRESHOLD = 180; // feel free to tune
+
+	// Live smooth dragging using direct style update
+	const updateLivePosition = useCallback((offset: number) => {
+		currentOffsetRef.current = offset;
+		if (slidingRef.current) {
+			slidingRef.current.style.transform = `translateX(${offset}px)`;
+			slidingRef.current.style.transition = "none"; // no transition while dragging
+		}
+	}, []);
+
+	const onTouchStart = useCallback(
+		(e: React.TouchEvent) => {
+			const touch = e.touches[0];
+			const rect = e.currentTarget.getBoundingClientRect();
+
+			const touchXRelative = touch.clientX - rect.left;
+
+			isEdgeSwipeRef.current =
+				touchXRelative < EDGE_THRESHOLD ||
+				touchXRelative > rect.width - EDGE_THRESHOLD;
+
+			if (!isEdgeSwipeRef.current) {
+				startXRef.current = null;
+				startYRef.current = null;
+				return;
+			}
+
+			startXRef.current = touch.clientX;
+			startYRef.current = touch.clientY;
+
+			// Reset to committed position
+			currentOffsetRef.current = committedOffset;
+			updateLivePosition(committedOffset);
+		},
+		[committedOffset, updateLivePosition],
+	);
+
+	const onTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			if (
+				!isEdgeSwipeRef.current ||
+				startXRef.current === null ||
+				startYRef.current === null
+			) {
+				return;
+			}
+
+			const diffX = startXRef.current - e.touches[0].clientX;
+			const diffY = Math.abs(startYRef.current - e.touches[0].clientY);
+
+			// Strong directional lock
+			if (Math.abs(diffX) < diffY + 15) return;
+
+			let newOffset = -diffX;
+
+			// Clamp to tray widths
+			if (swipeDirection === "left" || (!swipeDirection && newOffset < 0)) {
+				newOffset = Math.max(-LEFT_TRAY_WIDTH, Math.min(0, newOffset));
+			} else if (
+				swipeDirection === "right" ||
+				(!swipeDirection && newOffset > 0)
+			) {
+				newOffset = Math.min(RIGHT_TRAY_WIDTH, Math.max(0, newOffset));
+			}
+
+			updateLivePosition(newOffset);
+		},
+		[swipeDirection, LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH, updateLivePosition],
+	);
+
+	const onTouchEnd = useCallback(
+		(e: React.TouchEvent) => {
+			if (!isEdgeSwipeRef.current || startXRef.current === null) {
+				isEdgeSwipeRef.current = false;
+				return;
+			}
+
+			const diffX = startXRef.current - e.changedTouches[0].clientX;
+			const diffY = Math.abs(startYRef.current! - e.changedTouches[0].clientY);
+
+			const isMostlyHorizontal = Math.abs(diffX) > diffY + 25;
+
+			let finalDirection: "left" | "right" | null = null;
+			let finalOffset = 0;
+
+			if (isMostlyHorizontal) {
+				if (diffX > 55) {
+					finalDirection = "left";
+					finalOffset = -LEFT_TRAY_WIDTH;
+				} else if (diffX < -55) {
+					finalDirection = "right";
+					finalOffset = RIGHT_TRAY_WIDTH;
+				}
+			}
+
+			// Snap with smooth transition
+			setSwipeDirection(finalDirection);
+			setCommittedOffset(finalOffset);
+
+			// Let React control the final snap
+			if (slidingRef.current) {
+				slidingRef.current.style.transition =
+					"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
+				slidingRef.current.style.transform = `translateX(${finalOffset}px)`;
+			}
+
+			startXRef.current = null;
+			startYRef.current = null;
+			isEdgeSwipeRef.current = false;
+		},
+		[LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH],
+	);
+
+	const close = useCallback(() => {
+		setSwipeDirection(null);
+		setCommittedOffset(0);
+		if (slidingRef.current) {
+			slidingRef.current.style.transition =
+				"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
+			slidingRef.current.style.transform = "translateX(0px)";
+		}
+	}, []);
+
+	// Expose the ref so the sliding div can attach itself
+	const registerSlidingElement = useCallback(
+		(el: HTMLDivElement | null) => {
+			slidingRef.current = el;
+			// Initialize position
+			if (el) {
+				el.style.transform = `translateX(${committedOffset}px)`;
+			}
+		},
+		[committedOffset],
+	);
+
+	return {
+		swipedLeft: swipeDirection === "left",
+		swipedRight: swipeDirection === "right",
+		dragOffset: committedOffset, // still return for compatibility
+		isDragging: startXRef.current !== null,
+		onTouchStart,
+		onTouchMove,
+		onTouchEnd,
+		close,
+		registerSlidingElement, // ← NEW: important!
+	};
+}
+
+function playCompletionSound() {
+	try {
+		const ctx = new AudioContext();
+		const oscillator = ctx.createOscillator();
+		const gain = ctx.createGain();
+
+		oscillator.connect(gain);
+		gain.connect(ctx.destination);
+
+		oscillator.type = "sine";
+		oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+		oscillator.frequency.exponentialRampToValueAtTime(
+			1200,
+			ctx.currentTime + 0.1,
+		);
+
+		gain.gain.setValueAtTime(0.15, ctx.currentTime);
+		gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+		oscillator.start(ctx.currentTime);
+		oscillator.stop(ctx.currentTime + 0.3);
+	} catch {
+		// Silently fail if AudioContext is unavailable
+	}
+}
 
 interface TaskListProps {
 	tasks: Task[];
@@ -85,6 +285,8 @@ interface TaskListProps {
 	onMoveTask: (taskId: string, toPamphletId: string) => void;
 	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
 }
+
+const FALLBACK_TASK_ROW_HEIGHT = 48;
 
 interface TaskRowProps {
 	task: Task;
@@ -117,213 +319,14 @@ interface TaskRowProps {
 	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
 }
 
-// =============================================================================
-// HELPERS
-// =============================================================================
+const DUE_DATE_URGENCY_CLASSES: Record<string, string> = {
+	overdue: "border-red-500/40 bg-red-500/10 text-red-500",
+	soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+	normal: "border-muted-foreground/30 bg-muted/50 text-muted-foreground",
+	far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
+};
 
-/** Detect mobile viewport for conditional swipe/behavior */
-function useIsMobile() {
-	const [isMobile, setIsMobile] = useState(false);
-	useEffect(() => {
-		const check = () => setIsMobile(window.innerWidth < 768);
-		check();
-		window.addEventListener("resize", check);
-		return () => window.removeEventListener("resize", check);
-	}, []);
-	return isMobile;
-}
-
-/** Play a subtle completion sound effect */
-function playCompletionSound() {
-	try {
-		const ctx = new AudioContext();
-		const oscillator = ctx.createOscillator();
-		const gain = ctx.createGain();
-
-		oscillator.connect(gain);
-		gain.connect(ctx.destination);
-
-		oscillator.type = "sine";
-		oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-		oscillator.frequency.exponentialRampToValueAtTime(
-			1200,
-			ctx.currentTime + 0.1,
-		);
-
-		gain.gain.setValueAtTime(0.15, ctx.currentTime);
-		gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-
-		oscillator.start(ctx.currentTime);
-		oscillator.stop(ctx.currentTime + 0.3);
-	} catch {
-		// Silently fail if AudioContext is unavailable
-	}
-}
-
-// =============================================================================
-// SWIPE REVEAL HOOK
-// =============================================================================
-
-/**
- * Manages swipe-to-reveal action trays on mobile.
- * Uses direct DOM manipulation for 60fps performance during drag,
- * with React state sync for snap animations.
- */
-function useSwipeReveal(isFirst: boolean, isLast: boolean) {
-	const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(
-		null,
-	);
-	const [committedOffset, setCommittedOffset] = useState(0);
-	const startXRef = useRef<number | null>(null);
-	const startYRef = useRef<number | null>(null);
-	const isEdgeSwipeRef = useRef(false);
-	const slidingRef = useRef<HTMLDivElement | null>(null);
-
-	const LEFT_TRAY_WIDTH = isFirst ? 96 : 144;
-	const RIGHT_TRAY_WIDTH = isLast ? 96 : 144;
-	const EDGE_THRESHOLD = 180;
-
-	/** Update transform directly for smooth 60fps dragging */
-	const updateLivePosition = useCallback((offset: number) => {
-		if (slidingRef.current) {
-			slidingRef.current.style.transform = `translateX(${offset}px)`;
-			slidingRef.current.style.transition = "none";
-		}
-	}, []);
-
-	const onTouchStart = useCallback(
-		(e: React.TouchEvent) => {
-			const touch = e.touches[0];
-			const rect = e.currentTarget.getBoundingClientRect();
-			const touchXRelative = touch.clientX - rect.left;
-
-			isEdgeSwipeRef.current =
-				touchXRelative < EDGE_THRESHOLD ||
-				touchXRelative > rect.width - EDGE_THRESHOLD;
-
-			if (!isEdgeSwipeRef.current) {
-				startXRef.current = null;
-				startYRef.current = null;
-				return;
-			}
-
-			startXRef.current = touch.clientX;
-			startYRef.current = touch.clientY;
-			updateLivePosition(committedOffset);
-		},
-		[committedOffset, updateLivePosition],
-	);
-
-	const onTouchMove = useCallback(
-		(e: React.TouchEvent) => {
-			if (
-				!isEdgeSwipeRef.current ||
-				startXRef.current === null ||
-				startYRef.current === null
-			) {
-				return;
-			}
-
-			const diffX = startXRef.current - e.touches[0].clientX;
-			const diffY = Math.abs(startYRef.current - e.touches[0].clientY);
-
-			if (Math.abs(diffX) < diffY + 15) return;
-
-			let newOffset = -diffX;
-
-			if (swipeDirection === "left" || (!swipeDirection && newOffset < 0)) {
-				newOffset = Math.max(-LEFT_TRAY_WIDTH, Math.min(0, newOffset));
-			} else if (
-				swipeDirection === "right" ||
-				(!swipeDirection && newOffset > 0)
-			) {
-				newOffset = Math.min(RIGHT_TRAY_WIDTH, Math.max(0, newOffset));
-			}
-
-			updateLivePosition(newOffset);
-		},
-		[swipeDirection, LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH, updateLivePosition],
-	);
-
-	const onTouchEnd = useCallback(
-		(e: React.TouchEvent) => {
-			if (!isEdgeSwipeRef.current || startXRef.current === null) {
-				isEdgeSwipeRef.current = false;
-				return;
-			}
-
-			const diffX = startXRef.current - e.changedTouches[0].clientX;
-			const diffY = Math.abs(startYRef.current! - e.changedTouches[0].clientY);
-			const isMostlyHorizontal = Math.abs(diffX) > diffY + 25;
-
-			let finalDirection: "left" | "right" | null = null;
-			let finalOffset = 0;
-
-			if (isMostlyHorizontal) {
-				if (diffX > 55) {
-					finalDirection = "left";
-					finalOffset = -LEFT_TRAY_WIDTH;
-				} else if (diffX < -55) {
-					finalDirection = "right";
-					finalOffset = RIGHT_TRAY_WIDTH;
-				}
-			}
-
-			setSwipeDirection(finalDirection);
-			setCommittedOffset(finalOffset);
-
-			if (slidingRef.current) {
-				slidingRef.current.style.transition =
-					"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
-				slidingRef.current.style.transform = `translateX(${finalOffset}px)`;
-			}
-
-			startXRef.current = null;
-			startYRef.current = null;
-			isEdgeSwipeRef.current = false;
-		},
-		[LEFT_TRAY_WIDTH, RIGHT_TRAY_WIDTH],
-	);
-
-	const close = useCallback(() => {
-		setSwipeDirection(null);
-		setCommittedOffset(0);
-		if (slidingRef.current) {
-			slidingRef.current.style.transition =
-				"transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
-			slidingRef.current.style.transform = "translateX(0px)";
-		}
-	}, []);
-
-	const registerSlidingElement = useCallback((el: HTMLDivElement | null) => {
-		slidingRef.current = el;
-		if (el) {
-			el.style.transform = "translateX(0px)";
-		}
-	}, []);
-
-	return {
-		swipedLeft: swipeDirection === "left",
-		swipedRight: swipeDirection === "right",
-		dragOffset: committedOffset,
-		isDragging: startXRef.current !== null,
-		onTouchStart,
-		onTouchMove,
-		onTouchEnd,
-		close,
-		registerSlidingElement,
-	};
-}
-
-// =============================================================================
-// TASK ROW COMPONENT (MEMOIZED)
-// =============================================================================
-
-/**
- * Individual task row with inline editing, swipe actions, and context menu.
- * Memoized to prevent re-render when other rows change state.
- */
-const TaskRow = memo(function TaskRow({
+function TaskRow({
 	task,
 	isWorking,
 	workingTask,
@@ -359,11 +362,13 @@ const TaskRow = memo(function TaskRow({
 
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const reenterButtonRef = useRef<HTMLButtonElement>(null);
-	const isMobile = useIsMobile();
 
+	const isMobile = useIsMobile();
 	const {
 		swipedLeft,
 		swipedRight,
+		dragOffset,
+		isDragging: isSwipeDragging,
 		onTouchStart,
 		onTouchMove,
 		onTouchEnd,
@@ -389,12 +394,10 @@ const TaskRow = memo(function TaskRow({
 		opacity: isDragging ? 0.5 : 1,
 	};
 
-	// Sync edit text when task changes externally
 	useEffect(() => {
 		setEditText(task.text);
 	}, [task.text]);
 
-	// Auto-focus and select when entering edit mode
 	useEffect(() => {
 		if (isEditing && inputRef.current) {
 			inputRef.current.focus();
@@ -402,7 +405,12 @@ const TaskRow = memo(function TaskRow({
 		}
 	}, [isEditing]);
 
-	// Auto-resize textarea
+	useEffect(() => {
+		if (showSwitchConfirm) {
+			reenterButtonRef.current?.focus();
+		}
+	}, [showSwitchConfirm]);
+
 	useEffect(() => {
 		if (isEditing && inputRef.current) {
 			inputRef.current.style.height = "auto";
@@ -410,24 +418,14 @@ const TaskRow = memo(function TaskRow({
 		}
 	}, [isEditing, editText]);
 
-	// Focus reenter button when switch dialog opens
-	useEffect(() => {
-		if (showSwitchConfirm) {
-			reenterButtonRef.current?.focus();
-		}
-	}, [showSwitchConfirm]);
+	const handleTextClick = (e: React.MouseEvent) => {
+		if (isWorking) return;
+		e.stopPropagation();
+		setEditText(task.text);
+		setIsEditing(true);
+	};
 
-	const handleTextClick = useCallback(
-		(e: React.MouseEvent) => {
-			if (isWorking) return;
-			e.stopPropagation();
-			setEditText(task.text);
-			setIsEditing(true);
-		},
-		[isWorking, task.text],
-	);
-
-	const handleSave = useCallback(() => {
+	const handleSave = () => {
 		const trimmed = editText.trim();
 		if (!trimmed) {
 			setIsEditing(false);
@@ -443,63 +441,56 @@ const TaskRow = memo(function TaskRow({
 			);
 		}
 		setIsEditing(false);
-	}, [editText, task.id, task.text, onUpdateText]);
+	};
 
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
-			if (e.key === "Enter" && !e.shiftKey) {
-				e.preventDefault();
-				handleSave();
-			} else if (e.key === "Escape") {
-				setEditText(task.text);
-				setIsEditing(false);
-			}
-		},
-		[handleSave, task.text],
-	);
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			handleSave();
+		} else if (e.key === "Escape") {
+			setEditText(task.text);
+			setIsEditing(false);
+		}
+	};
 
-	const handleDeleteClick = useCallback(
-		(e: React.MouseEvent) => {
-			e.stopPropagation();
-			if (showDeleteConfirm) {
-				onDelete(task.id);
-				setShowDeleteConfirm(false);
-			} else {
-				setShowDeleteConfirm(true);
-				setTimeout(() => setShowDeleteConfirm(false), 3000);
-			}
-		},
-		[showDeleteConfirm, task.id, onDelete],
-	);
+	const handleDeleteClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (showDeleteConfirm) {
+			onDelete(task.id);
+			setShowDeleteConfirm(false);
+		} else {
+			setShowDeleteConfirm(true);
+			setTimeout(() => setShowDeleteConfirm(false), 3000);
+		}
+	};
 
-	const handleStartClick = useCallback(
-		(e: React.MouseEvent) => {
-			e.stopPropagation();
-			if (workingTask && workingTask.id !== task.id) {
-				setPendingTask(task);
-				setShowSwitchConfirm(true);
-			} else {
-				onStart(task);
-			}
-		},
-		[workingTask, task, onStart],
-	);
+	const handleStartClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (workingTask && workingTask.id !== task.id) {
+			setPendingTask(task);
+			setShowSwitchConfirm(true);
+		} else {
+			onStart(task);
+		}
+	};
 
-	const handleSwitchComplete = useCallback(async () => {
+	const handleSwitchComplete = async () => {
 		setShowSwitchConfirm(false);
 		if (pendingTask) {
 			await onSwitchTask(pendingTask, "complete");
 			setPendingTask(null);
 		}
-	}, [pendingTask, onSwitchTask]);
+	};
 
-	const handleSwitchReenter = useCallback(async () => {
+	const handleSwitchReenter = async () => {
 		setShowSwitchConfirm(false);
 		if (pendingTask) {
 			await onSwitchTask(pendingTask, "reenter");
 			setPendingTask(null);
 		}
-	}, [pendingTask, onSwitchTask]);
+	};
+
+	const shouldDisableSwipe = disableSwipe || isWorking; // safety: also disable if isWorking
 
 	const handleContextMenu = useCallback((e: React.MouseEvent) => {
 		e.preventDefault();
@@ -520,20 +511,6 @@ const TaskRow = memo(function TaskRow({
 		delay: 1000,
 	});
 
-	const shouldDisableSwipe = disableSwipe || isWorking;
-
-	// Due date urgency styling
-	const dueDateClasses = useMemo(() => {
-		if (!task.due_date) return "";
-		const { urgency } = formatDueDate(task.due_date);
-		return {
-			overdue: "border-red-500/40 bg-red-500/10 text-red-500",
-			soon: "border-amber-500/40 bg-amber-500/10 text-amber-500",
-			normal: "border-muted-foreground/30 bg-muted/50 text-muted-foreground",
-			far: "border-muted-foreground/20 bg-transparent text-muted-foreground/50",
-		}[urgency];
-	}, [task.due_date]);
-
 	return (
 		<>
 			<li
@@ -541,11 +518,11 @@ const TaskRow = memo(function TaskRow({
 				style={style}
 				data-task-id={task.id}
 				className={`
-					group relative flex select-none
-					${isWorking ? "bg-[#8b9a6b]/5 ring-1 ring-inset ring-[#8b9a6b]/30" : ""}
-					${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
-					transition-colors overflow-hidden
-				`}
+                group relative flex select-none
+                ${isWorking ? "bg-[#8b9a6b]/5 ring-1 ring-inset ring-[#8b9a6b]/30" : ""}
+                ${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
+                transition-colors overflow-hidden
+            `}
 				onContextMenu={handleContextMenu}
 				onTouchStart={(e) => {
 					lpStart(e);
@@ -560,11 +537,32 @@ const TaskRow = memo(function TaskRow({
 					if (isMobile && !shouldDisableSwipe) onTouchEnd(e);
 				}}
 			>
-				{/* Sliding content wrapper */}
+				{/* Sliding wrapper — this moves left to reveal buttons behind it */}
+				{/* <div
+					className="relative flex items-center gap-2 px-3 py-2.5 w-full bg-background"
+					style={{
+						transform: isMobile ? `translateX(${dragOffset}px)` : undefined,
+						// Only use CSS transition when finger is lifted (snapping), not while dragging
+						transition: isSwipeDragging ? "none" : "transform 120ms ease-out",
+						zIndex: 1,
+					}}
+					onTouchEnd={
+						isMobile && (swipedLeft || swipedRight)
+							? (e) => {
+									if (e.cancelable) e.preventDefault();
+									e.stopPropagation();
+									close();
+								}
+							: undefined
+					}
+				> */}
 				<div
-					ref={registerSlidingElement}
+					ref={registerSlidingElement} // ← ADD THIS
 					className="relative flex items-center gap-2 px-3 py-2.5 w-full bg-background touch-pan-y"
-					style={{ zIndex: 1 }}
+					style={{
+						// We no longer need inline transform — the hook manages it directly
+						zIndex: 1,
+					}}
 					onTouchEnd={
 						isMobile && (swipedLeft || swipedRight)
 							? (e) => {
@@ -588,12 +586,12 @@ const TaskRow = memo(function TaskRow({
 						</button>
 					)}
 
-					{/* Task text / Edit input */}
+					{/* Task text */}
 					<div className="flex-1 min-w-0 flex items-center gap-2">
 						{isEditing ? (
 							<div className="flex-1 flex items-center gap-2 min-w-0">
 								<textarea
-									ref={inputRef}
+									ref={inputRef as React.RefObject<HTMLTextAreaElement>}
 									value={editText}
 									onChange={(e) => setEditText(e.target.value)}
 									onBlur={handleSave}
@@ -623,14 +621,13 @@ const TaskRow = memo(function TaskRow({
 
 					{/* Right side badges */}
 					<div className="flex items-center gap-1.5 shrink-0">
-						{/* Re-entered badge */}
+						{/* RE-ENTERED BADGE */}
 						{task.re_entered_from && !isEditing && (
 							<span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
 								<RefreshCw className="w-2.5 h-2.5" />
 							</span>
 						)}
-
-						{/* Due date badge */}
+						{/* DUE DATE BADEGE */}
 						{!isEditing && !isWorking && (
 							<div className="relative flex-shrink-0 max-sm:hidden">
 								<button
@@ -638,11 +635,14 @@ const TaskRow = memo(function TaskRow({
 										e.stopPropagation();
 										setDueDatePickerOpen((prev) => !prev);
 									}}
-									className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
-										task.due_date
-											? dueDateClasses
-											: "border-dashed border-muted-foreground/20 text-muted-foreground/30 hover:border-muted-foreground/50 hover:text-muted-foreground/60"
-									}`}
+									className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors flex-shrink-0
+       									 ${
+														task.due_date
+															? DUE_DATE_URGENCY_CLASSES[
+																	formatDueDate(task.due_date).urgency
+																]
+															: "border-dashed border-muted-foreground/20 text-muted-foreground/30 hover:border-muted-foreground/50 hover:text-muted-foreground/60"
+													}`}
 									title={
 										task.due_date
 											? formatDueDateVerbose(task.due_date)
@@ -650,12 +650,13 @@ const TaskRow = memo(function TaskRow({
 									}
 								>
 									{task.due_date ? (
-										formatDueDate(task.due_date).label
+										`${formatDueDate(task.due_date).label}`
 									) : (
 										<ClockAlert className="w-3 h-3" />
 									)}
 								</button>
 
+								{/* Due date picker popup — reuses the same component as TimerBar */}
 								{dueDatePickerOpen && (
 									<DueDatePicker
 										currentDueDate={task.due_date}
@@ -669,14 +670,14 @@ const TaskRow = memo(function TaskRow({
 							</div>
 						)}
 
-						{/* Time logged badge */}
+						{/* TOTAL TIME LOGGED BADGE */}
 						{task.total_time_ms > 0 && !isEditing && (
 							<span className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
 								{formatTimeCompact(task.total_time_ms)}
 							</span>
 						)}
 
-						{/* Age badge */}
+						{/* TASK AGE BADGE */}
 						{!isEditing && (
 							<div className="flex items-center justify-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-transparent text-muted-foreground/50 flex-shrink-0">
 								<History className="w-3 h-3" />
@@ -684,14 +685,14 @@ const TaskRow = memo(function TaskRow({
 							</div>
 						)}
 
-						{/* Tag pill */}
+						{/* TAG PILL BADGE */}
 						<TagPill
 							tagId={task.tag}
 							onSelectTag={(tag) => !disabled && onUpdateTag(task.id, tag)}
 							disabled={disabled || isEditing || isWorking}
 						/>
 
-						{/* Desktop action buttons */}
+						{/* DESKTOP BADGES */}
 						{!isMobile && !isWorking && !isEditing && (
 							<div className="flex items-center gap-1 flex-shrink-0">
 								<button
@@ -701,7 +702,13 @@ const TaskRow = memo(function TaskRow({
 								>
 									<Play className="w-3.5 h-3.5 text-[#8b9a6b]" />
 								</button>
+								{/* <TagPicker
+									currentTag={task.tag}
+									onSelectTag={(tag) => onUpdateTag(task.id, tag)}
+									disabled={disabled}
+								/> */}
 
+								{/* PUMP BUTTON */}
 								{!isFirst && (
 									<button
 										onClick={(e) => {
@@ -727,6 +734,7 @@ const TaskRow = memo(function TaskRow({
 									</button>
 								)}
 
+								{/* SINK BUTTON */}
 								{!isLast && (
 									<button
 										onClick={(e) => {
@@ -751,7 +759,6 @@ const TaskRow = memo(function TaskRow({
 										</svg>
 									</button>
 								)}
-
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
@@ -762,7 +769,6 @@ const TaskRow = memo(function TaskRow({
 								>
 									<Check className="w-3.5 h-3.5 text-[#8b9a6b]" />
 								</button>
-
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
@@ -773,7 +779,6 @@ const TaskRow = memo(function TaskRow({
 								>
 									<RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
 								</button>
-
 								{showDeleteConfirm ? (
 									<button
 										onClick={handleDeleteClick}
@@ -795,7 +800,8 @@ const TaskRow = memo(function TaskRow({
 					</div>
 				</div>
 
-				{/* Mobile left tray (swipe left to reveal: re-enter, pump, delete) */}
+				{/* Mobile action buttons — rendered BEHIND the sliding content, fixed to right edge */}
+				{/* Mobile LEFT tray — re-enter, tag, delete (swipe left to reveal) */}
 				{isMobile && !isWorking && !isEditing && (
 					<div
 						className="absolute right-0 top-0 h-full flex items-stretch"
@@ -862,7 +868,7 @@ const TaskRow = memo(function TaskRow({
 					</div>
 				)}
 
-				{/* Mobile right tray (swipe right to reveal: start, complete, sink) */}
+				{/* Mobile RIGHT tray — start, complete (swipe right to reveal) */}
 				{isMobile && !isWorking && !isEditing && (
 					<div
 						className="absolute left-0 top-0 h-full flex items-stretch"
@@ -879,7 +885,6 @@ const TaskRow = memo(function TaskRow({
 						>
 							<Play className="w-4 h-4 text-white" />
 						</button>
-
 						<button
 							onTouchEnd={(e) => {
 								if (e.cancelable) e.preventDefault();
@@ -891,7 +896,7 @@ const TaskRow = memo(function TaskRow({
 						>
 							<Check className="w-4 h-4 text-white" />
 						</button>
-
+						{/* SINK BUTTON */}
 						{!isLast && (
 							<button
 								onTouchEnd={(e) => {
@@ -983,17 +988,8 @@ const TaskRow = memo(function TaskRow({
 			</Dialog>
 		</>
 	);
-});
+}
 
-// =============================================================================
-// MAIN TASK LIST COMPONENT
-// =============================================================================
-
-/**
- * Virtualized task list with drag-drop reordering, filtering, and optimistic UI.
- * Optimized to minimize re-renders: TaskRow is memoized, callbacks are stable,
- * and loading states are tracked per-task without triggering parent re-renders.
- */
 export function TaskList({
 	tasks,
 	allTasks,
@@ -1019,40 +1015,42 @@ export function TaskList({
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
+	// const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null); (Old)
+
 	const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
+	const [localTasks, setLocalTasks] = useState(tasks);
 
-	// Stable loading state helpers
-	const addLoading = useCallback((id: string) => {
-		setLoadingTaskIds((prev) => {
-			if (prev.has(id)) return prev;
-			const next = new Set(prev);
-			next.add(id);
-			return next;
-		});
-	}, []);
+	useEffect(() => {
+		setLocalTasks(tasks);
+	}, [tasks]);
 
-	const removeLoading = useCallback((id: string) => {
+	const addLoading = (id: string) =>
+		setLoadingTaskIds((prev) => new Set(prev).add(id));
+
+	const removeLoading = (id: string) =>
 		setLoadingTaskIds((prev) => {
-			if (!prev.has(id)) return prev;
 			const next = new Set(prev);
 			next.delete(id);
 			return next;
 		});
-	}, []);
 
-	// DnD sensors with reduced delay for snappier feel
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
-			activationConstraint: { distance: 5 },
+			activationConstraint: {
+				distance: 5,
+			},
 		}),
 		useSensor(TouchSensor, {
-			activationConstraint: { delay: 100, tolerance: 5 }, // Reduced from 150ms
+			activationConstraint: {
+				delay: 150,
+				tolerance: 5,
+			},
 		}),
 	);
 
-	// Memoized filtered tasks - only recalculates when dependencies actually change
+	// Filter tasks by selected tags
 	const filteredTasks = useMemo(() => {
-		if (selectedTags.size === 0) return tasks;
+		if (selectedTags.size === 0) return localTasks;
 
 		return tasks.filter((task) => {
 			if (selectedTags.has("none")) {
@@ -1060,9 +1058,8 @@ export function TaskList({
 			}
 			return task.tag && selectedTags.has(task.tag);
 		});
-	}, [tasks, selectedTags]); // Removed localTasks dependency
+	}, [localTasks, selectedTags]);
 
-	// Stable callback creators using useCallback
 	const handleUpdateTag = useCallback(
 		async (taskId: string, tag: TagId | null) => {
 			if (loadingTaskIds.has(taskId)) return;
@@ -1074,7 +1071,7 @@ export function TaskList({
 				removeLoading(taskId);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onRefresh],
+		[loadingTaskIds, onRefresh],
 	);
 
 	const handlePumpTask = useCallback(
@@ -1087,7 +1084,7 @@ export function TaskList({
 				removeLoading(taskId);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onPumpTask],
+		[loadingTaskIds, onPumpTask],
 	);
 
 	const handleSinkTask = useCallback(
@@ -1100,7 +1097,7 @@ export function TaskList({
 				removeLoading(taskId);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onSinkTask],
+		[loadingTaskIds, onSinkTask],
 	);
 
 	const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -1123,11 +1120,12 @@ export function TaskList({
 		[onReorderTasks],
 	);
 
-	// Optimistic due date update - updates UI immediately, syncs in background
 	const handleUpdateDueDate = useCallback(
 		async (taskId: string, dueDate: string | null) => {
-			// Optimistic update could go here if parent supports it
-			// For now, just pass through with error handling
+			// Optimistically update local state so the badge changes instantly
+			setLocalTasks((prev) =>
+				prev.map((t) => (t.id === taskId ? { ...t, due_date: dueDate } : t)),
+			);
 			try {
 				await onUpdateDueDate(taskId, dueDate);
 			} catch (error) {
@@ -1138,21 +1136,11 @@ export function TaskList({
 		[onUpdateDueDate, onRefresh],
 	);
 
-	// Memoized derived values
-	const activeTask = useMemo(
-		() => (activeId ? allTasks.find((t) => t.id === activeId) : null),
-		[activeId, allTasks],
-	);
+	const activeTask = activeId ? allTasks.find((t) => t.id === activeId) : null;
+	const workingTask = workingTaskId
+		? (allTasks.find((t) => t.id === workingTaskId) ?? null)
+		: null;
 
-	const workingTask = useMemo(
-		() =>
-			workingTaskId
-				? (allTasks.find((t) => t.id === workingTaskId) ?? null)
-				: null,
-		[workingTaskId, allTasks],
-	);
-
-	// Visible capacity calculation for parent pagination
 	useEffect(() => {
 		if (!onVisibleCapacityChange) return;
 
@@ -1162,7 +1150,9 @@ export function TaskList({
 
 			const firstTaskRow =
 				listRef.current?.querySelector<HTMLLIElement>("li[data-task-id]");
-			const rowHeight = firstTaskRow?.getBoundingClientRect().height || 48;
+			const rowHeight =
+				firstTaskRow?.getBoundingClientRect().height ||
+				FALLBACK_TASK_ROW_HEIGHT;
 			const capacity = Math.max(
 				1,
 				Math.floor(container.clientHeight / Math.max(rowHeight, 1)),
@@ -1173,17 +1163,23 @@ export function TaskList({
 
 		calculateVisibleCapacity();
 
-		if (typeof ResizeObserver === "undefined") return;
+		if (typeof ResizeObserver === "undefined") {
+			return;
+		}
 
 		const observer = new ResizeObserver(calculateVisibleCapacity);
-		if (containerRef.current) observer.observe(containerRef.current);
+		if (containerRef.current) {
+			observer.observe(containerRef.current);
+		}
+
 		const firstTaskRow = listRef.current?.querySelector("li[data-task-id]");
-		if (firstTaskRow) observer.observe(firstTaskRow);
+		if (firstTaskRow) {
+			observer.observe(firstTaskRow);
+		}
 
 		return () => observer.disconnect();
 	}, [tasks, onVisibleCapacityChange]);
 
-	// Stable action handlers
 	const handleStart = useCallback(
 		async (task: Task) => {
 			if (loadingTaskIds.has(task.id)) return;
@@ -1194,7 +1190,7 @@ export function TaskList({
 				removeLoading(task.id);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onStartTask],
+		[loadingTaskIds, onStartTask],
 	);
 
 	const handleDone = useCallback(
@@ -1208,7 +1204,7 @@ export function TaskList({
 				removeLoading(task.id);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onDoneTask],
+		[loadingTaskIds, onDoneTask],
 	);
 
 	const handleReenter = useCallback(
@@ -1216,13 +1212,15 @@ export function TaskList({
 			if (loadingTaskIds.has(task.id)) return;
 			addLoading(task.id);
 			try {
-				// REMOVED: Artificial 300ms delay - no longer needed with optimized store.ts
+				if (!task.id) return;
+
+				await new Promise((r) => setTimeout(r, 300)); // wait for DB insert to settle
 				await onReenterTask(task);
 			} finally {
 				removeLoading(task.id);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onReenterTask],
+		[loadingTaskIds, onReenterTask],
 	);
 
 	const handleDelete = useCallback(
@@ -1235,11 +1233,21 @@ export function TaskList({
 				removeLoading(taskId);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onDeleteTask],
+		[loadingTaskIds, onDeleteTask],
 	);
-
 	const handleUpdateText = useCallback(
 		async (taskId: string, newText: string, dueDate?: string | null) => {
+			setLocalTasks((prev) =>
+				prev.map((t) =>
+					t.id === taskId
+						? {
+								...t,
+								text: newText,
+								...(dueDate !== undefined && { due_date: dueDate }),
+							}
+						: t,
+				),
+			);
 			try {
 				await updateTask(taskId, {
 					text: newText,
@@ -1263,60 +1271,7 @@ export function TaskList({
 				removeLoading(newTask.id);
 			}
 		},
-		[loadingTaskIds, addLoading, removeLoading, onSwitchTask],
-	);
-
-	// Memoized row renderer to prevent unnecessary re-renders
-	const renderTaskRow = useCallback(
-		(task: Task, index: number) => (
-			<TaskRow
-				key={task.id}
-				task={task}
-				isWorking={task.id === workingTaskId}
-				workingTask={workingTask}
-				onStart={handleStart}
-				onDone={handleDone}
-				onReenter={handleReenter}
-				onDelete={handleDelete}
-				onUpdateText={handleUpdateText}
-				onUpdateTag={handleUpdateTag}
-				onSwitchTask={handleSwitchTask}
-				disabled={loadingTaskIds.has(task.id)}
-				onPumpTask={handlePumpTask}
-				onSinkTask={handleSinkTask}
-				isFirst={index === 0 && task.page_number === 1}
-				isLast={
-					index === filteredTasks.length - 1 &&
-					task.page_number === visibleTotalPages
-				}
-				disableSwipe={disableSwipeForWorkingTask && task.id === workingTaskId}
-				pamphlets={pamphlets}
-				activePamphletId={activePamphletId}
-				onMoveTask={onMoveTask}
-				onUpdateDueDate={handleUpdateDueDate}
-			/>
-		),
-		[
-			workingTaskId,
-			workingTask,
-			loadingTaskIds,
-			filteredTasks.length,
-			visibleTotalPages,
-			disableSwipeForWorkingTask,
-			pamphlets,
-			activePamphletId,
-			onMoveTask,
-			handleStart,
-			handleDone,
-			handleReenter,
-			handleDelete,
-			handleUpdateText,
-			handleUpdateTag,
-			handleSwitchTask,
-			handlePumpTask,
-			handleSinkTask,
-			handleUpdateDueDate,
-		],
+		[loadingTaskIds, onSwitchTask],
 	);
 
 	return (
@@ -1336,7 +1291,37 @@ export function TaskList({
 						strategy={verticalListSortingStrategy}
 					>
 						<ul ref={listRef} className="divide-y divide-border">
-							{filteredTasks.map(renderTaskRow)}
+							{filteredTasks.map((task, index) => (
+								<TaskRow
+									key={task.id}
+									task={task}
+									isWorking={task.id === workingTaskId}
+									workingTask={workingTask}
+									onStart={handleStart}
+									onDone={handleDone}
+									onReenter={handleReenter}
+									onDelete={handleDelete}
+									onUpdateText={handleUpdateText}
+									onUpdateTag={handleUpdateTag}
+									onSwitchTask={handleSwitchTask}
+									disabled={loadingTaskIds.has(task.id)}
+									onPumpTask={handlePumpTask}
+									onSinkTask={handleSinkTask}
+									isFirst={index === 0 && task.page_number === 1}
+									isLast={
+										index === filteredTasks.length - 1 &&
+										task.page_number === visibleTotalPages
+									}
+									disableSwipe={
+										disableSwipeForWorkingTask === true &&
+										task.id === workingTaskId
+									}
+									pamphlets={pamphlets}
+									activePamphletId={activePamphletId}
+									onMoveTask={onMoveTask}
+									onUpdateDueDate={handleUpdateDueDate}
+								/>
+							))}
 						</ul>
 					</SortableContext>
 					<DragOverlay>

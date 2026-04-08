@@ -15,7 +15,7 @@ import useSWR from "swr";
 
 // Components
 import { Header } from "@/components/layout/header";
-import { TimerBar } from "@/components/features/timer/timer-bar";
+import { TimerBar } from "@/components/features/timer/timer-bar-v2";
 import { ViewTabs } from "@/components/layout/view-tabs";
 import { PageNav } from "@/components/layout/page-nav";
 import { TaskList } from "@/components/features/tasks/task-list";
@@ -50,8 +50,8 @@ import {
 	createAndCompleteTask,
 	reindexActiveTasks,
 	reenterAndComplete,
-} from "@/lib/db/store";
-import { moveTaskToPamphlet } from "@/lib/db/store";
+} from "@/lib/db/store-v1";
+import { moveTaskToPamphlet } from "@/lib/db/store-v1";
 
 import type {
 	Task,
@@ -534,7 +534,11 @@ export function AutofocusApp() {
 				await action();
 				await refreshAll();
 			} catch (error) {
-				console.error("Optimistic update failed:", error);
+				console.error("Optimistic update failed:", {
+					message: error instanceof Error ? error.message : String(error),
+					stack: error instanceof Error ? error.stack : undefined,
+					error,
+				});
 				await refreshAll();
 				throw error;
 			} finally {

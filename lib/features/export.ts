@@ -2,7 +2,7 @@ import {
 	getTasks,
 	getCompletedTasks,
 	getCompletedTasksCount,
-} from "@/lib/db/store";
+} from "@/lib/db/store-v1";
 import {
 	getHabits,
 	getLast66Days,

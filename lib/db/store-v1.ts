@@ -1,13 +1,14 @@
-// store.ts - Optimized for speed
 import { createClient } from "@/lib/supabase/client";
 import type { Task, AppState, TaskStatus, Pamphlet } from "@/lib/types";
 import { TagId } from "@/lib/tags";
 import type { PamphletColor } from "@/lib/features/pamphlet-colors";
 
-// =============================================================================
-// TASK FETCHING
-// =============================================================================
+const APP_STATE_ID = "00000000-0000-0000-0000-000000000001";
 
+/**
+ * Retrieves all tasks from the database, ordered by page_number then position.
+ * @returns {Promise<Task[]>} Array of all tasks
+ */
 export async function getTasks(): Promise<Task[]> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -20,6 +21,11 @@ export async function getTasks(): Promise<Task[]> {
 	return data || [];
 }
 
+/**
+ * Retrieves tasks filtered by specific status, ordered by page_number then position.
+ * @param status - The task status to filter by
+ * @returns {Promise<Task[]>} Array of matching tasks
+ */
 export async function getTasksByStatus(status: TaskStatus): Promise<Task[]> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -33,6 +39,10 @@ export async function getTasksByStatus(status: TaskStatus): Promise<Task[]> {
 	return data || [];
 }
 
+/**
+ * Retrieves active and in-progress tasks, ordered by page_number then position.
+ * @returns {Promise<Task[]>} Array of active tasks
+ */
 export async function getActiveTasks(): Promise<Task[]> {
 	const supabase = createClient();
 	const { data, error } = await supabase
@@ -48,6 +58,11 @@ export async function getActiveTasks(): Promise<Task[]> {
 
 const COMPLETED_PAGE_SIZE = 50;
 
+/**
+ * Retrieves completed tasks for a specific page (paginated), newest first.
+ * @param page - Page number for pagination
+ * @returns {Promise<Task[]>} Array of completed tasks for the page
+ */
 export async function getCompletedTasks(page: number = 1): Promise<Task[]> {
 	const supabase = createClient();
 	const from = (page - 1) * COMPLETED_PAGE_SIZE;
@@ -64,6 +79,10 @@ export async function getCompletedTasks(page: number = 1): Promise<Task[]> {
 	return data || [];
 }
 
+/**
+ * Gets the total count of completed tasks.
+ * @returns {Promise<number>} Count of completed tasks
+ */
 export async function getCompletedTasksCount(): Promise<number> {
 	const supabase = createClient();
 	const { count, error } = await supabase
@@ -88,10 +107,6 @@ export async function getTasksForPage(pageNumber: number): Promise<Task[]> {
 	return data || [];
 }
 
-// =============================================================================
-// TASK CREATION
-// =============================================================================
-
 export async function addTask(
 	text: string,
 	pageNumber: number,
@@ -106,54 +121,52 @@ export async function addTask(
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
+	// Shift all existing active tasks down by 1
+	const { data: existingTasks } = await supabase
+		.from("tasks")
+		.select("*")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
 	const PAGE_SIZE = 12;
 	const now = new Date().toISOString();
 
-	// Fetch and shift in parallel
-	const [existingResult, insertResult] = await Promise.all([
-		supabase
+	// Batch update all tasks in parallel
+	const updatePromises = (existingTasks || []).map((task, i) => {
+		const newPageNumber = Math.floor((i + 1) / PAGE_SIZE) + 1;
+		const newPosition = (i + 1) % PAGE_SIZE;
+
+		return supabase
 			.from("tasks")
-			.select("*")
-			.in("status", ["active", "in-progress"])
-			.order("page_number", { ascending: true })
-			.order("position", { ascending: true }),
-		supabase
-			.from("tasks")
-			.insert({
-				text,
-				page_number: pageNumber,
-				position,
-				status: "active",
-				tag: tag ?? null,
-				due_date: dueDate ?? null,
-				pamphlet_id: pamphletId ?? null,
-				user_id: user.id,
+			.update({
+				page_number: newPageNumber,
+				position: newPosition,
+				updated_at: now,
 			})
-			.select()
-			.single(),
-	]);
+			.eq("id", task.id);
+	});
+
+	// Insert new task at position 0
+	const insertPromise = supabase
+		.from("tasks")
+		.insert({
+			text,
+			page_number: pageNumber,
+			position,
+			status: "active",
+			tag: tag ?? null,
+			due_date: dueDate ?? null,
+			pamphlet_id: pamphletId ?? null,
+			user_id: user.id,
+		})
+		.select()
+		.single();
+
+	// Execute all operations in parallel
+	const [insertResult] = await Promise.all([insertPromise, ...updatePromises]);
 
 	if (insertResult.error) throw insertResult.error;
-
-	// Background reindex - don't block return
-	const existingTasks = existingResult.data || [];
-	if (existingTasks.length > 0) {
-		Promise.all(
-			existingTasks.map((task, i) => {
-				const newPageNumber = Math.floor((i + 1) / PAGE_SIZE) + 1;
-				const newPosition = (i + 1) % PAGE_SIZE;
-				return supabase
-					.from("tasks")
-					.update({
-						page_number: newPageNumber,
-						position: newPosition,
-						updated_at: now,
-					})
-					.eq("id", task.id);
-			}),
-		).catch(console.error); // Fire and forget, log errors
-	}
-
 	return insertResult.data;
 }
 
@@ -173,63 +186,57 @@ export async function addMultipleTasks(
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
+	// Shift all existing active tasks down
+	const { data: existingTasks } = await supabase
+		.from("tasks")
+		.select("*")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
 	const PAGE_SIZE = 12;
 	const shiftAmount = tasks.length;
 	const now = new Date().toISOString();
 
-	// Fetch and insert in parallel
-	const [existingResult, insertResult] = await Promise.all([
-		supabase
+	// Batch update all tasks in parallel
+	const updatePromises = (existingTasks || []).map((task, i) => {
+		const newIndex = i + shiftAmount;
+		const newPageNumber = Math.floor(newIndex / PAGE_SIZE) + 1;
+		const newPosition = newIndex % PAGE_SIZE;
+
+		return supabase
 			.from("tasks")
-			.select("*")
-			.in("status", ["active", "in-progress"])
-			.order("page_number", { ascending: true })
-			.order("position", { ascending: true }),
-		supabase
-			.from("tasks")
-			.insert(
-				tasks.map((t) => ({
-					text: t.text,
-					page_number: t.pageNumber,
-					position: t.position,
-					status: "active" as TaskStatus,
-					tag: t.tag ?? null,
-					due_date: t.dueDate ?? null,
-					pamphlet_id: t.pamphletId ?? null,
-					user_id: user.id,
-				})),
-			)
-			.select(),
-	]);
+			.update({
+				page_number: newPageNumber,
+				position: newPosition,
+				updated_at: now,
+			})
+			.eq("id", task.id);
+	});
+
+	// Insert new tasks at the top
+	const insertPromise = supabase
+		.from("tasks")
+		.insert(
+			tasks.map((t) => ({
+				text: t.text,
+				page_number: t.pageNumber,
+				position: t.position,
+				status: "active" as TaskStatus,
+				tag: t.tag ?? null,
+				due_date: t.dueDate ?? null,
+				pamphlet_id: t.pamphletId ?? null,
+				user_id: user.id,
+			})),
+		)
+		.select();
+
+	// Execute all operations in parallel
+	const [insertResult] = await Promise.all([insertPromise, ...updatePromises]);
 
 	if (insertResult.error) throw insertResult.error;
-
-	// Background reindex
-	const existingTasks = existingResult.data || [];
-	if (existingTasks.length > 0) {
-		Promise.all(
-			existingTasks.map((task, i) => {
-				const newIndex = i + shiftAmount;
-				const newPageNumber = Math.floor(newIndex / PAGE_SIZE) + 1;
-				const newPosition = newIndex % PAGE_SIZE;
-				return supabase
-					.from("tasks")
-					.update({
-						page_number: newPageNumber,
-						position: newPosition,
-						updated_at: now,
-					})
-					.eq("id", task.id);
-			}),
-		).catch(console.error);
-	}
-
 	return insertResult.data || [];
 }
-
-// =============================================================================
-// TASK UPDATES
-// =============================================================================
 
 export async function updateTask(
 	id: string,
@@ -247,69 +254,28 @@ export async function updateTask(
 	return data;
 }
 
-// =============================================================================
-// TASK COMPLETION - OPTIMIZED
-// =============================================================================
-
 export async function completeTask(
 	id: string,
 	totalTimeMs: number,
 	pamphletId?: string | null,
 ): Promise<Task> {
 	const supabase = createClient();
-	const now = new Date().toISOString();
 
 	const { data, error } = await supabase
 		.from("tasks")
 		.update({
 			status: "completed",
-			completed_at: now,
+			completed_at: new Date().toISOString(),
 			total_time_ms: totalTimeMs,
-			updated_at: now,
+			updated_at: new Date().toISOString(),
 		})
 		.eq("id", id)
 		.select()
 		.single();
 
 	if (error) throw error;
-
-	// Background reindex - don't await
-	reindexActiveTasks(pamphletId).catch(console.error);
-
 	return data;
 }
-
-export async function markTaskDone(
-	taskId: string,
-	totalTimeMs: number = 0,
-	pamphletId?: string | null,
-): Promise<Task> {
-	const supabase = createClient();
-	const now = new Date().toISOString();
-
-	const { data, error } = await supabase
-		.from("tasks")
-		.update({
-			status: "completed",
-			completed_at: now,
-			total_time_ms: totalTimeMs,
-			updated_at: now,
-		})
-		.eq("id", taskId)
-		.select()
-		.single();
-
-	if (error) throw error;
-
-	// Background reindex
-	reindexActiveTasks(pamphletId).catch(console.error);
-
-	return data;
-}
-
-// =============================================================================
-// RE-ENTER TASK - OPTIMIZED
-// =============================================================================
 
 export async function reenterTask(
 	originalTaskId: string,
@@ -326,178 +292,25 @@ export async function reenterTask(
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
-	const now = new Date().toISOString();
+	const { data, error } = await supabase
+		.from("tasks")
+		.insert({
+			text: newText,
+			page_number: pageNumber,
+			position,
+			status: "active",
+			total_time_ms: totalTimeMs || 0,
+			re_entered_from: originalTaskId,
+			tag: tag ?? null,
+			pamphlet_id: pamphletId ?? null,
+			user_id: user.id,
+		})
+		.select()
+		.single();
 
-	// Complete original and insert new in parallel
-	const [insertResult] = await Promise.all([
-		supabase
-			.from("tasks")
-			.insert({
-				text: newText,
-				page_number: pageNumber,
-				position,
-				status: "active",
-				total_time_ms: totalTimeMs || 0,
-				re_entered_from: originalTaskId,
-				tag: tag ?? null,
-				pamphlet_id: pamphletId ?? null,
-				user_id: user.id,
-			})
-			.select()
-			.single(),
-		supabase
-			.from("tasks")
-			.update({
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			})
-			.eq("id", originalTaskId),
-	]);
-
-	if (insertResult.error) throw insertResult.error;
-
-	// Background reindex
-	reindexActiveTasks(pamphletId).catch(console.error);
-
-	return insertResult.data;
+	if (error) throw error;
+	return data;
 }
-
-export async function reenterFromPanel(
-	taskId: string,
-	taskText: string,
-): Promise<Task> {
-	const supabase = createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) throw new Error("Not authenticated");
-
-	const now = new Date().toISOString();
-
-	// Get current task data and clear panel in parallel
-	const [currentTaskResult, clearPanelResult] = await Promise.all([
-		supabase
-			.from("tasks")
-			.select("total_time_ms, tag, pamphlet_id")
-			.eq("id", taskId)
-			.single(),
-		supabase
-			.from("app_state")
-			.update({
-				working_on_task_id: null,
-				session_start_time: null,
-				timer_state: "idle",
-				current_session_ms: 0,
-				updated_at: now,
-			})
-			.eq("user_id", user.id),
-	]);
-
-	if (currentTaskResult.error) throw currentTaskResult.error;
-	if (clearPanelResult.error) throw clearPanelResult.error;
-
-	const currentTask = currentTaskResult.data;
-
-	// Get position for new task
-	const activeTasks = await getActiveTasks();
-	const maxPage =
-		activeTasks.length > 0
-			? Math.max(...activeTasks.map((t) => t.page_number))
-			: 1;
-	const nextPosition = await getNextPosition(maxPage);
-
-	// Insert new task and mark old complete in parallel
-	const [insertResult] = await Promise.all([
-		supabase
-			.from("tasks")
-			.insert({
-				text: taskText,
-				page_number: maxPage,
-				position: nextPosition,
-				status: "active",
-				total_time_ms: currentTask.total_time_ms || 0,
-				re_entered_from: taskId,
-				tag: currentTask.tag ?? null,
-				pamphlet_id: currentTask.pamphlet_id ?? null,
-				user_id: user.id,
-			})
-			.select()
-			.single(),
-		supabase
-			.from("tasks")
-			.update({
-				status: "completed",
-				completed_at: now,
-				updated_at: now,
-			})
-			.eq("id", taskId),
-	]);
-
-	if (insertResult.error) throw insertResult.error;
-
-	// Background reindex
-	reindexActiveTasks(currentTask.pamphlet_id).catch(console.error);
-
-	return insertResult.data;
-}
-
-export async function reenterAndComplete(
-	originalTaskId: string,
-	newText: string,
-	pageNumber: number,
-	position: number,
-	totalTimeMs: number,
-	tag: TagId | null,
-	pamphletId: string | null,
-): Promise<Task> {
-	const supabase = createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) throw new Error("Not authenticated");
-
-	const now = new Date().toISOString();
-
-	// Mark original complete and insert new in parallel
-	const [insertResult] = await Promise.all([
-		supabase
-			.from("tasks")
-			.insert({
-				text: newText,
-				page_number: 9999, // sentinel for reindex
-				position: 9999,
-				status: "active",
-				total_time_ms: totalTimeMs,
-				re_entered_from: originalTaskId,
-				tag: tag ?? null,
-				pamphlet_id: pamphletId ?? null,
-				user_id: user.id,
-			})
-			.select()
-			.single(),
-		supabase
-			.from("tasks")
-			.update({
-				status: "completed",
-				completed_at: now,
-				total_time_ms: totalTimeMs,
-				updated_at: now,
-			})
-			.eq("id", originalTaskId),
-	]);
-
-	if (insertResult.error) throw insertResult.error;
-
-	// Background reindex
-	reindexActiveTasks(pamphletId).catch(console.error);
-
-	return insertResult.data;
-}
-
-// =============================================================================
-// TASK DELETION - OPTIMIZED
-// =============================================================================
 
 export async function deleteTask(
 	id: string,
@@ -517,18 +330,43 @@ export async function deleteTask(
 		.from("tasks")
 		.delete()
 		.eq("id", id);
+
 	if (deleteError) throw deleteError;
 
 	if (!deletedTask || deletedTask.status === "completed") return;
 
-	// Background reindex
-	reindexActiveTasks(pamphletId).catch(console.error);
+	let reindexQuery = supabase
+		.from("tasks")
+		.select("id, page_number, position")
+		.in("status", ["active", "in-progress"]);
+
+	if (pamphletId) reindexQuery = reindexQuery.eq("pamphlet_id", pamphletId);
+
+	const { data: remainingTasks, error: reorderFetchError } = await reindexQuery
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
+	if (reorderFetchError) throw reorderFetchError;
+	if (!remainingTasks || remainingTasks.length === 0) return;
+
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+
+	for (const [index, task] of remainingTasks.entries()) {
+		const { error } = await supabase
+			.from("tasks")
+			.update({
+				page_number: Math.floor(index / PAGE_SIZE) + 1,
+				position: index % PAGE_SIZE,
+				updated_at: now,
+			})
+			.eq("id", task.id);
+
+		if (error) throw error;
+	}
 }
 
-// =============================================================================
-// APP STATE
-// =============================================================================
-
+// App State functions
 export async function getAppState(): Promise<AppState> {
 	const supabase = createClient();
 	const {
@@ -543,6 +381,7 @@ export async function getAppState(): Promise<AppState> {
 		.single();
 
 	if (error && error.code === "PGRST116") {
+		// No row yet — create one for this user
 		const { data: newState, error: insertError } = await supabase
 			.from("app_state")
 			.insert({
@@ -588,10 +427,6 @@ export async function updateAppState(
 	return data;
 }
 
-// =============================================================================
-// TIMER OPERATIONS - OPTIMIZED
-// =============================================================================
-
 export async function startWorkingOnTask(taskId: string): Promise<AppState> {
 	const supabase = createClient();
 	const {
@@ -599,30 +434,28 @@ export async function startWorkingOnTask(taskId: string): Promise<AppState> {
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
-	const now = new Date().toISOString();
+	const { data, error } = await supabase
+		.from("app_state")
+		.update({
+			working_on_task_id: taskId,
+			session_start_time: new Date().toISOString(),
+			timer_state: "running",
+			current_session_ms: 0,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("user_id", user.id)
+		.select()
+		.single();
 
-	// Update app state and task status in parallel
-	const [appStateResult] = await Promise.all([
-		supabase
-			.from("app_state")
-			.update({
-				working_on_task_id: taskId,
-				session_start_time: now,
-				timer_state: "running",
-				current_session_ms: 0,
-				updated_at: now,
-			})
-			.eq("user_id", user.id)
-			.select()
-			.single(),
-		supabase
-			.from("tasks")
-			.update({ status: "in-progress", updated_at: now })
-			.eq("id", taskId),
-	]);
+	if (error) throw error;
 
-	if (appStateResult.error) throw appStateResult.error;
-	return appStateResult.data;
+	// Also update the task status
+	await supabase
+		.from("tasks")
+		.update({ status: "in-progress", updated_at: new Date().toISOString() })
+		.eq("id", taskId);
+
+	return data;
 }
 
 export async function stopWorkingOnTask(): Promise<AppState> {
@@ -681,44 +514,105 @@ export async function stopTimer(
 	} = await supabase.auth.getUser();
 	if (!user) throw new Error("Not authenticated");
 
-	const now = new Date().toISOString();
+	// First get the current task to add session time to total
+	const { data: currentTask, error: taskFetchError } = await supabase
+		.from("tasks")
+		.select("*")
+		.eq("id", taskId)
+		.single();
 
-	// Get current task and update everything in parallel
-	const [currentTaskResult, appStateResult] = await Promise.all([
-		supabase.from("tasks").select("*").eq("id", taskId).single(),
-		supabase
-			.from("app_state")
-			.update({
-				timer_state: "stopped",
-				current_session_ms: 0,
-				session_start_time: null,
-				updated_at: now,
-			})
-			.eq("user_id", user.id)
-			.select()
-			.single(),
-	]);
+	if (taskFetchError) throw taskFetchError;
 
-	if (currentTaskResult.error) throw currentTaskResult.error;
-	if (appStateResult.error) throw appStateResult.error;
-
-	const newTotalTime =
-		(currentTaskResult.data.total_time_ms || 0) + sessionTimeMs;
-
-	// Update task time (fire and forget - not critical for UI)
-	supabase
+	// Update task with accumulated time
+	const newTotalTime = (currentTask.total_time_ms || 0) + sessionTimeMs;
+	const { data: updatedTask, error: taskUpdateError } = await supabase
 		.from("tasks")
 		.update({
 			total_time_ms: newTotalTime,
-			updated_at: now,
+			updated_at: new Date().toISOString(),
 		})
 		.eq("id", taskId)
-		.then(() => {}, console.error);
+		.select()
+		.single();
 
-	return {
-		appState: appStateResult.data,
-		task: { ...currentTaskResult.data, total_time_ms: newTotalTime },
-	};
+	if (taskUpdateError) throw taskUpdateError;
+
+	// Update app state to stopped (keep working_on_task_id)
+	const { data: appState, error: appStateError } = await supabase
+		.from("app_state")
+		.update({
+			timer_state: "stopped",
+			current_session_ms: 0,
+			session_start_time: null,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("user_id", user.id)
+		.select()
+		.single();
+
+	if (appStateError) throw appStateError;
+
+	return { appState, task: updatedTask };
+}
+
+export async function reenterFromPanel(
+	taskId: string,
+	taskText: string,
+): Promise<Task> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	// Get the max position on the last page
+	const activeTasks = await getActiveTasks();
+	const maxPage =
+		activeTasks.length > 0
+			? Math.max(...activeTasks.map((t) => t.page_number))
+			: 1;
+	const nextPosition = await getNextPosition(maxPage);
+
+	// Get the current task to preserve total_time_ms
+	const { data: currentTask, error: fetchError } = await supabase
+		.from("tasks")
+		.select("total_time_ms")
+		.eq("id", taskId)
+		.single();
+
+	if (fetchError) throw fetchError;
+
+	// Create new task at end of list with total time carried over
+	const { data: newTask, error: insertError } = await supabase
+		.from("tasks")
+		.insert({
+			text: taskText,
+			page_number: maxPage,
+			position: nextPosition,
+			status: "active",
+			total_time_ms: currentTask.total_time_ms || 0,
+			re_entered_from: taskId,
+			user_id: user.id,
+		})
+		.select()
+		.single();
+
+	if (insertError) throw insertError;
+
+	// Mark original as completed
+	await supabase
+		.from("tasks")
+		.update({
+			status: "completed",
+			completed_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId);
+
+	// Clear the panel
+	await stopWorkingOnTask();
+
+	return newTask;
 }
 
 export async function resumeTimer(): Promise<AppState> {
@@ -742,43 +636,6 @@ export async function resumeTimer(): Promise<AppState> {
 	if (error) throw error;
 	return data;
 }
-
-export async function startTask(taskId: string): Promise<AppState> {
-	const supabase = createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) throw new Error("Not authenticated");
-
-	const now = new Date().toISOString();
-
-	// Update app state and task in parallel
-	const [appStateResult] = await Promise.all([
-		supabase
-			.from("app_state")
-			.update({
-				working_on_task_id: taskId,
-				session_start_time: null,
-				timer_state: "idle",
-				current_session_ms: 0,
-				updated_at: now,
-			})
-			.eq("user_id", user.id)
-			.select()
-			.single(),
-		supabase
-			.from("tasks")
-			.update({ status: "in-progress", updated_at: now })
-			.eq("id", taskId),
-	]);
-
-	if (appStateResult.error) throw appStateResult.error;
-	return appStateResult.data;
-}
-
-// =============================================================================
-// TASK REORDERING & REINDEXING
-// =============================================================================
 
 export async function getTotalPageCount(): Promise<number> {
 	const supabase = createClient();
@@ -812,21 +669,20 @@ export async function reorderTasks(
 	updates: Array<{ id: string; page_number: number; position: number }>,
 ): Promise<void> {
 	const supabase = createClient();
-	const now = new Date().toISOString();
 
-	// Parallel updates
-	await Promise.all(
-		updates.map((update) =>
-			supabase
-				.from("tasks")
-				.update({
-					page_number: update.page_number,
-					position: update.position,
-					updated_at: now,
-				})
-				.eq("id", update.id),
-		),
-	);
+	// Update each task's position
+	for (const update of updates) {
+		const { error } = await supabase
+			.from("tasks")
+			.update({
+				page_number: update.page_number,
+				position: update.position,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", update.id);
+
+		if (error) throw error;
+	}
 }
 
 export async function revertTaskLastPosition(taskId: string): Promise<Task> {
@@ -835,6 +691,7 @@ export async function revertTaskLastPosition(taskId: string): Promise<Task> {
 	const activeTasks = await getActiveTasks();
 	const PAGE_SIZE = 12;
 
+	// Compute correct placement respecting page capacity
 	const lastPageNumber =
 		activeTasks.length > 0
 			? Math.max(...activeTasks.map((t) => t.page_number))
@@ -847,8 +704,6 @@ export async function revertTaskLastPosition(taskId: string): Promise<Task> {
 		lastPageTasks.length >= PAGE_SIZE ? lastPageNumber + 1 : lastPageNumber;
 	const position = lastPageTasks.length >= PAGE_SIZE ? 0 : lastPageTasks.length;
 
-	const now = new Date().toISOString();
-
 	const { data, error } = await supabase
 		.from("tasks")
 		.update({
@@ -856,6 +711,52 @@ export async function revertTaskLastPosition(taskId: string): Promise<Task> {
 			completed_at: null,
 			page_number: pageNumber,
 			position: position,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
+}
+
+export async function revertTaskOld(taskId: string): Promise<Task> {
+	const supabase = createClient();
+	const PAGE_SIZE = 12;
+	const now = new Date().toISOString();
+
+	// Shift all existing active tasks down by 1 to make room at page 1, position 0
+	const { data: existingTasks, error: fetchError } = await supabase
+		.from("tasks")
+		.select("id, page_number, position")
+		.in("status", ["active", "in-progress"])
+		.order("page_number", { ascending: true })
+		.order("position", { ascending: true });
+
+	if (fetchError) throw fetchError;
+
+	for (const [index, task] of (existingTasks || []).entries()) {
+		const { error } = await supabase
+			.from("tasks")
+			.update({
+				page_number: Math.floor((index + 1) / PAGE_SIZE) + 1,
+				position: (index + 1) % PAGE_SIZE,
+				updated_at: now,
+			})
+			.eq("id", task.id);
+
+		if (error) throw error;
+	}
+
+	// Place the reverted task at page 1, position 0
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({
+			status: "active",
+			completed_at: null,
+			page_number: 1,
+			position: 0,
 			updated_at: now,
 		})
 		.eq("id", taskId)
@@ -874,33 +775,33 @@ export async function revertTask(
 	const PAGE_SIZE = 12;
 	const now = new Date().toISOString();
 
-	// Fetch existing tasks
-	let query = supabase
+	let reindexQuery = supabase
 		.from("tasks")
 		.select("id, page_number, position")
 		.in("status", ["active", "in-progress"]);
 
-	if (pamphletId) query = query.eq("pamphlet_id", pamphletId);
+	if (pamphletId) reindexQuery = reindexQuery.eq("pamphlet_id", pamphletId);
 
-	const { data: existingTasks, error: fetchError } = await query
+	const { data: existingTasks, error: fetchError } = await reindexQuery
 		.order("page_number", { ascending: true })
 		.order("position", { ascending: true });
 
 	if (fetchError) throw fetchError;
 
-	// Parallel shift and revert
-	const updates = (existingTasks || []).map((task, index) =>
-		supabase
+	for (const [index, task] of (existingTasks || []).entries()) {
+		const { error } = await supabase
 			.from("tasks")
 			.update({
 				page_number: Math.floor((index + 1) / PAGE_SIZE) + 1,
 				position: (index + 1) % PAGE_SIZE,
 				updated_at: now,
 			})
-			.eq("id", task.id),
-	);
+			.eq("id", task.id);
 
-	const revertPromise = supabase
+		if (error) throw error;
+	}
+
+	const { data, error } = await supabase
 		.from("tasks")
 		.update({
 			status: "active",
@@ -913,10 +814,31 @@ export async function revertTask(
 		.select()
 		.single();
 
-	const [revertResult] = await Promise.all([revertPromise, ...updates]);
+	if (error) throw error;
+	return data;
+}
 
-	if (revertResult.error) throw revertResult.error;
-	return revertResult.data;
+export async function markTaskDone(
+	taskId: string,
+	totalTimeMs: number = 0,
+	pamphletId?: string | null,
+): Promise<Task> {
+	const supabase = createClient();
+
+	const { data, error } = await supabase
+		.from("tasks")
+		.update({
+			status: "completed",
+			completed_at: new Date().toISOString(),
+			total_time_ms: totalTimeMs,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", taskId)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data;
 }
 
 export async function reindexActiveTasks(
@@ -940,24 +862,57 @@ export async function reindexActiveTasks(
 	if (error) throw error;
 	if (!tasks || tasks.length === 0) return;
 
-	// Parallel updates
-	await Promise.all(
-		tasks.map((task, index) =>
-			supabase
-				.from("tasks")
-				.update({
-					page_number: Math.floor(index / PAGE_SIZE) + 1,
-					position: index % PAGE_SIZE,
-					updated_at: now,
-				})
-				.eq("id", task.id),
-		),
-	);
+	const updates = tasks.map((task, index) => ({
+		id: task.id,
+		page_number: Math.floor(index / PAGE_SIZE) + 1,
+		position: index % PAGE_SIZE,
+		updated_at: now,
+	}));
+
+	for (const update of updates) {
+		const { error: updateError } = await supabase
+			.from("tasks")
+			.update({
+				page_number: update.page_number,
+				position: update.position,
+				updated_at: update.updated_at,
+			})
+			.eq("id", update.id);
+
+		if (updateError) throw updateError;
+	}
 }
 
-// =============================================================================
-// TAG OPERATIONS
-// =============================================================================
+export async function startTask(taskId: string): Promise<AppState> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	const { data, error } = await supabase
+		.from("app_state")
+		.update({
+			working_on_task_id: taskId,
+			session_start_time: null, // Don't auto-start timer
+			timer_state: "idle",
+			current_session_ms: 0,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("user_id", user.id)
+		.select()
+		.single();
+
+	if (error) throw error;
+
+	// Also update the task status
+	await supabase
+		.from("tasks")
+		.update({ status: "in-progress", updated_at: new Date().toISOString() })
+		.eq("id", taskId);
+
+	return data;
+}
 
 export async function updateTaskTag(
 	taskId: string,
@@ -975,10 +930,7 @@ export async function updateTaskTag(
 	if (error) throw error;
 }
 
-// =============================================================================
-// CLEANUP & MISC
-// =============================================================================
-
+// Add this function to clean up any dismissed tasks
 export async function cleanupDismissedTasks(): Promise<void> {
 	const supabase = createClient();
 	await supabase
@@ -1002,7 +954,7 @@ export async function getTasksWithNotes(): Promise<Task[]> {
 }
 
 // =============================================================================
-// PAMPHLET OPERATIONS
+// PAMPHLET FUNCTIONS
 // =============================================================================
 
 export async function getPamphlets(): Promise<Pamphlet[]> {
@@ -1056,6 +1008,7 @@ export async function updatePamphlet(
 export async function deletePamphlet(id: string): Promise<void> {
 	const supabase = createClient();
 	const { error } = await supabase.from("pamphlets").delete().eq("id", id);
+
 	if (error) throw error;
 }
 
@@ -1128,6 +1081,7 @@ export async function getTotalPageCountForPamphlet(
 	return data[0].page_number;
 }
 
+// Move task to another pamphlet
 export async function moveTaskToPamphlet(
 	taskId: string,
 	toPamphletId: string,
@@ -1148,28 +1102,84 @@ export async function reorderPamphlets(
 	updates: Array<{ id: string; position: number }>,
 ): Promise<void> {
 	const supabase = createClient();
-	await Promise.all(
-		updates.map((update) =>
-			supabase
-				.from("pamphlets")
-				.update({
-					position: update.position,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("id", update.id),
-		),
-	);
+	for (const update of updates) {
+		const { error } = await supabase
+			.from("pamphlets")
+			.update({
+				position: update.position,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", update.id);
+		if (error) throw error;
+	}
+}
+
+export async function reenterAndComplete(
+	originalTaskId: string,
+	newText: string,
+	pageNumber: number,
+	position: number,
+	totalTimeMs: number,
+	tag: TagId | null,
+	pamphletId: string | null,
+): Promise<Task> {
+	const supabase = createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Not authenticated");
+
+	const now = new Date().toISOString();
+
+	// 1. Mark original as completed — no reindex
+	const { error: completeError } = await supabase
+		.from("tasks")
+		.update({
+			status: "completed",
+			completed_at: now,
+			total_time_ms: totalTimeMs,
+			updated_at: now,
+		})
+		.eq("id", originalTaskId);
+
+	if (completeError) throw completeError;
+
+	// 2. Insert re-entered task at the computed position
+	// Instead of inserting at the computed pageNumber/position,
+	// insert at a position that guarantees it sorts last
+	const { data: newTask, error: insertError } = await supabase
+		.from("tasks")
+		.insert({
+			text: newText,
+			page_number: 9999, // sentinel — reindex will correct this
+			position: 9999, // sentinel — reindex will correct this
+			status: "active",
+			total_time_ms: totalTimeMs,
+			re_entered_from: originalTaskId,
+			tag: tag ?? null,
+			pamphlet_id: pamphletId ?? null,
+			user_id: user.id,
+		})
+		.select()
+		.single();
+
+	if (insertError) throw insertError;
+
+	// NOW reindex — new task sorts last because 9999 > everything else
+	await reindexActiveTasks(pamphletId);
+
+	return newTask;
 }
 
 // =============================================================================
-// LOGGED ACTIVITY
+// LOGGED ACTIVITY FUNCTIONS
 // =============================================================================
 
 export async function addLoggedActivity(
 	text: string,
 	tag?: TagId | null,
 	note?: string | null,
-	completedAt?: string | null,
+	completedAt?: string | null, // allows backdating
 	pamphletId?: string | null,
 	source?: "log" | "task",
 ): Promise<Task> {

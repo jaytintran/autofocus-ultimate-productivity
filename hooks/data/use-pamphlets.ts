@@ -11,7 +11,7 @@ import {
 	updatePamphlet,
 	deletePamphlet,
 	reassignPamphletTasks,
-} from "@/lib/db/store";
+} from "@/lib/db/store-v1";
 import {
 	getActivePamphletId,
 	setActivePamphletId,
@@ -20,7 +20,7 @@ import {
 	invalidatePamphletCache,
 } from "@/lib/db/pamphlet-cache";
 import type { Task, Pamphlet, PamphletColor } from "@/lib/types";
-import { reorderPamphlets } from "@/lib/db/store";
+import { reorderPamphlets } from "@/lib/db/store-v1";
 
 import { useUserId } from "@/hooks/state/use-user-id";
 
