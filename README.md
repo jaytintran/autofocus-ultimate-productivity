@@ -1,45 +1,103 @@
 # Autofocus
 
-Autofocus is a productivity system that helps you stay focused and on track. It's a simple yet powerful tool that helps you manage your tasks and prioritize your work. This project is a web application that implements the Autofocus system.
+Autofocus is a productivity system that helps you stay focused and on track. It's a simple yet powerful tool that helps you manage your tasks and prioritize your work. This project is a web application that implements the Autofocus system with additional productivity features.
 
 ---
 
 # Features
 
-- Single-list task management with AF4 page-based workflow
-- Working task panel with live timer (start / pause / resume / stop)
-- Task tags with filter bar — add tags in `src/lib/tags.ts`
-- Completed tasks view grouped by date and time of day
-- Mobile swipe-to-reveal action tray
-- Dark / light theme
-- Second Brain quick-links panel (Notion integration)
-- Fully persistent via Supabase — syncs across devices
+## Task Management (AF4 System)
+
+- **Single-list workflow** with page-based navigation (12 tasks per page)
+- **Working task panel** with live timer (start / pause / resume / stop)
+- **Task tags** with filter bar — customizable in `src/lib/tags.ts`
+- **Task notes** — add context and achievements during work sessions
+- **Sidequest tracking** — log mini-tasks completed during main task sessions
+- **Completed tasks view** with three display modes:
+  - Default: grouped by date and time of day (morning/afternoon/evening)
+  - Bullet Journal: chronological log with activity logging
+  - 7-Day View: week-at-a-glance grid
+- **Task search** in both active and completed views
+- **Export functionality** — export tasks to JSON, CSV, or Markdown
+- **Mobile-optimized** with swipe-to-reveal action tray
+- **Drag-and-drop** task reordering
+
+## Habit Tracking
+
+- **Daily habit check-ins** with streak tracking
+- **Category organization** (Health, Productivity, Learning, Mindfulness, Social, Creative)
+- **Frequency targets** — set weekly goals (e.g., 3x/week, 5x/week)
+- **Progress visualization** — current streak and weekly completion stats
+- **66-day habit formation** tracking
+- **Export habits** to JSON, CSV, or Markdown
+
+## Project Management
+
+- **Project dashboard** with status tracking (Planning, Active, On Hold, Completed, Archived)
+- **Priority levels** (High, Medium, Low)
+- **Progress tracking** with percentage completion
+- **Category organization** (Work, Personal, Learning, Health, Creative, Finance, Social)
+- **Due dates** and key outcomes tracking
+- **Detailed notes** and descriptions
+- **Export projects** to JSON, CSV, or Markdown
+
+## Book Tracking
+
+- **Reading list** organized by domain (Fiction, Non-Fiction, Technical, Business, Self-Help, Philosophy, Science, History, Biography)
+- **Reading progress** tracking (page numbers and percentages)
+- **Priority system** for reading queue
+- **Status management** (To Read, Reading, Completed, Paused, DNF)
+- **Rating system** (1-5 stars)
+- **Notes and key takeaways** capture
+- **Dashboard view** with reading statistics
+- **Export books** to JSON, CSV, or Markdown
+
+## Second Brain Integration
+
+- **Quick-links panel** with Notion integration
+- **Customizable pamphlets** — organize links by category
+- **One-click access** to external resources
+
+## Theming & Customization
+
+- **Multiple themes**: Light, Dark, Golden Twilight, Mossy Woods
+- **Custom fonts**: Geist Mono, Rubik, IBM Plex Mono, Literata, DM Sans, Playfair Display
+- **Responsive design** — works seamlessly on desktop, tablet, and mobile
+
+## Data Persistence
+
+- **Supabase backend** — all data syncs across devices in real-time
+- **Offline-capable** with SWR caching
+- **Row-level security** for authenticated users
 
 ---
 
 # Why I Built It?
 
 I built Autofocus because I wanted to create a tool that helps me stay focused and productive. I found that traditional task management systems can be overwhelming and distracting, so I wanted to create a simple and intuitive tool that helps me stay on track.
-I also wanted to create a tool that is customizable to my needs. Autofocus allows me to prioritize my tasks and tag them in a way that makes sense to me. It also provides a task history so that I can see what I've done in the past and learn from it.
-Overall, Autofocus is a tool that helps me stay focused, productive, and organized.
+
+I also wanted to create a tool that is customizable to my needs. Autofocus allows me to prioritize my tasks and tag them in a way that makes sense to me. It also provides a comprehensive task history so that I can see what I've done in the past and learn from it.
+
+Beyond tasks, I needed a unified system to track habits, manage projects, and organize my reading list — all in one place. Autofocus is a complete productivity suite that helps me stay focused, productive, and organized across all areas of my life.
 
 ---
 
 # Tech Stack
 
-- Next.js: A React framework for building server-rendered applications.
-- React: A JavaScript library for building user interfaces.
-- Tailwind CSS: A utility-first CSS framework for rapidly building custom user interfaces.
-- Lucide Icons: A collection of open-source icons.
-- SWR: A React hook library for data fetching.
-- Class Variance Authority: A library for managing CSS class variants.
-- TypeScript: A statically typed superset of JavaScript.
-- Tailwind Utilities: A collection of utility styles for Tailwind CSS.
-- Radix UI: A set of accessible, modular, and responsive UI components.
-- DND Kit: A library for building drag-and-drop interfaces.
-- Date FNS: A library for working with dates and times.
-- Supabase: A platform for building and deploying full-stack applications.
-- Google Fonts: A library of open-source fonts.
+- **Next.js 16** — React framework with App Router and Turbopack
+- **React 19** — UI library with latest features
+- **TypeScript 5.7** — Type-safe development
+- **Tailwind CSS 4** — Utility-first styling
+- **Radix UI** — Accessible, modular UI components
+- **Lucide Icons** — Beautiful open-source icons
+- **DND Kit** — Drag-and-drop functionality
+- **SWR** — Data fetching and caching
+- **Date-fns** — Date manipulation
+- **Supabase** — Backend, database, and real-time sync
+- **Framer Motion** — Smooth animations
+- **Sonner** — Toast notifications
+- **Class Variance Authority** — Component variant management
+- **Vercel Analytics** — Performance monitoring
 
 ---
 
@@ -65,7 +123,7 @@ Overall, Autofocus is a tool that helps me stay focused, productive, and organiz
 
 1. In your Supabase project dashboard, click **SQL Editor** in the left sidebar
 2. Click **New query**
-3. Copy and paste the entire contents of `create_tables_starter.sql` into the editor
+3. Copy and paste the entire contents of `scripts/create_tables.sql` into the editor
 4. Click **Run** (or `Cmd+Enter` / `Ctrl+Enter`)
 5. You should see `Success. No rows returned` — tables and indexes are now created
 
@@ -111,7 +169,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Adding New Tags
+## Customization
+
+### Adding New Tags
 
 Tags are defined in `src/lib/tags.ts`:
 
@@ -120,7 +180,6 @@ export const TAG_DEFINITIONS = [
 	{ id: "read" as const, label: "to Read", emoji: "📚" },
 	{ id: "learn" as const, label: "to Learn", emoji: "🎓" },
 	{ id: "finish" as const, label: "to Finish", emoji: "📋" },
-	// Add new tags here — no SQL migration needed
 	{ id: "watch" as const, label: "to Watch", emoji: "👀" },
 ] as const;
 ```
@@ -129,7 +188,30 @@ The `tag` column in Supabase has no `CHECK` constraint — TypeScript enforces v
 
 ---
 
-## Resetting All Data
+### Customizing Themes
+
+Themes are configured in `app/layout.tsx`. The app includes four built-in themes:
+
+- **Light** — Clean, minimal light theme
+- **Dark** — Easy on the eyes dark theme
+- **Golden Twilight** — Warm, sunset-inspired palette
+- **Mossy Woods** — Natural, earthy tones
+
+Switch themes from the settings panel in the app.
+
+---
+
+## Data Management
+
+### Exporting Data
+
+Export your data from the app's export panel:
+
+- **Tasks** — Export active and completed tasks
+- **Full Suite** — Export tasks, habits, projects, and books together
+- **Formats** — JSON (structured data), CSV (spreadsheet), or Markdown (readable)
+
+### Resetting All Data
 
 To wipe all tasks and reset app state, run this in the Supabase SQL Editor:
 
@@ -168,7 +250,7 @@ WHERE id = '00000000-0000-0000-0000-000000000001';
 - Fix: run this in the SQL Editor:
 
 ```sql
-  ALTER TABLE tasks DROP CONSTRAINT tasks_tag_check;
+ALTER TABLE tasks DROP CONSTRAINT tasks_tag_check;
 ```
 
 ---
@@ -183,3 +265,9 @@ The app deploys to [Vercel](https://vercel.com) without any configuration change
 4. Deploy
 
 The same `.env.local` variables work in Vercel's environment variable settings.
+
+---
+
+## License
+
+MIT
