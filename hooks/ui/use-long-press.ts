@@ -16,9 +16,11 @@ export function useLongPress({
 	const start = useCallback(
 		(e: React.TouchEvent) => {
 			movedRef.current = false;
-			setIsDragging(true);
 			timerRef.current = setTimeout(() => {
-				if (!movedRef.current) onLongPress(e);
+				if (!movedRef.current) {
+					setIsDragging(true);
+					onLongPress(e);
+				}
 			}, delay);
 		},
 		[onLongPress, delay],

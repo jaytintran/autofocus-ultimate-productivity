@@ -403,6 +403,13 @@ const TaskRow = memo(function TaskRow({
 		}
 	}, [isEditing]);
 
+	// Close due date picker when entering edit mode
+	useEffect(() => {
+		if (isEditing) {
+			setDueDatePickerOpen(false);
+		}
+	}, [isEditing]);
+
 	// Auto-resize textarea
 	useEffect(() => {
 		if (isEditing && inputRef.current) {
@@ -525,6 +532,13 @@ const TaskRow = memo(function TaskRow({
 
 	const shouldDisableSwipe = disableSwipe || isWorking;
 
+	// Close swipe tray when task becomes working
+	useEffect(() => {
+		if (isWorking) {
+			close();
+		}
+	}, [isWorking, close]);
+
 	// Due date urgency styling
 	const dueDateClasses = useMemo(() => {
 		if (!task.due_date) return "";
@@ -551,16 +565,22 @@ const TaskRow = memo(function TaskRow({
 				`}
 				onContextMenu={handleContextMenu}
 				onTouchStart={(e) => {
-					if (!isDragging && !isLongPressDragging) lpStart(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchStart(e);
+					if (!isDragging) {
+						lpStart(e);
+						if (isMobile && !shouldDisableSwipe) onTouchStart(e);
+					}
 				}}
 				onTouchMove={(e) => {
-					if (!isDragging && !isLongPressDragging) lpMove(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchMove(e);
+					if (!isDragging) {
+						lpMove(e);
+						if (isMobile && !shouldDisableSwipe) onTouchMove(e);
+					}
 				}}
 				onTouchEnd={(e) => {
-					if (!isDragging && !isLongPressDragging) lpEnd(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchEnd(e);
+					if (!isDragging) {
+						lpEnd(e);
+						if (isMobile && !shouldDisableSwipe) onTouchEnd(e);
+					}
 				}}
 			>
 				{/* Sliding content wrapper */}
