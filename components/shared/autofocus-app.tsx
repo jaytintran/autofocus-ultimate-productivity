@@ -2132,6 +2132,7 @@ export function AutofocusApp() {
 							activePamphletId={activePamphletId}
 							onMoveTask={handleMoveTask}
 							onUpdateDueDate={handleUpdateTaskDueDate}
+							onUpdateText={(taskId, text) => handleUpdateTaskText(taskId, text, false)}
 						/>
 					))}
 				{activeView === "completed" && (

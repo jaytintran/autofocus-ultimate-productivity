@@ -24,6 +24,7 @@ import {
 	ChevronRight,
 	Dot,
 	Search,
+	Circle,
 } from "lucide-react";
 import {
 	TAG_DEFINITIONS,
@@ -392,8 +393,8 @@ const BulletIndicator = memo(function BulletIndicator({
 }) {
 	if (isLog) {
 		return (
-			<span className="text-muted-foreground/50 flex-shrink-0 font-mono text-base leading-none mt-0.5">
-				•
+			<span className="text-muted-foreground/50 flex-shrink-0 leading-none mt-0.5">
+				<Circle className="w-3.5 h-3.5" />
 			</span>
 		);
 	}
@@ -405,14 +406,14 @@ const BulletIndicator = memo(function BulletIndicator({
 				onClick={onClick}
 				className="flex-shrink-0 text-amber-500 hover:text-amber-400 transition-colors leading-none mt-0.5"
 			>
-				× {/* <X className="w-3.5 h-3.5" /> */}
+				<X className="w-3.5 h-3.5" />
 			</button>
 		);
 	}
 
 	return (
-		<span className="text-[#8b9a6b] flex-shrink-0 font-mono text-sm leading-none mt-0.5">
-			×
+		<span className="text-[#8b9a6b] flex-shrink-0 leading-none mt-0.5">
+			<Check className="w-3.5 h-3.5" />
 		</span>
 	);
 });
@@ -433,22 +434,24 @@ const TaskMetadata = memo(function TaskMetadata({
 	onUpdateTag: (tag: TagId | null) => void;
 }) {
 	return (
-		<div className="flex items-center gap-2 mt-0.5 flex-wrap">
-			{completedAt && (
-				<span className="text-[11px] text-muted-foreground/60 font-mono">
-					{formatCompletionTime(completedAt)}
-				</span>
-			)}
-			{totalTimeMs > 0 && (
-				<span className="text-[11px] text-[#8b9a6b]">
-					{formatTimeCompact(totalTimeMs)}
-				</span>
-			)}
+		<div className="flex items-center justify-between gap-2 mt-0.5">
+			<div className="flex items-center gap-2 flex-wrap">
+				{completedAt && (
+					<span className="text-[11px] text-muted-foreground/60 font-mono">
+						{formatCompletionTime(completedAt)}
+					</span>
+				)}
+				{totalTimeMs > 0 && (
+					<span className="text-[11px] text-[#8b9a6b]">
+						{formatTimeCompact(totalTimeMs)}
+					</span>
+				)}
+			</div>
 			<TagPill
 				tagId={tag}
 				onSelectTag={onUpdateTag}
 				disabled={loadingTagTaskId !== null || isLoading}
-				className="scale-90 origin-left"
+				className="scale-90 origin-right"
 			/>
 		</div>
 	);
@@ -587,7 +590,7 @@ const BulletRow = memo(function BulletRow({
 	return (
 		<li className={`group py-1.5 ${isLoading ? "opacity-50" : ""}`}>
 			<div className="flex items-start gap-2.5">
-				<div className="relative z-10 bg-background">
+				<div className="relative z-10 bg-background px-0.5">
 					<BulletIndicator
 						isLog={isLog}
 						hasNote={!!task.note}

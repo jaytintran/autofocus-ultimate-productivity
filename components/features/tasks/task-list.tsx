@@ -84,6 +84,7 @@ interface TaskListProps {
 	activePamphletId: string | null;
 	onMoveTask: (taskId: string, toPamphletId: string) => void;
 	onUpdateDueDate: (taskId: string, dueDate: string | null) => Promise<void>;
+	onUpdateText?: (taskId: string, text: string) => Promise<void>;
 }
 
 interface TaskRowProps {
@@ -1015,6 +1016,7 @@ export function TaskList({
 	activePamphletId,
 	onMoveTask,
 	onUpdateDueDate,
+	onUpdateText,
 }: TaskListProps) {
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -1240,17 +1242,28 @@ export function TaskList({
 
 	const handleUpdateText = useCallback(
 		async (taskId: string, newText: string, dueDate?: string | null) => {
-			try {
-				await updateTask(taskId, {
-					text: newText,
-					...(dueDate !== undefined && { due_date: dueDate }),
-				});
-			} catch (error) {
-				console.error("Failed to update task text:", error);
-				onRefresh();
+			if (onUpdateText) {
+				// Use parent's optimistic update handler
+				await onUpdateText(taskId, newText);
+				// If there's a due date change, handle it separately
+				if (dueDate !== undefined) {
+					await onUpdateDueDate(taskId, dueDate);
+				}
+			} else {
+				// Fallback to direct update (shouldn't happen in normal flow)
+				try {
+					await updateTask(taskId, {
+						text: newText,
+						...(dueDate !== undefined && { due_date: dueDate }),
+					});
+					onRefresh();
+				} catch (error) {
+					console.error("Failed to update task text:", error);
+					onRefresh();
+				}
 			}
 		},
-		[onRefresh],
+		[onUpdateText, onUpdateDueDate, onRefresh],
 	);
 
 	const handleSwitchTask = useCallback(
