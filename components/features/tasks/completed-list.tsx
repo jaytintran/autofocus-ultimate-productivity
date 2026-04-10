@@ -587,11 +587,13 @@ const BulletRow = memo(function BulletRow({
 	return (
 		<li className={`group py-1.5 ${isLoading ? "opacity-50" : ""}`}>
 			<div className="flex items-start gap-2.5">
-				<BulletIndicator
-					isLog={isLog}
-					hasNote={!!task.note}
-					onClick={handleSelect}
-				/>
+				<div className="relative z-10 bg-background">
+					<BulletIndicator
+						isLog={isLog}
+						hasNote={!!task.note}
+						onClick={handleSelect}
+					/>
+				</div>
 
 				<div className="flex-1 min-w-0">
 					<TaskMetadata
@@ -615,8 +617,8 @@ const BulletRow = memo(function BulletRow({
 					</span>
 
 					{task.note &&
-						/* 
-							
+						/*
+
 							Multi-line Note -> Logs
 							- It is logged in real-time during a work session, timestamped, granular.
 							- It's a session log or just log.
@@ -625,8 +627,8 @@ const BulletRow = memo(function BulletRow({
 						(isMultiLineNote ? (
 							<TaskSessionLogNote note={task.note} />
 						) : (
-							/* 
-							
+							/*
+
 							Single-line Note -> Achievement
 							- It's written at completion, one reflection, summary of what was done.
 							- It's an achievement note or just achievement.
@@ -680,21 +682,28 @@ const TimeBlockSection = memo(function TimeBlockSection({
 			</button>
 
 			{!isCollapsed && (
-				<ul className="space-y-0">
-					{timeBlock.tasks.map((task) => (
-						<BulletRow
-							key={task.id}
-							task={task}
-							isLoading={task.id === loadingTaskId}
-							loadingTagTaskId={loadingTagTaskId}
-							showDeleteConfirm={showDeleteConfirm}
-							onSelect={onSelectTask}
-							onRevert={onRevertTask}
-							onDelete={onDeleteTask}
-							onUpdateTag={onUpdateTag}
-						/>
-					))}
-				</ul>
+				<div className="relative">
+					{/* Vertical connecting line for BuJo aesthetic */}
+					{timeBlock.tasks.length > 0 && (
+						<div className="absolute left-[7px] top-0 bottom-0 w-[2px] bg-border/30" />
+					)}
+
+					<ul className="space-y-0 relative">
+						{timeBlock.tasks.map((task) => (
+							<BulletRow
+								key={task.id}
+								task={task}
+								isLoading={task.id === loadingTaskId}
+								loadingTagTaskId={loadingTagTaskId}
+								showDeleteConfirm={showDeleteConfirm}
+								onSelect={onSelectTask}
+								onRevert={onRevertTask}
+								onDelete={onDeleteTask}
+								onUpdateTag={onUpdateTag}
+							/>
+						))}
+					</ul>
+				</div>
 			)}
 		</div>
 	);
