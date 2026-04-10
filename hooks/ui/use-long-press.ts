@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 
 interface UseLongPressOptions {
 	onLongPress: (e: React.TouchEvent) => void;
@@ -11,10 +11,12 @@ export function useLongPress({
 }: UseLongPressOptions) {
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const movedRef = useRef(false);
+	const [isDragging, setIsDragging] = useState(false);
 
 	const start = useCallback(
 		(e: React.TouchEvent) => {
 			movedRef.current = false;
+			setIsDragging(true);
 			timerRef.current = setTimeout(() => {
 				if (!movedRef.current) onLongPress(e);
 			}, delay);
@@ -27,6 +29,7 @@ export function useLongPress({
 			clearTimeout(timerRef.current);
 			timerRef.current = null;
 		}
+		setIsDragging(false);
 	}, []);
 
 	const move = useCallback(
@@ -36,5 +39,5 @@ export function useLongPress({
 		},
 		[cancel],
 	);
-	return { onTouchStart: start, onTouchEnd: cancel, onTouchMove: move };
+	return { onTouchStart: start, onTouchEnd: cancel, onTouchMove: move, isDragging };
 }

@@ -513,6 +513,7 @@ const TaskRow = memo(function TaskRow({
 		onTouchStart: lpStart,
 		onTouchEnd: lpEnd,
 		onTouchMove: lpMove,
+		isDragging: isLongPressDragging,
 	} = useLongPress({
 		onLongPress: (e) => {
 			if (isEditing || isDragging) return; // Don't trigger long press while dragging
@@ -550,16 +551,16 @@ const TaskRow = memo(function TaskRow({
 				`}
 				onContextMenu={handleContextMenu}
 				onTouchStart={(e) => {
-					lpStart(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging) onTouchStart(e);
+					if (!isDragging && !isLongPressDragging) lpStart(e);
+					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchStart(e);
 				}}
 				onTouchMove={(e) => {
-					lpMove(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging) onTouchMove(e);
+					if (!isDragging && !isLongPressDragging) lpMove(e);
+					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchMove(e);
 				}}
 				onTouchEnd={(e) => {
-					lpEnd(e);
-					if (isMobile && !shouldDisableSwipe && !isDragging) onTouchEnd(e);
+					if (!isDragging && !isLongPressDragging) lpEnd(e);
+					if (isMobile && !shouldDisableSwipe && !isDragging && !isLongPressDragging) onTouchEnd(e);
 				}}
 			>
 				{/* Sliding content wrapper */}
