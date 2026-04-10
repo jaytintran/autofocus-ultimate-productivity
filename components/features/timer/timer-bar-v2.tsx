@@ -31,6 +31,7 @@ import {
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { NoteEntryList } from "./note-entry-list";
 
 // =============================================================================
 // TYPES
@@ -799,6 +800,35 @@ export function TimerBar({
 		setNoteInput("");
 	}, [noteInput, effectiveWorkingTask, sessionMs, noteType]);
 
+	// Note entry editing handlers
+	const handleNoteEditStart = useCallback((id: string, text: string) => {
+		setEditingNoteId(id);
+		setEditingNoteText(text);
+	}, []);
+
+	const handleNoteEditChange = useCallback((text: string) => {
+		setEditingNoteText(text);
+	}, []);
+
+	const handleNoteEditSave = useCallback((id: string, text: string) => {
+		setNoteEntries((prev) =>
+			prev.map((n) => (n.id === id ? { ...n, text } : n)),
+		);
+		setEditingNoteId(null);
+		setEditingNoteText("");
+	}, []);
+
+	const handleNoteEditCancel = useCallback(() => {
+		setEditingNoteId(null);
+		setEditingNoteText("");
+	}, []);
+
+	const handleNoteDelete = useCallback((id: string) => {
+		setNoteEntries((prev) => prev.filter((n) => n.id !== id));
+		setEditingNoteId(null);
+		setEditingNoteText("");
+	}, []);
+
 	// ── Idle state — delegate to extracted component ───────────────────────────
 	if (!effectiveWorkingTask) {
 		return (
@@ -1294,114 +1324,16 @@ export function TimerBar({
 									scrollbarColor: "hsl(var(--border)) transparent",
 								}}
 							>
-								{[
-									...noteEntries.filter((e) => e.type === "achievement"),
-									...noteEntries.filter((e) => e.type === "sidequest"),
-									...noteEntries.filter((e) => e.type === "log"),
-								].map((entry) => {
-									const isAchievement = entry.type === "achievement";
-									const isSidequest = entry.type === "sidequest";
-									return (
-										<div
-											key={entry.id}
-											className="flex items-baseline gap-2 text-xs"
-										>
-											{/* Bullet / icon */}
-											{isAchievement ? (
-												<span className="text-amber-500 flex-shrink-0 text-[11px]">
-													🏆
-												</span>
-											) : isSidequest ? (
-												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-											) : (
-												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
-													•
-												</span>
-											)}
-
-											{/* Timestamp — only for logs */}
-											{!isAchievement && !isSidequest && (
-												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
-													{formatTimeCompact(entry.elapsedMs)}
-												</span>
-											)}
-
-											{/* Inline edit */}
-											{editingNoteId === entry.id ? (
-												<input
-													autoFocus
-													value={editingNoteText}
-													onChange={(e) => setEditingNoteText(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") {
-															const trimmed = editingNoteText.trim();
-															if (trimmed) {
-																setNoteEntries((prev) =>
-																	prev.map((n) =>
-																		n.id === entry.id
-																			? { ...n, text: trimmed }
-																			: n,
-																	),
-																);
-															} else {
-																setNoteEntries((prev) =>
-																	prev.filter((n) => n.id !== entry.id),
-																);
-															}
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-														if (e.key === "Escape") {
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-													}}
-													onBlur={() => {
-														const trimmed = editingNoteText.trim();
-														if (trimmed) {
-															setNoteEntries((prev) =>
-																prev.map((n) =>
-																	n.id === entry.id
-																		? { ...n, text: trimmed }
-																		: n,
-																),
-															);
-														} else {
-															setNoteEntries((prev) =>
-																prev.filter((n) => n.id !== entry.id),
-															);
-														}
-														setEditingNoteId(null);
-														setEditingNoteText("");
-													}}
-													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-400"
-															: isSidequest
-																? "text-sky-400"
-																: "text-foreground"
-													}`}
-												/>
-											) : (
-												<span
-													onClick={() => {
-														setEditingNoteId(entry.id);
-														setEditingNoteText(entry.text);
-													}}
-													className={`cursor-pointer hover:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-500 dark:text-amber-400"
-															: isSidequest
-																? "text-sky-500 dark:text-sky-400"
-																: "text-foreground/70"
-													}`}
-												>
-													{entry.text}
-												</span>
-											)}
-										</div>
-									);
-								})}
+								<NoteEntryList
+									entries={noteEntries}
+									editingNoteId={editingNoteId}
+									editingNoteText={editingNoteText}
+									onEditStart={handleNoteEditStart}
+									onEditChange={handleNoteEditChange}
+									onEditSave={handleNoteEditSave}
+									onEditCancel={handleNoteEditCancel}
+									onDelete={handleNoteDelete}
+								/>
 							</div>
 						</CollapsibleContent>
 
@@ -1428,114 +1360,16 @@ export function TimerBar({
 									scrollbarColor: "hsl(var(--border)) transparent",
 								}}
 							>
-								{[
-									...noteEntries.filter((e) => e.type === "achievement"),
-									...noteEntries.filter((e) => e.type === "sidequest"),
-									...noteEntries.filter((e) => e.type === "log"),
-								].map((entry) => {
-									const isAchievement = entry.type === "achievement";
-									const isSidequest = entry.type === "sidequest";
-									return (
-										<div
-											key={entry.id}
-											className="flex items-baseline gap-2 text-xs"
-										>
-											{/* Bullet / icon */}
-											{isAchievement ? (
-												<span className="text-amber-500 flex-shrink-0 text-[11px]">
-													🏆
-												</span>
-											) : isSidequest ? (
-												<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-											) : (
-												<span className="text-[#8b9a6b] font-mono flex-shrink-0">
-													•
-												</span>
-											)}
-
-											{/* Timestamp — only for logs */}
-											{!isAchievement && !isSidequest && (
-												<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
-													{formatTimeCompact(entry.elapsedMs)}
-												</span>
-											)}
-
-											{/* Inline edit */}
-											{editingNoteId === entry.id ? (
-												<input
-													autoFocus
-													value={editingNoteText}
-													onChange={(e) => setEditingNoteText(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") {
-															const trimmed = editingNoteText.trim();
-															if (trimmed) {
-																setNoteEntries((prev) =>
-																	prev.map((n) =>
-																		n.id === entry.id
-																			? { ...n, text: trimmed }
-																			: n,
-																	),
-																);
-															} else {
-																setNoteEntries((prev) =>
-																	prev.filter((n) => n.id !== entry.id),
-																);
-															}
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-														if (e.key === "Escape") {
-															setEditingNoteId(null);
-															setEditingNoteText("");
-														}
-													}}
-													onBlur={() => {
-														const trimmed = editingNoteText.trim();
-														if (trimmed) {
-															setNoteEntries((prev) =>
-																prev.map((n) =>
-																	n.id === entry.id
-																		? { ...n, text: trimmed }
-																		: n,
-																),
-															);
-														} else {
-															setNoteEntries((prev) =>
-																prev.filter((n) => n.id !== entry.id),
-															);
-														}
-														setEditingNoteId(null);
-														setEditingNoteText("");
-													}}
-													className={`flex-1 bg-transparent border-none outline-none text-xs focus:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-400"
-															: isSidequest
-																? "text-sky-400"
-																: "text-foreground"
-													}`}
-												/>
-											) : (
-												<span
-													onClick={() => {
-														setEditingNoteId(entry.id);
-														setEditingNoteText(entry.text);
-													}}
-													className={`cursor-pointer hover:text-foreground transition-colors ${
-														isAchievement
-															? "text-amber-500 dark:text-amber-400"
-															: isSidequest
-																? "text-sky-500 dark:text-sky-400"
-																: "text-foreground/70"
-													}`}
-												>
-													{entry.text}
-												</span>
-											)}
-										</div>
-									);
-								})}
+								<NoteEntryList
+									entries={noteEntries}
+									editingNoteId={editingNoteId}
+									editingNoteText={editingNoteText}
+									onEditStart={handleNoteEditStart}
+									onEditChange={handleNoteEditChange}
+									onEditSave={handleNoteEditSave}
+									onEditCancel={handleNoteEditCancel}
+									onDelete={handleNoteDelete}
+								/>
 							</div>
 						)}
 					</div>
