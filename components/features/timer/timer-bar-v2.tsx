@@ -160,12 +160,28 @@ function IdleInput({
 	);
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 	const [submitting, setSubmitting] = useState(false);
+	const [dropdownPosition, setDropdownPosition] = useState<"top" | "bottom">(
+		"top",
+	);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const inputContainerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedQuery(focusQuery), 400);
 		return () => clearTimeout(t);
 	}, [focusQuery]);
+
+	// Check available space and adjust dropdown position
+	useEffect(() => {
+		if (focusMentionQuery !== null && inputContainerRef.current) {
+			const rect = inputContainerRef.current.getBoundingClientRect();
+			const spaceAbove = rect.top;
+			const spaceBelow = window.innerHeight - rect.bottom;
+
+			// If less than 200px above, show below instead
+			setDropdownPosition(spaceAbove < 200 ? "bottom" : "top");
+		}
+	}, [focusMentionQuery]);
 
 	const focusMatches = useMemo(
 		() =>
@@ -265,10 +281,12 @@ function IdleInput({
 	return (
 		<div className="border-y border-border/80 bg-card px-6 py-6 md:px-10">
 			<div className="mx-auto flex max-w-6xl flex-col items-center w-full">
-				<div className="relative w-full max-w-2xl">
+				<div ref={inputContainerRef} className="relative w-full max-w-2xl">
 					{/* Tag mention dropdown */}
 					{focusMentionQuery !== null && focusMentionResults.length > 0 && (
-						<div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-lg p-1.5 z-50 min-w-[160px]">
+						<div
+							className={`absolute ${dropdownPosition === "top" ? "bottom-full mb-2" : "top-full mt-2"} left-0 bg-card border border-border rounded-xl shadow-lg p-1.5 z-50 min-w-[160px]`}
+						>
 							<p className="text-[10px] text-muted-foreground px-2 py-1">
 								Tag as...
 							</p>
