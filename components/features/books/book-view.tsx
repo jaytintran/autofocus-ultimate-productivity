@@ -239,13 +239,17 @@ function BookModal({
 	onUpdate,
 	onDelete,
 	onStatusChange,
+	allBooks,
 }: {
 	book: Book;
 	onClose: () => void;
 	onUpdate: (id: string, updates: Partial<Book>) => Promise<void>;
 	onDelete: (id: string) => Promise<void>;
 	onStatusChange: (id: string, status: BookStatus) => Promise<void>;
+	allBooks: Book[];
 }) {
+	const [tags, setTags] = useState<string[]>(book.tags ?? []);
+	const [tagInput, setTagInput] = useState("");
 	const [notes, setNotes] = useState(book.notes ?? "");
 	const [takeaways, setTakeaways] = useState(book.key_takeaways ?? "");
 	const [currentPage, setCurrentPage] = useState(
@@ -256,6 +260,7 @@ function BookModal({
 	);
 	const [isSaving, setIsSaving] = useState(false);
 	const [localStatus, setLocalStatus] = useState<BookStatus>(book.status);
+	const [rating, setRating] = useState<number | null>(book.rating ?? null);
 
 	const progress =
 		totalPages && currentPage
@@ -264,6 +269,14 @@ function BookModal({
 					Math.round((parseInt(currentPage) / parseInt(totalPages)) * 100),
 				)
 			: null;
+
+	// Get all tags from books in the same domain
+	const domainTags = useMemo(() => {
+		const all = allBooks
+			.filter((b) => b.domain === book.domain && b.tags)
+			.flatMap((b) => b.tags as string[]);
+		return Array.from(new Set(all)).sort();
+	}, [allBooks, book.domain]);
 
 	const handleSave = async () => {
 		setIsSaving(true);
@@ -275,6 +288,8 @@ function BookModal({
 				key_takeaways: takeaways.trim() || null,
 				current_page: currentPage ? parseInt(currentPage) : null,
 				total_pages: totalPages ? parseInt(totalPages) : null,
+				tags: tags.length ? tags : null,
+				rating: rating,
 			});
 			if (localStatus !== book.status) {
 				await onStatusChange(book.id, localStatus);
@@ -294,69 +309,121 @@ function BookModal({
 			<DialogContent className="sm:max-w-[580px] max-w-[calc(100vw-2rem)] p-0 overflow-hidden max-h-[90vh] flex flex-col">
 				{/* Header */}
 				<DialogHeader />
-				<div className="px-6 pt-5 pb-4 flex-shrink-0">
-					<DialogTitle>
+				<div className="px-6 pt-5 pb-4 flex-shrink-0 space-y-4">
+					<div>
+						<DialogTitle>
+							<input
+								value={title}
+								onChange={(e) => setTitle(e.target.value)}
+								className="text-base font-semibold bg-transparent border-b border-transparent hover:border-border focus:border-ring focus:outline-none transition-colors w-full pr-6"
+							/>
+						</DialogTitle>
 						<input
-							value={title}
-							onChange={(e) => setTitle(e.target.value)}
-							className="text-base font-semibold bg-transparent border-b border-transparent hover:border-border focus:border-ring focus:outline-none transition-colors w-full pr-6"
+							value={author}
+							onChange={(e) => setAuthor(e.target.value)}
+							className="text-sm text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-ring focus:outline-none transition-colors w-full mt-1"
 						/>
-					</DialogTitle>
-					<input
-						value={author}
-						onChange={(e) => setAuthor(e.target.value)}
-						className="text-sm text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-ring focus:outline-none transition-colors w-full mt-1 mb-2"
-					/>
-
-					{/* Meta pills */}
-					<div className="flex items-center gap-2 mt-3 flex-wrap">
-						{priority && (
-							<span
-								className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${priority.color} ${priority.bg}`}
-							>
-								{priority.label}
-							</span>
-						)}
-						<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-							{book.domain}
-						</span>
-						{book.layer && (
-							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-								{book.layer}
-							</span>
-						)}
-						{book.rating && (
-							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground flex items-center gap-1">
-								<Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-								{book.rating}
-							</span>
-						)}
 					</div>
 
-					{/* Status selector */}
-					<div className="flex items-center gap-1.5 mt-3 flex-wrap">
-						{(Object.keys(STATUS_CONFIG) as BookStatus[]).map((s) => {
-							const cfg = STATUS_CONFIG[s];
-							return (
-								<button
-									key={s}
-									type="button"
-									onClick={() => setLocalStatus(s)}
-									className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
-										localStatus === s
-											? `border-foreground/30 bg-foreground/10 ${cfg.text}`
-											: "border-border text-muted-foreground hover:border-foreground/20"
-									}`}
+					{/* Meta info section */}
+					<div className="space-y-3">
+						<div className="flex items-center gap-2 flex-wrap">
+							<span className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium">
+								Meta
+							</span>
+							{priority && (
+								<span
+									className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${priority.color} ${priority.bg}`}
 								>
-									{cfg.label}
-								</button>
-							);
-						})}
+									{priority.label}
+								</span>
+							)}
+							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+								{book.domain}
+							</span>
+							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+								{book.book_type}
+							</span>
+						</div>
+
+						{/* Rating selector */}
+						<div className="flex items-center gap-2">
+							<span className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium">
+								Rating
+							</span>
+							<div className="flex items-center gap-0.5">
+								{Array.from({ length: 5 }).map((_, i) => (
+									<button
+										key={i}
+										type="button"
+										onClick={() => setRating(rating === i + 1 ? null : i + 1)}
+										className="hover:scale-110 transition-transform"
+									>
+										<Star
+											className={`w-4 h-4 ${
+												rating && i < rating
+													? "fill-amber-400 text-amber-400"
+													: "text-muted-foreground/20 hover:text-amber-400/50"
+											}`}
+										/>
+									</button>
+								))}
+								{rating && (
+									<button
+										type="button"
+										onClick={() => setRating(null)}
+										className="ml-1 text-[10px] text-muted-foreground/40 hover:text-foreground"
+									>
+										<X className="w-3 h-3" />
+									</button>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{/* Reading status section */}
+					<div className="bg-secondary/30 rounded-lg px-3 py-3 space-y-2">
+						<div className="flex items-center gap-2">
+							<span className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium">
+								Reading Status
+							</span>
+						</div>
+						<div className="flex items-center gap-1.5 flex-wrap">
+							{(Object.keys(STATUS_CONFIG) as BookStatus[]).map((s) => {
+								const cfg = STATUS_CONFIG[s];
+								return (
+									<button
+										key={s}
+										type="button"
+										onClick={() => setLocalStatus(s)}
+										className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+											localStatus === s
+												? `border-foreground/30 bg-foreground/10 ${cfg.text}`
+												: "border-border text-muted-foreground hover:border-foreground/20"
+										}`}
+									>
+										{cfg.label}
+									</button>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 
 				{/* Body */}
 				<div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4 border-t border-border/60 pt-4 bg-secondary/20">
+					{/* Tags */}
+					<div className="space-y-1.5">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+							Tags
+						</label>
+						<TagChipSelector
+							domainTags={domainTags}
+							selected={tags}
+							onChange={setTags}
+						/>
+					</div>
+
 					{/* Progress */}
 					{(localStatus === "reading" || localStatus === "completed") && (
 						<div className="space-y-1.5">
@@ -451,6 +518,211 @@ function BookModal({
 	);
 }
 
+// ─── Tag Chip Selector ────────────────────────────────────────────────────────
+
+function TagChipSelector({
+	domainTags,
+	selected,
+	onChange,
+}: {
+	domainTags: string[];
+	selected: string[];
+	onChange: (tags: string[]) => void;
+}) {
+	const [showInput, setShowInput] = useState(false);
+	const [newTagValue, setNewTagValue] = useState("");
+	const [dropdownOpen, setDropdownOpen] = useState(false);
+	const newTagInputRef = useRef<HTMLInputElement>(null);
+	const dropdownRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (showInput) newTagInputRef.current?.focus();
+	}, [showInput]);
+
+	useEffect(() => {
+		if (!dropdownOpen) return;
+		const handler = (e: MouseEvent) => {
+			if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+				setDropdownOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, [dropdownOpen]);
+
+	const toggle = (tag: string) => {
+		onChange(
+			selected.includes(tag)
+				? selected.filter((t) => t !== tag)
+				: [...selected, tag],
+		);
+	};
+
+	const commitNewTag = () => {
+		const val = newTagValue.trim().toLowerCase();
+		if (val && !selected.includes(val)) {
+			onChange([...selected, val]);
+		}
+		setNewTagValue("");
+		setShowInput(false);
+	};
+
+	// All chips to show: existing domain tags + any newly created tags not yet in domainTags
+	const allTags = Array.from(new Set([...domainTags, ...selected])).sort();
+
+	return (
+		<>
+			{/* Desktop: chip selector */}
+			<div className="hidden sm:flex flex-wrap gap-1.5">
+				{allTags.map((tag) => {
+					const active = selected.includes(tag);
+					return (
+						<button
+							key={tag}
+							type="button"
+							onClick={() => toggle(tag)}
+							className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+								active
+									? "border-foreground/30 bg-foreground/10 text-foreground"
+									: "border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+							}`}
+						>
+							{tag}
+						</button>
+					);
+				})}
+
+				{/* + New tag */}
+				{showInput ? (
+					<input
+						ref={newTagInputRef}
+						value={newTagValue}
+						onChange={(e) => setNewTagValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								commitNewTag();
+							}
+							if (e.key === "Escape") {
+								setShowInput(false);
+								setNewTagValue("");
+							}
+						}}
+						onBlur={commitNewTag}
+						placeholder="tag name..."
+						className="text-[11px] px-2.5 py-1 rounded-full border border-ring bg-background outline-none w-24"
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={() => setShowInput(true)}
+						className="text-[11px] px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+					>
+						+ New
+					</button>
+				)}
+			</div>
+
+			{/* Mobile: dropdown button */}
+			<div className="sm:hidden relative" ref={dropdownRef}>
+				<button
+					type="button"
+					onClick={() => setDropdownOpen(!dropdownOpen)}
+					className="w-full flex items-center justify-between bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+				>
+					<span className="text-muted-foreground text-xs">
+						{selected.length === 0
+							? "Select tags..."
+							: `${selected.length} tag${selected.length > 1 ? "s" : ""} selected`}
+					</span>
+					<ChevronRight
+						className={`w-4 h-4 text-muted-foreground transition-transform ${dropdownOpen ? "rotate-90" : ""}`}
+					/>
+				</button>
+
+				{dropdownOpen && (
+					<div className="absolute z-50 mt-1 w-full bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+						<div className="p-2 space-y-1">
+							{allTags.map((tag) => {
+								const active = selected.includes(tag);
+								return (
+									<button
+										key={tag}
+										type="button"
+										onClick={() => toggle(tag)}
+										className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+											active
+												? "bg-foreground/10 text-foreground font-medium"
+												: "text-muted-foreground hover:bg-accent"
+										}`}
+									>
+										<span className="flex items-center gap-2">
+											<span
+												className={`w-4 h-4 rounded border flex items-center justify-center ${
+													active ? "bg-foreground border-foreground" : "border-border"
+												}`}
+											>
+												{active && (
+													<svg
+														className="w-3 h-3 text-background"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+													>
+														<path
+															strokeLinecap="round"
+															strokeLinejoin="round"
+															strokeWidth={3}
+															d="M5 13l4 4L19 7"
+														/>
+													</svg>
+												)}
+											</span>
+											{tag}
+										</span>
+									</button>
+								);
+							})}
+
+							{/* + New tag input */}
+							<div className="pt-1 border-t border-border">
+								{showInput ? (
+									<input
+										ref={newTagInputRef}
+										value={newTagValue}
+										onChange={(e) => setNewTagValue(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												commitNewTag();
+											}
+											if (e.key === "Escape") {
+												setShowInput(false);
+												setNewTagValue("");
+											}
+										}}
+										onBlur={commitNewTag}
+										placeholder="New tag name..."
+										className="w-full px-3 py-2 text-sm bg-background border border-ring rounded-md outline-none"
+									/>
+								) : (
+									<button
+										type="button"
+										onClick={() => setShowInput(true)}
+										className="w-full text-left px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors"
+									>
+										+ New tag
+									</button>
+								)}
+							</div>
+						</div>
+					</div>
+				)}
+			</div>
+		</>
+	);
+}
+
 // ─── Add Book Modal ───────────────────────────────────────────────────────────
 
 function AddBookModal({
@@ -469,34 +741,29 @@ function AddBookModal({
 	const [title, setTitle] = useState("");
 	const [author, setAuthor] = useState("");
 	const [domain, setDomain] = useState("");
+	const [showNewDomain, setShowNewDomain] = useState(false);
 
-	const [layer, setLayer] = useState("");
+	const [tags, setTags] = useState<string[]>([]);
+
 	const [priority, setPriority] = useState<Book["priority"]>("MEDIUM");
 
 	const [bookType, setBookType] = useState<Book["book_type"]>("Core");
 	const [totalPages, setTotalPages] = useState("");
 
-	const [rating, setRating] = useState("");
+	const [rating, setRating] = useState<number | null>(null);
 	const [saving, setSaving] = useState(false);
 
-	const [showNewDomain, setShowNewDomain] = useState(false);
-	const [showNewLayer, setShowNewLayer] = useState(false);
-
-	const existingLayers = useMemo(() => {
-		if (!domain || showNewDomain) return [];
-		return Array.from(
-			new Set(
-				books
-					.filter((b) => b.domain === domain && b.layer)
-					.map((b) => b.layer as string),
-			),
-		);
-	}, [books, domain, showNewDomain]);
-
 	useEffect(() => {
-		setLayer("");
-		setShowNewLayer(false);
+		setTags([]);
 	}, [domain]);
+
+	const domainTags = useMemo(() => {
+		if (!domain || domain === "__new__") return [];
+		const all = books
+			.filter((b) => b.domain === domain && b.tags)
+			.flatMap((b) => b.tags as string[]);
+		return Array.from(new Set(all)).sort();
+	}, [books, domain]);
 
 	const handleSubmit = async () => {
 		if (!title.trim() || !author.trim() || !domain.trim()) return;
@@ -506,9 +773,9 @@ function AddBookModal({
 				title: title.trim(),
 				author: author.trim(),
 				domain: domain.trim(),
-				layer: layer.trim() || null,
+				tags: tags.length ? tags : null,
 				priority,
-				rating: rating ? parseFloat(rating) : null,
+				rating: rating,
 				book_type: bookType,
 				status: "unread",
 				started_at: null,
@@ -548,7 +815,6 @@ function AddBookModal({
 							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 						/>
 					</div>
-
 					{/* Author */}
 					<div className="space-y-1.5">
 						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
@@ -561,105 +827,65 @@ function AddBookModal({
 							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 						/>
 					</div>
-
-					{/* Domain + Layer */}
-					<div className="grid grid-cols-2 gap-3">
-						<div className="space-y-1.5">
-							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-								Domain *
-							</label>
-							{showNewDomain ? (
-								<div className="flex gap-2">
-									<input
-										autoFocus
-										value={domain}
-										onChange={(e) => setDomain(e.target.value)}
-										placeholder="New domain name"
-										className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-									/>
-									<button
-										type="button"
-										onClick={() => {
-											setShowNewDomain(false);
-											setDomain("");
-										}}
-										className="text-xs text-muted-foreground hover:text-foreground"
-									>
-										Cancel
-									</button>
-								</div>
-							) : (
-								<select
+					{/* Domain */}
+					<div className="space-y-1.5">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+							Domain *
+						</label>
+						{showNewDomain ? (
+							<div className="flex gap-2">
+								<input
+									autoFocus
 									value={domain}
-									onChange={(e) => {
-										if (e.target.value === "__new__") {
-											setShowNewDomain(true);
-											setDomain("");
-										} else {
-											setDomain(e.target.value);
-										}
+									onChange={(e) => setDomain(e.target.value)}
+									placeholder="New domain name"
+									className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+								/>
+								<button
+									type="button"
+									onClick={() => {
+										setShowNewDomain(false);
+										setDomain("");
 									}}
-									className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+									className="text-xs text-muted-foreground hover:text-foreground"
 								>
-									<option value="">Select a domain...</option>
-									{domains.map((d) => (
-										<option key={d} value={d}>
-											{d}
-										</option>
-									))}
-									<option value="__new__">+ Create new domain</option>
-								</select>
-							)}
-						</div>
+									Cancel
+								</button>
+							</div>
+						) : (
+							<select
+								value={domain}
+								onChange={(e) => {
+									if (e.target.value === "__new__") {
+										setShowNewDomain(true);
+										setDomain("");
+									} else setDomain(e.target.value);
+								}}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+							>
+								<option value="">Select a domain...</option>
+								{domains.map((d) => (
+									<option key={d} value={d}>
+										{d}
+									</option>
+								))}
+								<option value="__new__">+ Create new domain</option>
+							</select>
+						)}
+					</div>
+					{/* Tags */}
+					{domain && !showNewDomain && (
 						<div className="space-y-1.5">
 							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-								Layer
+								Tags
 							</label>
-							{showNewLayer ? (
-								<div className="flex gap-2">
-									<input
-										autoFocus
-										value={layer}
-										onChange={(e) => setLayer(e.target.value)}
-										placeholder="New layer name"
-										className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-									/>
-									<button
-										type="button"
-										onClick={() => {
-											setShowNewLayer(false);
-											setLayer("");
-										}}
-										className="text-xs text-muted-foreground hover:text-foreground"
-									>
-										Cancel
-									</button>
-								</div>
-							) : (
-								<select
-									value={layer}
-									disabled={!domain || showNewDomain}
-									onChange={(e) => {
-										if (e.target.value === "__new__") {
-											setShowNewLayer(true);
-											setLayer("");
-										} else {
-											setLayer(e.target.value);
-										}
-									}}
-									className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40 disabled:cursor-not-allowed"
-								>
-									<option value="">No layer</option>
-									{existingLayers.map((l) => (
-										<option key={l} value={l}>
-											{l}
-										</option>
-									))}
-									<option value="__new__">+ Create new layer</option>
-								</select>
-							)}
+							<TagChipSelector
+								domainTags={domainTags}
+								selected={tags}
+								onChange={setTags}
+							/>
 						</div>
-					</div>
+					)}
 
 					{/* Priority */}
 					<div className="space-y-1.5">
@@ -688,7 +914,6 @@ function AddBookModal({
 							})}
 						</div>
 					</div>
-
 					{/* Book Type */}
 					<div className="space-y-1.5">
 						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
@@ -711,38 +936,52 @@ function AddBookModal({
 							))}
 						</div>
 					</div>
-
-					{/* Total Pages + Rating */}
-					<div className="grid grid-cols-2 gap-3">
-						<div className="space-y-1.5">
-							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-								Total Pages
-							</label>
-							<input
-								type="number"
-								value={totalPages}
-								onChange={(e) => setTotalPages(e.target.value)}
-								placeholder="e.g. 320"
-								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-							/>
-						</div>
-						<div className="space-y-1.5">
-							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-								Rating (0–5)
-							</label>
-							<input
-								type="number"
-								min="0"
-								max="5"
-								step="0.5"
-								value={rating}
-								onChange={(e) => setRating(e.target.value)}
-								placeholder="e.g. 4.5"
-								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-							/>
+					{/* Total Pages */}
+					<div className="space-y-1.5">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+							Total Pages
+						</label>
+						<input
+							type="number"
+							value={totalPages}
+							onChange={(e) => setTotalPages(e.target.value)}
+							placeholder="e.g. 320"
+							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+						/>
+					</div>
+					{/* Rating */}
+					<div className="space-y-1.5">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+							Rating
+						</label>
+						<div className="flex items-center gap-0.5">
+							{Array.from({ length: 5 }).map((_, i) => (
+								<button
+									key={i}
+									type="button"
+									onClick={() => setRating(rating === i + 1 ? null : i + 1)}
+									className="hover:scale-110 transition-transform"
+								>
+									<Star
+										className={`w-4 h-4 ${
+											rating && i < rating
+												? "fill-amber-400 text-amber-400"
+												: "text-muted-foreground/20 hover:text-amber-400/50"
+										}`}
+									/>
+								</button>
+							))}
+							{rating && (
+								<button
+									type="button"
+									onClick={() => setRating(null)}
+									className="ml-1 text-[10px] text-muted-foreground/40 hover:text-foreground"
+								>
+									<X className="w-3 h-3" />
+								</button>
+							)}
 						</div>
 					</div>
-
 					{/* Actions */}
 					<div className="flex justify-end gap-2 pt-1">
 						<Button variant="outline" size="sm" onClick={onClose}>
@@ -931,6 +1170,10 @@ function DomainView({
 	search: string;
 	onBookClick: (book: Book) => void;
 }) {
+	const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+		new Set(),
+	);
+
 	const filtered = useMemo(() => {
 		if (!search.trim()) return books;
 		const q = search.toLowerCase();
@@ -940,35 +1183,67 @@ function DomainView({
 		);
 	}, [books, search]);
 
-	// Group by layer — null layer books go first, unlabeled
-	const grouped = useMemo(() => {
-		const nullBooks = filtered.filter((b) => !b.layer).sort(sortByPriority);
-		const layerMap = new Map<string, Book[]>();
+	// Group books by tags
+	const groupedBooks = useMemo(() => {
+		const groups: {
+			tag: string | null;
+			books: Book[];
+		}[] = [];
 
-		filtered
-			.filter((b) => !!b.layer)
-			.forEach((b) => {
-				const l = b.layer!;
-				if (!layerMap.has(l)) layerMap.set(l, []);
-				layerMap.get(l)!.push(b);
+		// Books without tags go first
+		const untagged = filtered.filter((b) => !b.tags || b.tags.length === 0);
+		if (untagged.length > 0) {
+			groups.push({ tag: null, books: untagged.sort(sortByPriority) });
+		}
+
+		// Group books by their tags
+		const tagMap = new Map<string, Book[]>();
+		filtered.forEach((book) => {
+			if (book.tags && book.tags.length > 0) {
+				book.tags.forEach((tag) => {
+					if (!tagMap.has(tag)) {
+						tagMap.set(tag, []);
+					}
+					tagMap.get(tag)!.push(book);
+				});
+			}
+		});
+
+		// Sort tags alphabetically and add to groups
+		Array.from(tagMap.keys())
+			.sort()
+			.forEach((tag) => {
+				groups.push({
+					tag,
+					books: tagMap.get(tag)!.sort(sortByPriority),
+				});
 			});
 
-		// Sort layer keys naturally
-		const sortedLayers = Array.from(layerMap.keys()).sort();
-
-		return {
-			nullBooks,
-			layers: sortedLayers.map((l) => ({
-				label: l,
-				books: layerMap.get(l)!.sort(sortByPriority),
-			})),
-		};
+		return groups;
 	}, [filtered]);
 
 	const total = filtered.length;
 
+	const toggleSection = (tag: string | null) => {
+		const key = tag ?? "__untagged__";
+		setCollapsedSections((prev) => {
+			const next = new Set(prev);
+			if (next.has(key)) {
+				next.delete(key);
+			} else {
+				next.add(key);
+			}
+			return next;
+		});
+	};
+
+	const isSectionCollapsed = (tag: string | null) => {
+		const key = tag ?? "__untagged__";
+		return collapsedSections.has(key);
+	};
+
 	return (
-		<div className="px-4 sm:px-6 py-6 pb-10 space-y-8">
+		<div className="px-4 sm:px-6 py-6 pb-10 space-y-6">
 			{/* Domain header */}
 			<div className="space-y-1">
 				<h2 className="text-lg font-semibold text-foreground">{domain}</h2>
@@ -981,42 +1256,44 @@ function DomainView({
 					No books match your search.
 				</p>
 			)}
-			{/* Unlabeled books first */}
-			{grouped.nullBooks.length > 0 && (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-					{grouped.nullBooks.map((book) => (
-						<BookCard
-							key={book.id}
-							book={book}
-							onClick={() => onBookClick(book)}
-						/>
-					))}
-				</div>
-			)}
-			{/* Layered groups */}
-			{grouped.layers.map(({ label, books: layerBooks }) => (
-				<div key={label} className="space-y-3">
-					<div className="flex items-center gap-2">
-						<Layers className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-						<h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-							{label}
-						</h3>
-						<div className="flex-1 h-px bg-border/40" />
-						<span className="text-[10px] text-muted-foreground/40">
-							{layerBooks.length}
-						</span>
-					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-						{layerBooks.map((book) => (
-							<BookCard
-								key={book.id}
-								book={book}
-								onClick={() => onBookClick(book)}
+
+			{/* Grouped sections */}
+			{groupedBooks.map((group) => {
+				const collapsed = isSectionCollapsed(group.tag);
+				return (
+					<div key={group.tag ?? "__untagged__"} className="space-y-3">
+						{/* Section header */}
+						<button
+							onClick={() => toggleSection(group.tag)}
+							className="flex items-center gap-2 w-full group"
+						>
+							<ChevronRight
+								className={`w-4 h-4 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`}
 							/>
-						))}
+							<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+								{group.tag ?? "Untagged"}
+							</h3>
+							<span className="text-[10px] text-muted-foreground/40 tabular-nums">
+								{group.books.length}
+							</span>
+							<div className="flex-1 h-px bg-border/40" />
+						</button>
+
+						{/* Books grid */}
+						{!collapsed && (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+								{group.books.map((book) => (
+									<BookCard
+										key={book.id}
+										book={book}
+										onClick={() => onBookClick(book)}
+									/>
+								))}
+							</div>
+						)}
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</div>
 	);
 }
@@ -1534,6 +1811,7 @@ export function BookView() {
 			{selectedBook && (
 				<BookModal
 					book={selectedBook}
+					allBooks={books}
 					onClose={() => setSelectedBookId(null)}
 					onUpdate={async (id, updates) => {
 						await handleUpdate(id, updates);
