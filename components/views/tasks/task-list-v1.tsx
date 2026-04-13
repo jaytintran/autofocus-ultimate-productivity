@@ -53,7 +53,7 @@ import { TagPill } from "@/components/shared/tag-pill";
 import { TagFilter } from "@/components/shared/tag-filter";
 import { updateTaskTag } from "@/lib/db/store-v1";
 import type { TagId } from "@/lib/tags";
-import { TaskContextMenu } from "@/components/features/tasks/task-context-menu";
+import { TaskContextMenu } from "@/components/views/tasks/task-context-menu";
 import { useLongPress } from "@/hooks/ui/use-long-press";
 import { DueDatePicker } from "@/components/shared/due-date-picker";
 

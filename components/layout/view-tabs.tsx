@@ -40,8 +40,8 @@ import {
 	SheetClose,
 } from "@/components/ui/sheet";
 import { TagFilter } from "@/components/shared/tag-filter";
-import { BacklogDump } from "@/components/sections/backlog-dump";
-import { ContentFilterBar } from "@/components/sections/content-filter-bar";
+import { BacklogDump } from "@/components/shared/backlog-dump";
+import { ContentFilterBar } from "@/components/shared/content-filter-bar";
 import type { TagId } from "@/lib/tags";
 import type { ContentFilterState } from "@/lib/features/content-filter";
 

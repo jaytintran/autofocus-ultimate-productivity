@@ -15,12 +15,12 @@ import useSWR from "swr";
 
 // Components
 import { Header } from "@/components/layout/header";
-import { TimerBar } from "@/components/features/timer/timer-bar-v2";
+import { TimerBar } from "@/components/views/timer/timer-bar-v2";
 import { ViewTabs } from "@/components/layout/view-tabs";
 import { PageNav } from "@/components/layout/page-nav";
-import { TaskList } from "@/components/features/tasks/task-list";
-import { CompletedList } from "@/components/features/tasks/completed-list";
-import { TaskInput } from "@/components/features/tasks/task-input";
+import { TaskList } from "@/components/views/tasks/task-list";
+import { CompletedList } from "@/components/views/completed-list/completed-list";
+import { TaskInput } from "@/components/views/tasks/task-input";
 import { PamphletSwitcher } from "@/components/layout/pamphlet-switcher";
 
 // Store & Types
@@ -98,9 +98,9 @@ import { invalidatePamphletCache } from "@/lib/db/pamphlet-cache";
 import { usePamphlets } from "@/hooks/data/use-pamphlets";
 import { useDebouncedValue } from "@/hooks/state/use-debounced-value";
 import { useHabits } from "@/hooks/data/use-habits";
-import { HabitGrid } from "@/components/features/habits/habit-grid";
+import { HabitGrid } from "@/components/views/habits/habit-grid";
 import { createClient } from "@/lib/supabase/client";
-import { ScheduleView } from "../features/schedule/schedule-view";
+import { ScheduleView } from "../views/schedule/schedule-view";
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -2132,7 +2132,9 @@ export function AutofocusApp() {
 							activePamphletId={activePamphletId}
 							onMoveTask={handleMoveTask}
 							onUpdateDueDate={handleUpdateTaskDueDate}
-							onUpdateText={(taskId, text) => handleUpdateTaskText(taskId, text, false)}
+							onUpdateText={(taskId, text) =>
+								handleUpdateTaskText(taskId, text, false)
+							}
 						/>
 					))}
 				{activeView === "completed" && (

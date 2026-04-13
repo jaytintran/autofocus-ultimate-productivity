@@ -9,7 +9,7 @@ import {
 import { Moon, Sun, Type, Palette, TreePine, Download } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { ExportSection } from "@/components/features/export/export-section";
+import { ExportSection } from "@/components/shared/settings/export/export-section";
 
 const THEMES = [
 	{ value: "light", label: "Light", icon: Sun },

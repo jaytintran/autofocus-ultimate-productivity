@@ -49,7 +49,7 @@ import { TagPill } from "@/components/shared/tag-pill";
 import { TagFilter } from "@/components/shared/tag-filter";
 import { updateTaskTag } from "@/lib/db/store-v1";
 import type { TagId } from "@/lib/tags";
-import { TaskContextMenu } from "@/components/features/tasks/task-context-menu";
+import { TaskContextMenu } from "@/components/views/tasks/task-context-menu";
 import { useLongPress } from "@/hooks/ui/use-long-press";
 import { DueDatePicker } from "@/components/shared/due-date-picker";
 
@@ -509,12 +509,15 @@ const TaskRow = memo(function TaskRow({
 		}
 	}, [pendingTask, onSwitchTask]);
 
-	const handleContextMenu = useCallback((e: React.MouseEvent) => {
-		if (isDragging) return; // Don't show context menu while dragging
-		e.preventDefault();
-		e.stopPropagation();
-		setContextMenu({ x: e.clientX, y: e.clientY });
-	}, [isDragging]);
+	const handleContextMenu = useCallback(
+		(e: React.MouseEvent) => {
+			if (isDragging) return; // Don't show context menu while dragging
+			e.preventDefault();
+			e.stopPropagation();
+			setContextMenu({ x: e.clientX, y: e.clientY });
+		},
+		[isDragging],
+	);
 
 	const handleEnableEdit = useCallback(() => {
 		setEditText(task.text);
