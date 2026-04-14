@@ -15,15 +15,9 @@ import {
 
 import { format, isSameDay, addMinutes, isToday, addDays } from "date-fns";
 import type { Task } from "@/lib/types";
-import {
-	Plus,
-	ChevronLeft,
-	ChevronRight,
-	X,
-	Search,
-} from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, X, Search } from "lucide-react";
 
-import { useDebounce } from "./hooks/use-debounce";
+import { useDebounce } from "./use-debounce";
 import type { ScheduleViewProps, ContextMenuState } from "./types";
 import {
 	PIXELS_PER_HOUR,
@@ -34,11 +28,11 @@ import {
 	TOTAL_HEIGHT,
 } from "./constants";
 import { computeBlockLayout } from "./utils";
-import { SchedulableTaskItem } from "./components/schedulable-task-item";
-import { BlockContextMenu } from "./components/block-context-menu";
-import { TimeBlockCard } from "./components/time-block-card";
-import { BlockDetailPanel } from "./components/block-detail-panel";
-import { CurrentTimeIndicator } from "./components/current-time-indicator";
+import { SchedulableTaskItem } from "./schedulable-task-item";
+import { BlockContextMenu } from "./block-context-menu";
+import { TimeBlockCard } from "./time-block-card";
+import { BlockDetailPanel } from "./block-detail-panel";
+import { CurrentTimeIndicator } from "./current-time-indicator";
 
 export function ScheduleView({
 	date,

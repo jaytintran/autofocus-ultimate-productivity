@@ -110,6 +110,30 @@ export function useHabits() {
 		[habits, mutate],
 	);
 
+	const handleToggleDate = useCallback(
+		async (id: string, date: string) => {
+			const habit = habits.find((h) => h.id === id);
+			if (!habit) return;
+
+			const wasCompleted = habit.completions.includes(date);
+
+			mutate(
+				habits.map((h) => {
+					if (h.id !== id) return h;
+					const newCompletions = wasCompleted
+						? h.completions.filter((d) => d !== date)
+						: [...h.completions, date];
+					return { ...h, completions: newCompletions };
+				}),
+				false,
+			);
+
+			await toggleCompletion(id, date, habit.completions);
+			await mutate();
+		},
+		[habits, mutate],
+	);
+
 	const handleStatusChange = useCallback(
 		async (id: string, status: Habit["status"]) => {
 			await handleUpdate(id, { status });
@@ -157,6 +181,7 @@ export function useHabits() {
 		handleAdd,
 		handleDelete,
 		handleToggleToday,
+		handleToggleDate,
 		handleStatusChange,
 		handleReorder,
 	};

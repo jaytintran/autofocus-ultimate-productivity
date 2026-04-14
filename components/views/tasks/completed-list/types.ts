@@ -53,6 +53,8 @@ export interface EntryModalProps {
 		title: string,
 		note: string,
 		tag: TagId | null,
+		completedAt?: string | null,
+		totalTimeMs?: number,
 	) => Promise<void>;
 	onDelete: (id: string) => Promise<void>;
 	onRevert?: (id: string) => Promise<void>;

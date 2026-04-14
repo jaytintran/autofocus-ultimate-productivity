@@ -219,14 +219,47 @@ export function CompletedList({
 	}, [onLoadMore]);
 
 	const handleModalSave = useCallback(
-		async (id: string, title: string, note: string, tag: TagId | null) => {
-			await Promise.all([
+		async (
+			id: string,
+			title: string,
+			note: string,
+			tag: TagId | null,
+			completedAt?: string | null,
+			totalTimeMs?: number,
+		) => {
+			const updates: Array<Promise<void>> = [
 				onUpdateTaskText ? onUpdateTaskText(id, title) : Promise.resolve(),
 				onUpdateTaskNote
 					? onUpdateTaskNote(id, note || null)
 					: Promise.resolve(),
 				onUpdateTaskTag ? onUpdateTaskTag(id, tag) : Promise.resolve(),
-			]);
+			];
+
+			// Update completed_at if provided
+			if (completedAt !== undefined && completedAt !== null) {
+				updates.push(
+					onUpdateTaskNote
+						? (async () => {
+								const { updateTask } = await import("@/lib/db/store");
+								await updateTask(id, { completed_at: completedAt });
+							})()
+						: Promise.resolve(),
+				);
+			}
+
+			// Update total_time_ms if provided
+			if (totalTimeMs !== undefined) {
+				updates.push(
+					onUpdateTaskNote
+						? (async () => {
+								const { updateTask } = await import("@/lib/db/store");
+								await updateTask(id, { total_time_ms: totalTimeMs });
+							})()
+						: Promise.resolve(),
+				);
+			}
+
+			await Promise.all(updates);
 			await onRefresh();
 		},
 		[onUpdateTaskText, onUpdateTaskNote, onUpdateTaskTag, onRefresh],

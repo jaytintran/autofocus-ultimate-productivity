@@ -13,6 +13,8 @@ interface DashboardViewProps {
 	onReorder: (draggedId: string, targetId: string) => void;
 }
 
+type FilterType = "all" | "active" | "completed-today" | "by-streak";
+
 export function DashboardView({
 	habits,
 	search,
@@ -25,6 +27,7 @@ export function DashboardView({
 
 	const [draggedId, setDraggedId] = useState<string | null>(null);
 	const [overId, setOverId] = useState<string | null>(null);
+	const [filter, setFilter] = useState<FilterType>("all");
 
 	const stats = useMemo(() => {
 		const total = habits.length;
@@ -36,10 +39,19 @@ export function DashboardView({
 		return { total, active, doneToday, longestStreak };
 	}, [habits, today]);
 
-	const activeHabits = useMemo(
-		() => habits.filter((h) => h.status === "active"),
-		[habits],
-	);
+	const activeHabits = useMemo(() => {
+		let filtered = habits.filter((h) => h.status === "active");
+
+		if (filter === "active") {
+			return filtered;
+		} else if (filter === "completed-today") {
+			return filtered.filter((h) => isCompletedOn(h, today));
+		} else if (filter === "by-streak") {
+			return [...filtered].sort((a, b) => getStreak(b) - getStreak(a));
+		}
+
+		return filtered;
+	}, [habits, filter, today]);
 
 	const filteredHabits = useMemo(() => {
 		const q = search.trim().toLowerCase();
@@ -64,6 +76,7 @@ export function DashboardView({
 						icon: Target,
 						color: "text-foreground",
 						bg: "bg-secondary/60",
+						filter: "all" as FilterType,
 					},
 					{
 						label: "Active",
@@ -71,6 +84,7 @@ export function DashboardView({
 						icon: Flame,
 						color: "text-sky-500",
 						bg: "bg-sky-500/10",
+						filter: "active" as FilterType,
 					},
 					{
 						label: "Done Today",
@@ -78,25 +92,31 @@ export function DashboardView({
 						icon: Check,
 						color: "text-[#8b9a6b]",
 						bg: "bg-[#8b9a6b]/10",
+						filter: "completed-today" as FilterType,
 					},
+
 					{
 						label: "Best Streak",
 						value: stats.longestStreak,
 						icon: TrendingUp,
 						color: "text-amber-500",
 						bg: "bg-amber-500/10",
+						filter: "by-streak" as FilterType,
 					},
-				].map(({ label, value, icon: Icon, color, bg }) => (
-					<div
+				].map(({ label, value, icon: Icon, color, bg, filter: cardFilter }) => (
+					<button
 						key={label}
-						className={`${bg} rounded-xl p-4 flex flex-col gap-2`}
+						onClick={() => setFilter(cardFilter)}
+						className={`${bg} rounded-xl p-4 flex flex-col gap-2 transition-all hover:scale-[1.02] cursor-pointer ${
+							filter === cardFilter ? "ring-2 ring-foreground/20" : ""
+						}`}
 					>
 						<Icon className={`w-4 h-4 ${color}`} />
 						<p className={`text-2xl font-bold ${color}`}>{value}</p>
 						<p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider">
 							{label}
 						</p>
-					</div>
+					</button>
 				))}
 			</div>
 

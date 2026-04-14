@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Habit } from "@/lib/db/habits";
 import {
 	getStreak,
@@ -6,7 +6,13 @@ import {
 	getToday,
 	isCompletedOn,
 } from "@/lib/db/habits";
-import { Flame, Check, GripVertical, GripHorizontal } from "lucide-react";
+import {
+	Flame,
+	Check,
+	GripHorizontal,
+	ChevronLeft,
+	ChevronRight,
+} from "lucide-react";
 import { STATUS_CONFIG } from "./constants";
 import { formatStreak, getWeekDays } from "./utils";
 
@@ -27,6 +33,7 @@ export function HabitCard({
 	onDragStart,
 	showMiniCalendar = false,
 }: HabitCardProps) {
+	const [weekOffset, setWeekOffset] = useState(0);
 	const streak = getStreak(habit);
 	const weekly = getWeeklyProgress(habit);
 	const today = getToday();
@@ -34,16 +41,16 @@ export function HabitCard({
 	const status = STATUS_CONFIG[habit.status];
 	const color = habit.color || "#8b9a6b";
 
-	// Get last 7 days for mini view
-	const last7Days = useMemo(() => {
+	// Get 7 days for mini view based on week offset
+	const displayedDays = useMemo(() => {
 		const days = [];
 		for (let i = 6; i >= 0; i--) {
 			const d = new Date();
-			d.setDate(d.getDate() - i);
+			d.setDate(d.getDate() - i + weekOffset * 7);
 			days.push(d.toISOString().split("T")[0]);
 		}
 		return days;
-	}, []);
+	}, [weekOffset]);
 
 	const weekLabels = getWeekDays();
 
@@ -138,42 +145,66 @@ export function HabitCard({
 			{/* Mini 7-day calendar */}
 			{showMiniCalendar && (
 				<div className="pt-2 border-border/40 max-sm:hidden">
-					<div className="flex items-center justify-between">
-						{last7Days.map((date, idx) => {
-							const completed = habit.completions.includes(date);
-							const isToday = date === today;
-							return (
-								<button
-									key={date}
-									onClick={(e) => {
-										e.stopPropagation();
-										onToggleDate?.(date);
-									}}
-									className="flex flex-col items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
-									title={`${completed ? "Unmark" : "Mark"} ${date}`}
-								>
-									<div
-										className={`w-7 h-1 rounded-[10px] ${
-											completed
-												? ""
-												: isToday
-													? "border border-dashed border-border"
-													: "bg-muted/50"
-										}`}
-										style={completed ? { backgroundColor: color } : {}}
-									/>
-									<span
-										className={`text-[8px] ${
-											isToday
-												? "text-foreground font-medium"
-												: "text-muted-foreground/40"
-										}`}
+					<div className="flex items-center justify-between gap-2">
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setWeekOffset(weekOffset - 1);
+							}}
+							className="p-1 hover:bg-accent rounded transition-colors"
+							title="Previous week"
+						>
+							<ChevronLeft className="w-3 h-3 text-muted-foreground" />
+						</button>
+
+						<div className="flex items-center justify-between flex-1">
+							{displayedDays.map((date, idx) => {
+								const completed = habit.completions.includes(date);
+								const isToday = date === today;
+								return (
+									<button
+										key={date}
+										onClick={(e) => {
+											e.stopPropagation();
+											onToggleDate?.(date);
+										}}
+										className="flex flex-col items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
+										title={`${completed ? "Unmark" : "Mark"} ${date}`}
 									>
-										{weekLabels[idx]}
-									</span>
-								</button>
-							);
-						})}
+										<div
+											className={`w-7 h-1 rounded-[10px] ${
+												completed
+													? ""
+													: isToday
+														? "border border-dashed border-border"
+														: "bg-muted/50"
+											}`}
+											style={completed ? { backgroundColor: color } : {}}
+										/>
+										<span
+											className={`text-[8px] ${
+												isToday
+													? "text-foreground font-medium"
+													: "text-muted-foreground/40"
+											}`}
+										>
+											{weekLabels[idx]}
+										</span>
+									</button>
+								);
+							})}
+						</div>
+
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setWeekOffset(weekOffset + 1);
+							}}
+							className="p-1 hover:bg-accent rounded transition-colors"
+							title="Next week"
+						>
+							<ChevronRight className="w-3 h-3 text-muted-foreground" />
+						</button>
 					</div>
 				</div>
 			)}

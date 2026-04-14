@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import type { Habit, HabitStatus } from "@/lib/db/habits";
 import {
 	getStreak,
@@ -59,14 +59,6 @@ export function HabitModal({
 		}
 	};
 
-	// Group 66 days into weeks for heatmap
-	const weeks = useMemo(() => {
-		const w = [];
-		for (let i = 0; i < history66.length; i += 7) {
-			w.push(history66.slice(i, i + 7));
-		}
-		return w;
-	}, [history66]);
 
 	return (
 		<Dialog open onOpenChange={onClose}>
@@ -89,14 +81,6 @@ export function HabitModal({
 								>
 									{isDoneToday && <Check className="w-4 h-4" />}
 								</button>
-
-								{/* Streak */}
-								{/* {streak > 0 && (
-									<span className="flex absolute -top-1 -left-1 bg-af4-highlight px-3.5 py-0.5 border-r border-r-rounded-full items-center text-amber-600 text-[10px]">
-										<Flame className="w-2 h-2" />
-										{streak}
-									</span>
-								)} */}
 							</div>
 							<DialogTitle className="flex-1 min-w-0">
 								<input
@@ -150,20 +134,16 @@ export function HabitModal({
 								{history66.filter((d) => d.completed).length} completed
 							</span>
 						</div>
-						<div className="flex gap-1 overflow-x-auto pb-2">
-							{weeks.map((week, weekIdx) => (
-								<div key={weekIdx} className="flex flex-col gap-1">
-									{week.map((day) => (
-										<div
-											key={day.date}
-											title={day.date}
-											className={`w-3 h-3 rounded-sm ${
-												day.completed ? "" : "bg-muted"
-											}`}
-											style={day.completed ? { backgroundColor: color } : {}}
-										/>
-									))}
-								</div>
+						<div className="grid grid-cols-[repeat(auto-fit,minmax(8px,1fr))] gap-1">
+							{history66.map((day) => (
+								<div
+									key={day.date}
+									title={day.date}
+									className={`w-full aspect-square rounded-sm ${
+										day.completed ? "" : "bg-muted"
+									}`}
+									style={day.completed ? { backgroundColor: color } : {}}
+								/>
 							))}
 						</div>
 					</div>

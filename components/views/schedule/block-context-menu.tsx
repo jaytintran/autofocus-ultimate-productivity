@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { TimeBlock } from "@/lib/types";
-import type { ContextMenuState } from "../types";
-import { BLOCK_COLORS } from "../constants";
+import type { ContextMenuState } from "./types";
+import { BLOCK_COLORS } from "./constants";
 
 export function BlockContextMenu({
 	menu,

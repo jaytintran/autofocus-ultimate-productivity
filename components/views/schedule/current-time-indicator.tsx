@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PIXELS_PER_MINUTE } from "../constants";
+import { PIXELS_PER_MINUTE } from "./constants";
 
 export function CurrentTimeIndicator() {
 	const [now, setNow] = useState(new Date());

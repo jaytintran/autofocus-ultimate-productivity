@@ -3,8 +3,8 @@ import { format } from "date-fns";
 import type { Task, TimeBlock } from "@/lib/types";
 import { X } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
-import { PIXELS_PER_MINUTE, SNAP_MINUTES } from "../constants";
-import { isTaskInBlock, getTaskScheduledTime } from "../utils";
+import { PIXELS_PER_MINUTE, SNAP_MINUTES } from "./constants";
+import { isTaskInBlock, getTaskScheduledTime } from "./utils";
 
 export function TimeBlockCard({
 	block,

@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import type { Task, TimeBlock } from "@/lib/types";
 import { ChevronLeft, Pencil, X, Play } from "lucide-react";
-import { BLOCK_COLORS } from "../constants";
-import { isTaskInBlock, getTaskScheduledTime } from "../utils";
+import { BLOCK_COLORS } from "./constants";
+import { isTaskInBlock, getTaskScheduledTime } from "./utils";
 
 export function BlockDetailPanel({
 	block,

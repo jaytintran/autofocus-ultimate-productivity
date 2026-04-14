@@ -1,5 +1,13 @@
 import React, { useState, useCallback, memo } from "react";
-import { Trash, RefreshCcw } from "lucide-react";
+import {
+	Trash,
+	RefreshCcw,
+	CheckCircle2,
+	FileText,
+	Clock,
+	Calendar,
+	Circle,
+} from "lucide-react";
 import type { EntryModalProps } from "./types";
 import type { TagId } from "@/lib/tags";
 import { TagPill } from "@/components/shared/tag-pill";
@@ -26,16 +34,49 @@ export const EntryModal = memo(function EntryModal({
 	const [tag, setTag] = useState<TagId | null>(task.tag ?? null);
 	const [isSaving, setIsSaving] = useState(false);
 
+	// Editable metadata
+	const [completedAt, setCompletedAt] = useState(
+		task.completed_at ? formatCompletionTime(task.completed_at) : "",
+	);
+	const [timeInput, setTimeInput] = useState(
+		task.total_time_ms > 0 ? formatTimeCompact(task.total_time_ms) : "0m 0s",
+	);
+
+	// Parse time input like "1h 30m" or "45m 20s" to milliseconds
+	const parseTimeToMs = (input: string): number => {
+		const hourMatch = input.match(/(\d+)h/);
+		const minMatch = input.match(/(\d+)m/);
+		const secMatch = input.match(/(\d+)s/);
+
+		const hours = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+		const minutes = minMatch ? parseInt(minMatch[1], 10) : 0;
+		const seconds = secMatch ? parseInt(secMatch[1], 10) : 0;
+
+		return (hours * 3600 + minutes * 60 + seconds) * 1000;
+	};
+
 	const handleSave = useCallback(async () => {
 		if (isSaving || !title.trim()) return;
 		setIsSaving(true);
 		try {
-			await onSave(task.id, title.trim(), note.trim(), tag);
+			// Parse the time input to milliseconds
+			const totalTimeMs = isLog ? 0 : parseTimeToMs(timeInput);
+
+			// Convert time input (HH:MM) to ISO string
+			let completedAtISO: string | null = null;
+			if (completedAt && task.completed_at) {
+				const originalDate = new Date(task.completed_at);
+				const [hours, minutes] = completedAt.split(':').map(Number);
+				originalDate.setHours(hours, minutes, 0, 0);
+				completedAtISO = originalDate.toISOString();
+			}
+
+			await onSave(task.id, title.trim(), note.trim(), tag, completedAtISO, totalTimeMs);
 			onClose();
 		} finally {
 			setIsSaving(false);
 		}
-	}, [task.id, title, note, tag, isSaving, onSave, onClose]);
+	}, [task.id, title, note, tag, completedAt, timeInput, isLog, task.completed_at, isSaving, onSave, onClose]);
 
 	const handleDelete = useCallback(async () => {
 		onClose();
@@ -60,34 +101,48 @@ export const EntryModal = memo(function EntryModal({
 	return (
 		<Dialog open onOpenChange={onClose}>
 			<DialogContent className="sm:max-w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden p-0">
-				<div className="px-6 pt-5 pb-4">
+				<div className="px-6 pt-5">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
 							{isLog ? (
-								<span className="text-muted-foreground/50 font-mono text-base leading-none">
-									•
-								</span>
+								<Circle className="w-4 h-4 text-muted-foreground/50" />
 							) : (
-								<span className="text-[#8b9a6b] font-mono text-sm leading-none">
-									×
-								</span>
+								<CheckCircle2 className="w-4 h-4 text-[#8b9a6b]" />
 							)}
 							<span>{isLog ? "Log Entry" : "Completed Task"}</span>
 						</DialogTitle>
 					</DialogHeader>
 
-					<div className="flex items-center gap-2 mt-3 flex-wrap">
-						{task.completed_at && (
-							<span className="text-[11px] font-mono text-muted-foreground/60 bg-secondary px-2 py-0.5 rounded-md">
-								{formatCompletionTime(task.completed_at)}
-							</span>
+					<div className="mt-4 space-y-2 flex gap-2 items-center">
+						<div className="flex items-center gap-2">
+							<input
+								type="time"
+								value={completedAt}
+								onChange={(e) => setCompletedAt(e.target.value)}
+								className="text-[11px] font-mono text-muted-foreground/80 bg-secondary px-2 py-1 rounded-md border border-border/40 focus:outline-none focus:ring-1 focus:ring-ring"
+								disabled={isSaving}
+							/>
+						</div>
+
+						{!isLog && (
+							<div className="flex items-center gap-2">
+								<input
+									type="text"
+									value={timeInput}
+									onChange={(e) => setTimeInput(e.target.value)}
+									placeholder="0m 0s"
+									className="text-[11px] text-[#8b9a6b] bg-[#8b9a6b]/10 px-2 py-1 rounded-md border border-[#8b9a6b]/20 focus:outline-none focus:ring-1 focus:ring-[#8b9a6b]/40 w-15"
+									disabled={isSaving}
+								/>
+							</div>
 						)}
-						{!isLog && task.total_time_ms > 0 && (
-							<span className="text-[11px] text-[#8b9a6b] bg-[#8b9a6b]/10 px-2 py-0.5 rounded-md">
-								{formatTimeCompact(task.total_time_ms)}
-							</span>
-						)}
-						<TagPill tagId={tag} onSelectTag={setTag} disabled={isSaving} />
+
+						<TagPill
+							tagId={tag}
+							onSelectTag={setTag}
+							disabled={isSaving}
+							className="-mt-2 py-1 rounded-none"
+						/>
 					</div>
 				</div>
 
