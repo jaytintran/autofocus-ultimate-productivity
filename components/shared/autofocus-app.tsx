@@ -17,7 +17,7 @@ import useSWR from "swr";
 import { Header } from "@/components/layout/header";
 import { TimerBar } from "@/components/views/timer/timer-bar-v2";
 import { ViewTabs } from "@/components/layout/view-tabs";
-import { PageNav } from "@/components/layout/page-nav";
+import { PageNav } from "@/components/layout/page-nav/page-nav";
 import { TaskList } from "@/components/views/tasks/task-list/task-list";
 import { CompletedList } from "@/components/views/tasks/completed-list/completed-list";
 import { TaskInput } from "@/components/views/tasks/task-list/task-input";
@@ -446,6 +446,9 @@ export function AutofocusApp() {
 				note: t.note!,
 				completed_at: t.completed_at!,
 				pamphlet_id: t.pamphlet_id,
+				total_time_ms: t.total_time_ms,
+				tag: t.tag,
+				source: t.source,
 			})),
 		[achievementTasks],
 	);

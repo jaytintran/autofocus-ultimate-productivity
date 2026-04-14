@@ -6,7 +6,14 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Moon, Sun, Type, Palette, TreePine, Download } from "lucide-react";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Moon, Sun, Type, Palette, TreePine, Download, Waves, Sunset, Trees, Sparkles, FileText, Snowflake, Flower, Briefcase } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { ExportSection } from "@/components/shared/settings/export/export-section";
@@ -16,6 +23,14 @@ const THEMES = [
 	{ value: "dark", label: "Dark", icon: Moon },
 	{ value: "golden-twilight", label: "Golden Twilight", icon: Palette },
 	{ value: "mossy-woods", label: "Mossy Woods", icon: TreePine },
+	{ value: "ocean-depth", label: "Ocean Depth", icon: Waves },
+	{ value: "sunset-ember", label: "Sunset Ember", icon: Sunset },
+	{ value: "forest-canopy", label: "Forest Canopy", icon: Trees },
+	{ value: "midnight-purple", label: "Midnight Purple", icon: Sparkles },
+	{ value: "sepia-vintage", label: "Sepia Vintage", icon: FileText },
+	{ value: "arctic-frost", label: "Arctic Frost", icon: Snowflake },
+	{ value: "cherry-blossom", label: "Cherry Blossom", icon: Flower },
+	{ value: "slate-professional", label: "Slate Professional", icon: Briefcase },
 ] as const;
 
 interface SettingsModalProps {
@@ -45,8 +60,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 	const ALL_FONT_CLASSES = FONTS.map((f) => f.className).filter(Boolean);
 
 	const [fontFamily, setFontFamily] = useState<FontId>("default");
+
 	useEffect(() => {
 		setMounted(true);
+
+		// Load theme from localStorage on mount
+		const savedTheme = localStorage.getItem("theme");
+		if (savedTheme) {
+			handleThemeChange(savedTheme);
+		}
 	}, []);
 
 	useEffect(() => {
@@ -71,14 +93,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 		const root = document.documentElement;
 
 		// remove all themes first
-		root.classList.remove("dark", "golden-twilight", "mossy-woods");
+		root.classList.remove(
+			"dark",
+			"golden-twilight",
+			"mossy-woods",
+			"ocean-depth",
+			"sunset-ember",
+			"forest-canopy",
+			"midnight-purple",
+			"sepia-vintage",
+			"arctic-frost",
+			"cherry-blossom",
+			"slate-professional"
+		);
 
 		if (newTheme !== "light") {
 			root.classList.add(newTheme);
 		}
 
-		// sync with next-themes
+		// sync with next-themes and persist to localStorage
 		setTheme(newTheme);
+		localStorage.setItem("theme", newTheme);
 	};
 
 	const getCurrentThemeIcon = () => {
@@ -112,29 +147,24 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 							})()}
 							<span>Theme</span>
 						</div>
-						<div className="grid grid-cols-2 gap-2">
-							{THEMES.map((t) => {
-								const Icon = t.icon;
-								const isSelected = theme === t.value;
-								return (
-									<button
-										key={t.value}
-										onClick={() => handleThemeChange(t.value)}
-										className={`
-											flex items-center gap-2 px-3 py-2 text-sm rounded border transition-all
-											${
-												isSelected
-													? "border-af4-olive bg-accent text-foreground"
-													: "border-border hover:border-muted-foreground/50 text-muted-foreground"
-											}
-										`}
-									>
-										<Icon className="w-4 h-4" />
-										<span>{t.label}</span>
-									</button>
-								);
-							})}
-						</div>
+						<Select value={theme} onValueChange={handleThemeChange}>
+							<SelectTrigger className="w-full">
+								<SelectValue placeholder="Select a theme" />
+							</SelectTrigger>
+							<SelectContent>
+								{THEMES.map((t) => {
+									const Icon = t.icon;
+									return (
+										<SelectItem key={t.value} value={t.value}>
+											<div className="flex items-center gap-2">
+												<Icon className="w-4 h-4" />
+												<span>{t.label}</span>
+											</div>
+										</SelectItem>
+									);
+								})}
+							</SelectContent>
+						</Select>
 						<p className="text-[0.625rem] text-muted-foreground">
 							Current: {getCurrentThemeLabel()}
 						</p>
