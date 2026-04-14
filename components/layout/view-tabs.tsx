@@ -219,55 +219,62 @@ function ViewTypeToggle({
 	onBuJoWidthChange,
 }: ViewTypeToggleProps) {
 	return (
-		<div className="hidden sm:inline-flex bg-secondary rounded overflow-hidden">
-			<Button
-				variant="outline"
-				size="sm"
+		<div className="hidden sm:inline-flex gap-1 bg-muted/30 rounded-lg p-1">
+			<button
 				onClick={() => onChange("bullet")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "bullet"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
+				className={`
+					px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200
+					flex items-center gap-1.5
+					${
+						value === "bullet"
+							? "bg-af4-olive text-background shadow-sm scale-105"
+							: "text-muted-foreground hover:text-foreground opacity-60"
+					}
+				`}
 				title="Bullet Journal View"
 			>
-				<BookOpen className="w-3 h-3" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
+				<BookOpen className="w-3.5 h-3.5" />
+				<span className="hidden lg:inline">Bullet</span>
+			</button>
+			<button
 				onClick={() => onChange("default")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "default"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
+				className={`
+					px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200
+					flex items-center gap-1.5
+					${
+						value === "default"
+							? "bg-af4-olive text-background shadow-sm scale-105"
+							: "text-muted-foreground hover:text-foreground opacity-60"
+					}
+				`}
 				title="Linear View"
 			>
-				<LayoutList className="w-3 h-3" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
+				<LayoutList className="w-3.5 h-3.5" />
+				<span className="hidden lg:inline">List</span>
+			</button>
+			<button
 				onClick={() => onChange("7days")}
-				className={`h-8 rounded text-xs transition-colors ${
-					value === "7days"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
+				className={`
+					px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200
+					flex items-center gap-1.5
+					${
+						value === "7days"
+							? "bg-af4-olive text-background shadow-sm scale-105"
+							: "text-muted-foreground hover:text-foreground opacity-60"
+					}
+				`}
 				title="7 Days View"
 			>
 				<CalendarDays className="w-3.5 h-3.5" />
-			</Button>
+				<span className="hidden lg:inline">7 Days</span>
+			</button>
 
 			{value === "bullet" && (
-				<Button
-					variant="outline"
-					size="sm"
+				<button
 					onClick={() =>
 						onBuJoWidthChange(buJoWidth === "full" ? "narrow" : "full")
 					}
-					className="h-8 rounded text-xs transition-colors text-muted-foreground hover:text-foreground"
+					className="px-2 py-1.5 rounded-md text-xs transition-all duration-200 text-muted-foreground hover:text-foreground opacity-60 hover:opacity-100 ml-1 border-l border-border/50 pl-3"
 					title={buJoWidth === "full" ? "Narrow view" : "Full width"}
 				>
 					{buJoWidth === "full" ? (
@@ -275,7 +282,7 @@ function ViewTypeToggle({
 					) : (
 						<PanelRightOpen className="w-3.5 h-3.5" />
 					)}
-				</Button>
+				</button>
 			)}
 		</div>
 	);
@@ -342,33 +349,37 @@ interface MainViewToggleProps {
 
 function MainViewToggle({ activeView, onChange }: MainViewToggleProps) {
 	return (
-		<div className="inline-flex bg-secondary rounded overflow-hidden w-fit">
-			<Button
-				variant="outline"
-				size="sm"
+		<div className="inline-flex gap-1 bg-muted/30 rounded-lg p-1 w-fit">
+			<button
 				onClick={() => onChange("tasks")}
-				className={`h-8 rounded text-xs transition-colors ${
-					activeView === "tasks"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
+				className={`
+					px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200
+					flex items-center gap-1.5
+					${
+						activeView === "tasks"
+							? "bg-af4-olive text-background shadow-sm scale-105"
+							: "text-muted-foreground hover:text-foreground opacity-60"
+					}
+				`}
 			>
 				<span className="hidden sm:inline">Tasks</span>
 				<Square className="w-3.5 h-3.5 sm:hidden" />
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
+			</button>
+			<button
 				onClick={() => onChange("completed")}
-				className={`h-8 rounded text-xs transition-colors ${
-					activeView === "completed"
-						? "bg-accent! text-foreground"
-						: "text-muted-foreground hover:text-foreground"
-				}`}
+				className={`
+					px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200
+					flex items-center gap-1.5
+					${
+						activeView === "completed"
+							? "bg-af4-olive text-background shadow-sm scale-105"
+							: "text-muted-foreground hover:text-foreground opacity-60"
+					}
+				`}
 			>
 				<span className="hidden sm:inline">Completed</span>
 				<SquareCheck className="w-3.5 h-3.5 sm:hidden" />
-			</Button>
+			</button>
 		</div>
 	);
 }
@@ -420,8 +431,8 @@ export function ViewTabs({
 
 	return (
 		<div className="relative flex flex-row flex-wrap gap-2 justify-between items-center px-4 py-3">
-			{/* Left side - Main view toggle */}
-			<div className="flex gap-2">
+			{/* Left side - Main view toggle and search */}
+			<div className="flex gap-2 flex-wrap items-center">
 				<MainViewToggle activeView={activeView} onChange={onViewChange} />
 
 				{/* Desktop: Show view type toggle inline */}
@@ -433,29 +444,29 @@ export function ViewTabs({
 						onBuJoWidthChange={onBuJoWidthChange}
 					/>
 				)}
-			</div>
 
-			{/* Centered search — completed view only */}
-			{activeView === "completed" && (
-				<div className="flex items-center gap-1 bg-secondary rounded-full px-3 py-1">
-					<Search className="w-3 h-3 mr-1 text-muted-foreground shrink-0" />
-					<input
-						type="text"
-						value={completedSearch}
-						onChange={(e) => onCompletedSearchChange(e.target.value)}
-						placeholder="Search completed..."
-						className="bg-transparent border-none outline-none text-xs py-1 w-56 max-sm:w-40 text-foreground placeholder:text-muted-foreground"
-					/>
-					{completedSearch && (
-						<button
-							onClick={() => onCompletedSearchChange("")}
-							className="text-muted-foreground hover:text-foreground transition-colors"
-						>
-							<X className="w-3.5 h-3.5" />
-						</button>
-					)}
-				</div>
-			)}
+				{/* Search bar — completed view only, positioned left */}
+				{activeView === "completed" && (
+					<div className="flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-1.5 h-8 border border-transparent focus-within:border-border transition-colors">
+						<Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+						<input
+							type="text"
+							value={completedSearch}
+							onChange={(e) => onCompletedSearchChange(e.target.value)}
+							placeholder="Search completed..."
+							className="bg-transparent border-none outline-none text-xs w-56 max-sm:w-40 text-foreground placeholder:text-muted-foreground"
+						/>
+						{completedSearch && (
+							<button
+								onClick={() => onCompletedSearchChange("")}
+								className="text-muted-foreground hover:text-foreground transition-colors"
+							>
+								<X className="w-3.5 h-3.5" />
+							</button>
+						)}
+					</div>
+				)}
+			</div>
 
 			{/* Right side - Filters */}
 			<div className="flex items-center gap-2">
