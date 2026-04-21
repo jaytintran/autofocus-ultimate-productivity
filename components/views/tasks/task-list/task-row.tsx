@@ -9,6 +9,7 @@ import {
 	Trash2,
 	ClockAlert,
 	History,
+	MoreVertical,
 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { useSortable } from "@dnd-kit/sortable";
@@ -31,6 +32,7 @@ import {
 import { TagPill } from "@/components/shared/tag-pill";
 import type { TagId } from "@/lib/tags";
 import { TaskContextMenu } from "@/components/views/tasks/task-list/task-context-menu";
+import { TaskActionDrawer } from "@/components/views/tasks/task-list/task-action-drawer";
 import { useLongPress } from "@/hooks/ui/use-long-press";
 import { DueDatePicker } from "@/components/shared/due-date-picker";
 import { useSwipeReveal } from "./use-swipe-reveal";
@@ -73,6 +75,7 @@ export const TaskRow = memo(function TaskRow({
 		x: number;
 		y: number;
 	} | null>(null);
+	const [showActionDrawer, setShowActionDrawer] = useState(false);
 	const [dueDatePickerOpen, setDueDatePickerOpen] = useState(false);
 
 	const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -248,11 +251,11 @@ export const TaskRow = memo(function TaskRow({
 		isDragging: isLongPressDragging,
 	} = useLongPress({
 		onLongPress: (e) => {
-			if (isEditing || isDragging) return; // Don't trigger long press while dragging
+			if (isEditing || isDragging || isMobile) return; // Disable long press context menu on mobile
 			const touch = e.touches[0];
 			setContextMenu({ x: touch.clientX, y: touch.clientY });
 		},
-		delay: 1000,
+		delay: 1400, // Increased from 1000ms to 1400ms for context menu
 	});
 
 	const shouldDisableSwipe = disableSwipe || isWorking;
@@ -289,10 +292,15 @@ export const TaskRow = memo(function TaskRow({
 					transition-colors overflow-hidden
 				`}
 				onContextMenu={handleContextMenu}
+				{...(isMobile && !isWorking && !isEditing && !disabled ? attributes : {})}
 				onTouchStart={(e) => {
 					if (!isDragging) {
 						lpStart(e);
 						if (isMobile && !shouldDisableSwipe) onTouchStart(e);
+						// Apply drag listeners on mobile
+						if (isMobile && !isWorking && !isEditing && !disabled && listeners?.onTouchStart) {
+							listeners.onTouchStart(e as any);
+						}
 					}
 				}}
 				onTouchMove={(e) => {
@@ -311,7 +319,7 @@ export const TaskRow = memo(function TaskRow({
 				{/* Sliding content wrapper */}
 				<div
 					ref={registerSlidingElement}
-					className="relative flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-3 sm:py-2.5 w-full bg-background touch-pan-y"
+					className="relative flex items-center gap-2 px-3 py-1.5 sm:py-2.5 w-full bg-background touch-pan-y"
 					style={{ zIndex: 1 }}
 					onTouchEnd={
 						isMobile && (swipedLeft || swipedRight)
@@ -323,73 +331,70 @@ export const TaskRow = memo(function TaskRow({
 							: undefined
 					}
 				>
-					{/* Top row: Drag handle + Task text */}
-					<div className="flex items-center gap-2 flex-1 min-w-0">
-						{/* Drag handle */}
-						{!isWorking && !isEditing && !isDragOverlay && (
-							<button
-								{...attributes}
-								{...listeners}
-								type="button"
-								className="cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
-								aria-label="Drag to reorder"
-							>
-								<GripVertical className="w-4 h-4 text-muted-foreground pointer-events-none" />
-							</button>
-						)}
+					{/* Drag handle */}
+					{!isWorking && !isEditing && !isDragOverlay && (
+						<button
+							{...attributes}
+							{...listeners}
+							type="button"
+							className="hidden sm:flex cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
+							aria-label="Drag to reorder"
+						>
+							<GripVertical className="w-4 h-4 text-muted-foreground pointer-events-none" />
+						</button>
+					)}
 
-						{/* Task text / Edit input */}
-						<div className="flex-1 min-w-0 flex items-center gap-2">
-							{isEditing ? (
-								<div className="flex-1 flex items-center gap-2 min-w-0">
-									<textarea
-										ref={inputRef}
-										value={editText}
-										onChange={(e) => setEditText(e.target.value)}
-										onBlur={handleSave}
-										onKeyDown={handleKeyDown}
-										placeholder="Task text… or append !1d, !2h, !30m"
-										onClick={(e) => e.stopPropagation()}
-										className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-foreground resize-none w-full"
-									/>
-									{(() => {
-										const { dueDate } = parseDueDateShortcut(editText);
-										return dueDate ? (
-											<span className="text-xs sm:text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 flex-shrink-0">
-												⏰ {parseDueDateShortcut(editText).dueDateLabel}
-											</span>
-										) : null;
-									})()}
-								</div>
-							) : (
-								<span
-									onClick={handleTextClick}
-									className={`wrap-break-word min-w-0 w-full cursor-text ${isWorking ? "text-[#ddd4b8]" : ""}`}
-								>
-									{task.text}
-								</span>
-							)}
-						</div>
+					{/* Task text / Edit input */}
+					<div className="flex-1 min-w-0 flex items-center gap-2">
+						{isEditing ? (
+							<div className="flex-1 flex items-center gap-2 min-w-0">
+								<textarea
+									ref={inputRef}
+									value={editText}
+									onChange={(e) => setEditText(e.target.value)}
+									onBlur={handleSave}
+									onKeyDown={handleKeyDown}
+									placeholder="Task text… or append !1d, !2h, !30m"
+									onClick={(e) => e.stopPropagation()}
+									className="flex-1 bg-transparent border-b border-[#8b9a6b] outline-none py-0.5 text-sm sm:text-base text-foreground resize-none w-full"
+								/>
+								{(() => {
+									const { dueDate } = parseDueDateShortcut(editText);
+									return dueDate ? (
+										<span className="text-[10px] px-1 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 flex-shrink-0">
+											⏰ {parseDueDateShortcut(editText).dueDateLabel}
+										</span>
+									) : null;
+								})()}
+							</div>
+						) : (
+							<span
+								onClick={handleTextClick}
+								className={`min-w-0 w-full cursor-text text-sm sm:text-base truncate ${isWorking ? "text-[#ddd4b8]" : ""}`}
+							>
+								{task.text}
+							</span>
+						)}
 					</div>
 
-					{/* Bottom row (mobile) / Right side (desktop): Badges and actions */}
-					<div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
-						{/* Re-entered badge */}
+					{/* Badges and actions - desktop only badges, mobile only menu button */}
+					<div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+						{/* Re-entered badge - desktop only */}
 						{task.re_entered_from && !isEditing && (
-							<span className="text-xs sm:text-[10px] px-1.5 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
-								<RefreshCw className="w-3 sm:w-2.5 h-3 sm:h-2.5" />
+							<span className="hidden sm:flex text-[10px] px-1 py-0.5 rounded border border-[#c49a6b]/40 bg-[#c49a6b]/10 text-[#c49a6b] flex-shrink-0">
+								<RefreshCw className="w-3 h-3 sm:w-2.5 sm:h-2.5" />
 							</span>
 						)}
 
-						{/* Due date badge - now visible on mobile */}
+						{/* Due date badge - desktop only */}
 						{!isEditing && !isWorking && (
-							<div className="relative flex-shrink-0">
+							<div className="relative flex-shrink-0 hidden sm:block">
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
 										setDueDatePickerOpen((prev) => !prev);
 									}}
-									className={`text-xs sm:text-[10px] px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
+									className={`text-[10px] px-1 py-0.5 rounded border transition-colors flex-shrink-0 ${
 										task.due_date
 											? dueDateClasses
 											: "border-dashed border-muted-foreground/20 text-muted-foreground/30 hover:border-muted-foreground/50 hover:text-muted-foreground/60"
@@ -403,7 +408,7 @@ export const TaskRow = memo(function TaskRow({
 									{task.due_date ? (
 										formatDueDate(task.due_date).label
 									) : (
-										<ClockAlert className="w-3.5 sm:w-3 h-3.5 sm:h-3" />
+										<ClockAlert className="w-3 h-3" />
 									)}
 								</button>
 
@@ -420,14 +425,14 @@ export const TaskRow = memo(function TaskRow({
 							</div>
 						)}
 
-						{/* Time logged badge */}
+						{/* Time logged badge - desktop only */}
 						{task.total_time_ms > 0 && !isEditing && (
-							<span className="text-xs sm:text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
+							<span className="hidden sm:flex text-[10px] px-1 py-0.5 rounded border border-muted-foreground/30 bg-muted/50 text-muted-foreground flex-shrink-0">
 								{formatTimeCompact(task.total_time_ms)}
 							</span>
 						)}
 
-						{/* Age badge - hidden on mobile */}
+						{/* Age badge - desktop only */}
 						{!isEditing && (
 							<div className="hidden sm:flex items-center justify-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-transparent text-muted-foreground/50 flex-shrink-0">
 								<History className="w-3 h-3" />
@@ -435,12 +440,28 @@ export const TaskRow = memo(function TaskRow({
 							</div>
 						)}
 
-						{/* Tag pill */}
-						<TagPill
-							tagId={task.tag}
-							onSelectTag={(tag) => !disabled && onUpdateTag(task.id, tag)}
-							disabled={disabled || isEditing || isWorking}
-						/>
+						{/* Tag pill - desktop only */}
+						<div className="hidden sm:block">
+							<TagPill
+								tagId={task.tag}
+								onSelectTag={(tag) => !disabled && onUpdateTag(task.id, tag)}
+								disabled={disabled || isEditing || isWorking}
+							/>
+						</div>
+
+						{/* Mobile menu button */}
+						{isMobile && !isEditing && (
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setShowActionDrawer(true);
+								}}
+								className="p-1.5 hover:bg-accent rounded transition-colors flex-shrink-0"
+								aria-label="More actions"
+							>
+								<MoreVertical className="w-4 h-4 text-muted-foreground" />
+							</button>
+						)}
 
 						{/* Desktop action buttons */}
 						{!isMobile && !isWorking && !isEditing && (
@@ -673,7 +694,7 @@ export const TaskRow = memo(function TaskRow({
 			</li>
 
 			{/* Context menu */}
-			{contextMenu && (
+			{contextMenu && !isMobile && (
 				<TaskContextMenu
 					task={task}
 					position={contextMenu}
@@ -691,6 +712,30 @@ export const TaskRow = memo(function TaskRow({
 					onUpdateTag={onUpdateTag}
 					onMoveTask={onMoveTask}
 					onEdit={isMobile ? handleEnableEdit : undefined}
+				/>
+			)}
+
+			{/* Mobile action drawer */}
+			{isMobile && (
+				<TaskActionDrawer
+					task={task}
+					isOpen={showActionDrawer}
+					onClose={() => setShowActionDrawer(false)}
+					isFirst={isFirst}
+					isLast={isLast}
+					pamphlets={pamphlets}
+					activePamphletId={activePamphletId}
+					onStart={onStart}
+					onDone={onDone}
+					onReenter={onReenter}
+					onDelete={onDelete}
+					onPump={onPumpTask}
+					onSink={onSinkTask}
+					onUpdateTag={onUpdateTag}
+					onMoveTask={onMoveTask}
+					onEdit={handleEnableEdit}
+					onUpdateDueDate={onUpdateDueDate}
+					onUpdateText={onUpdateText}
 				/>
 			)}
 

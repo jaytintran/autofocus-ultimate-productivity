@@ -82,7 +82,7 @@ export function TaskList({
 			activationConstraint: { distance: 5 },
 		}),
 		useSensor(TouchSensor, {
-			activationConstraint: { delay: 100, tolerance: 5 },
+			activationConstraint: { delay: 400, tolerance: 5 }, // 400ms for drag, context menu at 1400ms
 		}),
 	);
 
