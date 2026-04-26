@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import type { CompletedListProps, GroupedTasks } from "./types";
 import type { TagId } from "@/lib/tags";
-import { useSevenDayColumns, useDeleteConfirmation, useClipboardCopy } from "./hooks";
+import { useSevenDayColumns, useDeleteConfirmation, useClipboardCopy, useDeleteDayConfirmation } from "./hooks";
 import { BulletJournalView } from "./day-group";
 import { SevenDayView } from "./seven-day-view";
 import { DefaultView } from "./default-view";
@@ -39,6 +39,8 @@ export function CompletedList({
 	const { showDeleteConfirm, requestDelete, clearDelete } =
 		useDeleteConfirmation();
 	const { copiedDateKey, copy: copyToClipboard } = useClipboardCopy();
+	const { showDeleteDayConfirm, requestDeleteDay, clearDeleteDay } =
+		useDeleteDayConfirmation();
 
 	// Memoized values
 	const filteredTasks = useMemo(() => {
@@ -214,6 +216,26 @@ export function CompletedList({
 		[pamphlets, activePamphletId, copyToClipboard],
 	);
 
+	const handleDeleteDay = useCallback(
+		async (dateKey: string) => {
+			if (showDeleteDayConfirm === dateKey) {
+				// Confirmed - delete all tasks for this day
+				clearDeleteDay();
+				const group = groupedTasks.find((g) => g.dateKey === dateKey);
+				if (!group) return;
+
+				// Delete all tasks in this day
+				const deletePromises = group.tasks.map((task) => onDeleteTask(task.id));
+				await Promise.all(deletePromises);
+				await onRefresh();
+			} else {
+				// First click - request confirmation
+				requestDeleteDay(dateKey);
+			}
+		},
+		[showDeleteDayConfirm, clearDeleteDay, requestDeleteDay, groupedTasks, onDeleteTask, onRefresh],
+	);
+
 	const handleLoadMore = useCallback(() => {
 		onLoadMore();
 	}, [onLoadMore]);
@@ -310,6 +332,7 @@ export function CompletedList({
 						loadingTagTaskId={loadingTagTaskId}
 						showDeleteConfirm={showDeleteConfirm}
 						copiedDateKey={copiedDateKey}
+						showDeleteDayConfirm={showDeleteDayConfirm}
 						hasMore={hasMore}
 						isLoadingMore={isLoadingMore}
 						onSelectTask={handleSelectTask}
@@ -318,6 +341,7 @@ export function CompletedList({
 						onUpdateTag={handleUpdateTag}
 						onLoadMore={handleLoadMore}
 						onExportDay={handleExportDay}
+						onDeleteDay={handleDeleteDay}
 						buJoWidth={buJoWidth!}
 					/>
 				) : completedViewType === "7days" ? (

@@ -92,11 +92,13 @@ export interface DayGroupProps {
 	loadingTagTaskId: string | null;
 	showDeleteConfirm: string | null;
 	copiedDateKey: string | null;
+	showDeleteDayConfirm: string | null;
 	onSelectTask: (id: string) => void;
 	onRevertTask: (task: Task) => void;
 	onDeleteTask: (id: string) => void;
 	onUpdateTag: (taskId: string, tag: TagId | null) => void;
 	onExportDay: (group: GroupedTasks) => void;
+	onDeleteDay: (dateKey: string) => void;
 }
 
 export interface LogActivityBarProps {

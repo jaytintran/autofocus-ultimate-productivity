@@ -96,3 +96,41 @@ export function useClipboardCopy() {
 
 	return { copiedDateKey, copy };
 }
+
+export function useDeleteDayConfirmation() {
+	const [showDeleteDayConfirm, setShowDeleteDayConfirm] = useState<string | null>(null);
+	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	const requestDeleteDay = useCallback((dateKey: string) => {
+		// Clear any existing timeout
+		if (timeoutRef.current) {
+			clearTimeout(timeoutRef.current);
+		}
+
+		setShowDeleteDayConfirm(dateKey);
+
+		// Set new timeout
+		timeoutRef.current = setTimeout(() => {
+			setShowDeleteDayConfirm(null);
+		}, 5000);
+	}, []);
+
+	const clearDeleteDay = useCallback(() => {
+		if (timeoutRef.current) {
+			clearTimeout(timeoutRef.current);
+			timeoutRef.current = null;
+		}
+		setShowDeleteDayConfirm(null);
+	}, []);
+
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+			}
+		};
+	}, []);
+
+	return { showDeleteDayConfirm, requestDeleteDay, clearDeleteDay };
+}

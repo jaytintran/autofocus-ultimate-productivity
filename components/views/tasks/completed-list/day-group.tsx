@@ -1,5 +1,5 @@
 import React, { useCallback, memo } from "react";
-import { Copy, CopyCheck } from "lucide-react";
+import { Copy, CopyCheck, Trash2 } from "lucide-react";
 import type { DayGroupProps, TimeBlockSectionProps, GroupedTasks } from "./types";
 import type { Task } from "@/lib/types";
 import type { TagId } from "@/lib/tags";
@@ -76,17 +76,25 @@ export const DayGroup = memo(function DayGroup({
 	loadingTagTaskId,
 	showDeleteConfirm,
 	copiedDateKey,
+	showDeleteDayConfirm,
 	onSelectTask,
 	onRevertTask,
 	onDeleteTask,
 	onUpdateTag,
 	onExportDay,
+	onDeleteDay,
 }: DayGroupProps) {
 	const handleExport = useCallback(() => {
 		onExportDay(group);
 	}, [onExportDay, group]);
 
+	const handleDeleteDay = useCallback(() => {
+		onDeleteDay(group.dateKey);
+	}, [onDeleteDay, group.dateKey]);
+
 	const { isCollapsed, toggle } = useCollapsedTimeBlocks();
+
+	const isDeleteDayConfirm = showDeleteDayConfirm === group.dateKey;
 
 	return (
 		<div className="mb-6">
@@ -95,6 +103,18 @@ export const DayGroup = memo(function DayGroup({
 					{group.dateLabel}
 				</span>
 				<div className="flex-1 h-px bg-border/50" />
+				<button
+					type="button"
+					onClick={handleDeleteDay}
+					className={`flex items-center gap-1 transition-colors ${
+						isDeleteDayConfirm
+							? "text-red-500 hover:text-red-600"
+							: "text-muted-foreground/40 hover:text-muted-foreground"
+					}`}
+					title={isDeleteDayConfirm ? "Click again to confirm deletion" : "Delete entire day"}
+				>
+					<Trash2 className="w-4 h-4" />
+				</button>
 				<button
 					type="button"
 					onClick={handleExport}
@@ -138,6 +158,7 @@ export const BulletJournalView = memo(function BulletJournalView({
 	loadingTagTaskId,
 	showDeleteConfirm,
 	copiedDateKey,
+	showDeleteDayConfirm,
 	hasMore,
 	isLoadingMore,
 	onSelectTask,
@@ -146,6 +167,7 @@ export const BulletJournalView = memo(function BulletJournalView({
 	onUpdateTag,
 	onLoadMore,
 	onExportDay,
+	onDeleteDay,
 	buJoWidth,
 }: {
 	groupedTasks: GroupedTasks[];
@@ -153,6 +175,7 @@ export const BulletJournalView = memo(function BulletJournalView({
 	loadingTagTaskId: string | null;
 	showDeleteConfirm: string | null;
 	copiedDateKey: string | null;
+	showDeleteDayConfirm: string | null;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	onSelectTask: (id: string) => void;
@@ -161,6 +184,7 @@ export const BulletJournalView = memo(function BulletJournalView({
 	onUpdateTag: (taskId: string, tag: TagId | null) => void;
 	onLoadMore: () => void;
 	onExportDay: (group: GroupedTasks) => void;
+	onDeleteDay: (dateKey: string) => void;
 	buJoWidth: string | null;
 }) {
 	const handleLoadMore = useCallback(() => {
@@ -194,11 +218,13 @@ export const BulletJournalView = memo(function BulletJournalView({
 					loadingTagTaskId={loadingTagTaskId}
 					showDeleteConfirm={showDeleteConfirm}
 					copiedDateKey={copiedDateKey}
+					showDeleteDayConfirm={showDeleteDayConfirm}
 					onSelectTask={onSelectTask}
 					onRevertTask={onRevertTask}
 					onDeleteTask={onDeleteTask}
 					onUpdateTag={onUpdateTag}
 					onExportDay={onExportDay}
+					onDeleteDay={onDeleteDay}
 				/>
 			))}
 
