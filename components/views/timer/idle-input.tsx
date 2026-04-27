@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Play, Send, KeyboardIcon } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
-import {
-	parseDueDateShortcut,
-} from "@/lib/utils/due-date-parser";
+import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
 import type { TimerBarProps } from "./timer-bar.types";
 import { capitalizeText, parseTagMention } from "./timer-bar.utils";
 
@@ -147,9 +145,12 @@ export function IdleInput({
 		parseDueDateShortcut(focusQuery);
 
 	return (
-		<div className="border-y border-border/80 bg-card px-6 py-6 md:px-10">
-			<div className="mx-auto flex max-w-6xl flex-col items-center w-full">
-				<div ref={inputContainerRef} className="relative w-full max-w-2xl">
+		<div className="w-full bg-card px-4 py-3 md:py-6 md:h-full md:flex md:items-center">
+			<div className="flex flex-col items-center w-full">
+				<div
+					ref={inputContainerRef}
+					className="relative w-full flex justify-center items-center"
+				>
 					{/* Tag mention dropdown */}
 					{focusMentionQuery !== null && focusMentionResults.length > 0 && (
 						<div
@@ -175,7 +176,7 @@ export function IdleInput({
 						</div>
 					)}
 
-					<div className="flex items-center gap-3 py-2">
+					<div className="flex items-center gap-3 py-2 w-1/2 border-r">
 						<KeyboardIcon className="w-5 h-5 text-muted-foreground shrink-0" />
 
 						{focusTagDef && (
@@ -198,8 +199,8 @@ export function IdleInput({
 							value={focusQuery}
 							onChange={handleChange}
 							onKeyDown={handleKeyDown}
-							placeholder="What are you working on? Search or create. Use # to tag, ! for due date"
-							className="flex-1 bg-transparent border-none outline-none text-lg md:text-xl text-foreground placeholder:text-muted-foreground/50 placeholder:text-sm md:placeholder:text-base"
+							placeholder="What are you working on?"
+							className="flex-1 bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted-foreground/50 placeholder:text-sm"
 							autoFocus
 							disabled={submitting}
 						/>
@@ -227,7 +228,7 @@ export function IdleInput({
 
 					{/* Existing task matches */}
 					{focusMatches.length > 0 && (
-						<div className="absolute top-full mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50">
+						<div className="absolute top-full mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden z-100">
 							{focusMatches.map((task) => {
 								const tagDef = task.tag ? getTagDefinition(task.tag) : null;
 								return (

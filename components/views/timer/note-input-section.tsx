@@ -64,7 +64,7 @@ export function NoteInputSection({
 	onDelete,
 }: NoteInputSectionProps) {
 	return (
-		<div className="flex flex-col gap-3 md:border-l md:border-border/50 md:pl-6 mt-2 md:mt-0">
+		<div className="flex flex-col gap-3 md:border-l md:border-border/50 md:pl-6 mt-2 md:mt-0 h-full">
 			{/* Input row — mobile cycling button + input + send, desktop toggler + input + send */}
 			<div className="flex items-center gap-2">
 				{/* Mobile: Single cycling button */}
@@ -286,18 +286,16 @@ export function NoteInputSection({
 				)}
 			</Collapsible>
 
-			{/* Desktop: Note log zone */}
-			<div
-				className={`flex flex-col gap-1.5 border border-border rounded-[0.25rem] py-1 px-2 h-full max-sm:hidden`}
-			>
-				{noteEntries.length > 0 && (
-					<div
-						className="flex flex-col gap-0.5 overflow-y-auto max-h-[110px]"
-						style={{
-							scrollbarWidth: "thin",
-							scrollbarColor: "hsl(var(--border)) transparent",
-						}}
-					>
+			{/* Desktop: Note log zone - full height */}
+			<div className="hidden md:flex flex-col gap-1.5 border border-border rounded-[0.25rem] py-1 px-2 flex-1 min-h-0">
+				<div
+					className="flex flex-col gap-0.5 overflow-y-auto flex-1"
+					style={{
+						scrollbarWidth: "thin",
+						scrollbarColor: "hsl(var(--border)) transparent",
+					}}
+				>
+					{noteEntries.length > 0 ? (
 						<NoteEntryList
 							entries={noteEntries}
 							editingNoteId={editingNoteId}
@@ -308,8 +306,12 @@ export function NoteInputSection({
 							onEditCancel={onEditCancel}
 							onDelete={onDelete}
 						/>
-					</div>
-				)}
+					) : (
+						<div className="flex items-center justify-center h-full text-muted-foreground/40 text-xs">
+							No entries yet
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);

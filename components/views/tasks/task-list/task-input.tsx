@@ -264,7 +264,7 @@ export function TaskInput({ onAddTask, selectedTags }: TaskInputProps) {
 	return (
 		<div
 			ref={containerRef}
-			className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-10"
+			className="w-full px-6 py-4 border-t border-border bg-background"
 		>
 			{/* Template picker */}
 			{showTemplates && (

@@ -42,8 +42,10 @@ import {
 import { TagFilter } from "@/components/shared/tag-filter";
 import { BacklogDump } from "@/components/shared/backlog-dump";
 import { ContentFilterBar } from "@/components/shared/content-filter-bar";
+import { PamphletDropdown } from "@/components/layout/pamphlet-dropdown";
 import type { TagId } from "@/lib/tags";
 import type { ContentFilterState } from "@/lib/features/content-filter";
+import type { Pamphlet } from "@/lib/types";
 
 export type CompletedSortKey =
 	| "default"
@@ -521,6 +523,9 @@ interface ViewTabsProps {
 	onBuJoWidthChange: (w: "full" | "narrow") => void;
 	completedSearch: string;
 	onCompletedSearchChange: (q: string) => void;
+	pamphlets: Pamphlet[];
+	activePamphlet: Pamphlet | null;
+	onSwitchPamphlet: (id: string) => void;
 }
 
 export function ViewTabs({
@@ -539,6 +544,9 @@ export function ViewTabs({
 	onBuJoWidthChange,
 	completedSearch,
 	onCompletedSearchChange,
+	pamphlets,
+	activePamphlet,
+	onSwitchPamphlet,
 }: ViewTabsProps) {
 	// Calculate active filter count for badge
 	const activeFilterCount =
@@ -548,8 +556,15 @@ export function ViewTabs({
 
 	return (
 		<div className="relative flex flex-row flex-wrap gap-2 justify-between items-center px-4 py-3">
-			{/* Left side - Main view toggle */}
+			{/* Left side - Pamphlet dropdown (desktop only) + Main view toggle */}
 			<div className="flex gap-2 flex-wrap items-center">
+				<div className="hidden md:block">
+					<PamphletDropdown
+						pamphlets={pamphlets}
+						activePamphlet={activePamphlet}
+						onSwitch={onSwitchPamphlet}
+					/>
+				</div>
 				<MainViewToggle activeView={activeView} onChange={onViewChange} />
 			</div>
 

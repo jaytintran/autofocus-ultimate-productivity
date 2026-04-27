@@ -327,7 +327,7 @@ export const TaskRow = memo(function TaskRow({
 				{/* Sliding content wrapper */}
 				<div
 					ref={registerSlidingElement}
-					className="relative flex items-center gap-2 px-3 py-1.5 sm:py-2.5 w-full bg-background touch-pan-y"
+					className="relative flex items-center gap-2 px-3 py-1.5 sm:py-2.5 w-full bg-background touch-pan-y overflow-hidden"
 					style={{ zIndex: 1 }}
 					onTouchEnd={
 						isMobile && (swipedLeft || swipedRight)
@@ -353,7 +353,7 @@ export const TaskRow = memo(function TaskRow({
 					)}
 
 					{/* Task text / Edit input */}
-					<div className="flex-1 min-w-0 flex items-center gap-2">
+					<div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
 						{isEditing ? (
 							<div className="flex-1 flex items-center gap-2 min-w-0">
 								<textarea
@@ -378,7 +378,7 @@ export const TaskRow = memo(function TaskRow({
 						) : (
 							<span
 								onClick={handleTextClick}
-								className={`min-w-0 w-full cursor-text text-sm truncate ${isWorking ? "text-[#ddd4b8]" : ""}`}
+								className={`block min-w-0 w-full cursor-text text-sm truncate ${isWorking ? "text-[#ddd4b8]" : ""}`}
 							>
 								{task.text}
 							</span>

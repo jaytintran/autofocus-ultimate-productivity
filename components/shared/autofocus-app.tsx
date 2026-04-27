@@ -101,6 +101,7 @@ import { useHabits } from "@/hooks/data/use-habits";
 import { useViewPreferences } from "@/hooks/state/use-view-preferences";
 import { HabitGrid } from "@/components/views/habits/habit-grid";
 import { createClient } from "@/lib/supabase/client";
+import { LogsPanel } from "@/components/views/tasks/logs-panel/logs-panel";
 import { ScheduleView } from "../views/schedule/schedule-view";
 
 // =============================================================================
@@ -2041,36 +2042,42 @@ export function AutofocusApp() {
 		<div className="h-screen overflow-hidden bg-background text-foreground flex flex-col">
 			<Header />
 
-			<PamphletSwitcher
-				pamphlets={pamphlets}
-				activePamphlet={activePamphlet}
-				onSwitch={switchPamphlet}
-				onAdd={addPamphlet}
-				onRename={renamePamphlet}
-				onRemove={removePamphlet}
-				onReorder={reorderPamphletsList}
-			/>
+			{/* Mobile only: Pamphlet Switcher */}
+			<div className="md:hidden">
+				<PamphletSwitcher
+					pamphlets={pamphlets}
+					activePamphlet={activePamphlet}
+					onSwitch={switchPamphlet}
+					onAdd={addPamphlet}
+					onRename={renamePamphlet}
+					onRemove={removePamphlet}
+					onReorder={reorderPamphletsList}
+				/>
+			</div>
 
-			<TimerBar
-				appState={displayedAppState}
-				workingTask={workingTask}
-				onStartTimer={handleRunTimer}
-				onPauseTimer={handlePauseTimer}
-				onResumeTimer={handleRunTimer}
-				onStopTimer={handleStopTimer}
-				onCompleteTask={handleCompleteWorkingTask}
-				onCancelTask={handleCancelWorkingTask}
-				onReenterTask={handlePanelReenterTask}
-				onAddTask={handleAddTask}
-				onAddTaskAndStart={handleAddTaskAndStart}
-				onStartTask={handleStartTask}
-				activeTasks={displayedActiveTasks}
-				pamphlets={pamphlets}
-				onUpdateDueDate={handleUpdateWorkingTaskDueDate}
-				onUpdateTaskTag={handleUpdateWorkingTaskTag}
-				onCompleteAdjacentTask={handleCompleteAdjacentTask}
-				onResetTime={handleResetTime}
-			/>
+			{/* Mobile only: Timer Bar */}
+			<div className="md:hidden">
+				<TimerBar
+					appState={displayedAppState}
+					workingTask={workingTask}
+					onStartTimer={handleRunTimer}
+					onPauseTimer={handlePauseTimer}
+					onResumeTimer={handleRunTimer}
+					onStopTimer={handleStopTimer}
+					onCompleteTask={handleCompleteWorkingTask}
+					onCancelTask={handleCancelWorkingTask}
+					onReenterTask={handlePanelReenterTask}
+					onAddTask={handleAddTask}
+					onAddTaskAndStart={handleAddTaskAndStart}
+					onStartTask={handleStartTask}
+					activeTasks={displayedActiveTasks}
+					pamphlets={pamphlets}
+					onUpdateDueDate={handleUpdateWorkingTaskDueDate}
+					onUpdateTaskTag={handleUpdateWorkingTaskTag}
+					onCompleteAdjacentTask={handleCompleteAdjacentTask}
+					onResetTime={handleResetTime}
+				/>
+			</div>
 
 			<ViewTabs
 				activeView={activeView}
@@ -2088,40 +2095,12 @@ export function AutofocusApp() {
 				onBuJoWidthChange={setBuJoWidth}
 				completedSearch={completedSearch}
 				onCompletedSearchChange={setCompletedSearch}
+				pamphlets={pamphlets}
+				activePamphlet={activePamphlet}
+				onSwitchPamphlet={switchPamphlet}
 			/>
 
-			{activeView === "tasks" && (
-				<PageNav
-					currentPage={effectiveCurrentPage}
-					totalPages={effectiveTotalPages}
-					onPageChange={handlePageChange}
-					isFiltered={isSearchOrFilterActive}
-					searchQuery={searchQuery}
-					onSearchChange={setSearchQuery}
-					totalActiveTasks={displayedActiveTasks.length}
-					taskTagCounts={taskTagCounts}
-					completedTasksWithNotes={completedTasksWithNotes}
-					onRefreshAchievements={mutateAchievements}
-					pamphlets={pamphlets}
-					habitsViewActive={habitsViewActive}
-					onToggleHabitsView={() => {
-						setHabitsViewActive((v) => !v);
-						setScheduleViewActive(false);
-					}}
-					activeHabitCount={activeHabitCount}
-					selectedTags={selectedTags}
-					onToggleTag={handleToggleTag}
-					scheduleViewActive={scheduleViewActive}
-					onToggleScheduleView={() => {
-						setScheduleViewActive((v) => !v);
-						setHabitsViewActive(false);
-					}}
-				/>
-			)}
-
-			<main
-				className={`flex-1 flex flex-col min-h-0 ${scheduleViewActive ? "" : "pb-24"}`}
-			>
+			<main className="flex-1 flex min-h-0">
 				{activeView === "tasks" &&
 					(scheduleViewActive ? (
 						<div className="flex-1 min-h-0 h-full overflow-hidden">
@@ -2148,60 +2127,172 @@ export function AutofocusApp() {
 							/>
 						</div>
 					) : (
-						<TaskList
-							tasks={tasksForCurrentPage}
-							allTasks={displayedActiveTasks}
-							workingTaskId={displayedAppState.working_on_task_id}
-							selectedTags={selectedTags}
-							onRefresh={refreshAll}
-							onStartTask={handleStartTask}
-							onDoneTask={handleDoneTask}
-							onDeleteTask={handleDeleteTask}
-							onReenterTask={handleReenterTask}
-							onReorderTasks={handleReorderTasks}
-							onSwitchTask={handleSwitchTask}
-							onVisibleCapacityChange={handleVisibleTaskCapacityChange}
-							onPumpTask={handlePumpTask}
-							onSinkTask={handleSinkTask}
-							visibleTotalPages={getVisibleTotalPages(displayedActiveTasks)}
-							disableSwipeForWorkingTask={true}
-							pamphlets={pamphlets}
-							activePamphletId={activePamphletId}
-							onMoveTask={handleMoveTask}
-							onUpdateDueDate={handleUpdateTaskDueDate}
-							onUpdateText={(taskId, text) =>
-								handleUpdateTaskText(taskId, text, false)
-							}
-						/>
+						<>
+							{/* Desktop: 2-column layout */}
+							<div className="hidden md:flex flex-1 min-h-0">
+								{/* Left Column: PageNav + Task List + TaskInput */}
+								<div className="w-1/2 flex flex-col min-h-0 border-r border-border">
+									<PageNav
+										currentPage={effectiveCurrentPage}
+										totalPages={effectiveTotalPages}
+										onPageChange={handlePageChange}
+										isFiltered={isSearchOrFilterActive}
+										searchQuery={searchQuery}
+										onSearchChange={setSearchQuery}
+										totalActiveTasks={displayedActiveTasks.length}
+										taskTagCounts={taskTagCounts}
+										completedTasksWithNotes={completedTasksWithNotes}
+										onRefreshAchievements={mutateAchievements}
+										pamphlets={pamphlets}
+										habitsViewActive={habitsViewActive}
+										onToggleHabitsView={() => {
+											setHabitsViewActive((v) => !v);
+											setScheduleViewActive(false);
+										}}
+										activeHabitCount={activeHabitCount}
+										selectedTags={selectedTags}
+										onToggleTag={handleToggleTag}
+										scheduleViewActive={scheduleViewActive}
+										onToggleScheduleView={() => {
+											setScheduleViewActive((v) => !v);
+											setHabitsViewActive(false);
+										}}
+									/>
+									<div className="flex-1 overflow-y-auto">
+										<TaskList
+											tasks={tasksForCurrentPage}
+											allTasks={displayedActiveTasks}
+											workingTaskId={displayedAppState.working_on_task_id}
+											selectedTags={selectedTags}
+											onRefresh={refreshAll}
+											onStartTask={handleStartTask}
+											onDoneTask={handleDoneTask}
+											onDeleteTask={handleDeleteTask}
+											onReenterTask={handleReenterTask}
+											onReorderTasks={handleReorderTasks}
+											onSwitchTask={handleSwitchTask}
+											onVisibleCapacityChange={handleVisibleTaskCapacityChange}
+											onPumpTask={handlePumpTask}
+											onSinkTask={handleSinkTask}
+											visibleTotalPages={getVisibleTotalPages(
+												displayedActiveTasks,
+											)}
+											disableSwipeForWorkingTask={true}
+											pamphlets={pamphlets}
+											activePamphletId={activePamphletId}
+											onMoveTask={handleMoveTask}
+											onUpdateDueDate={handleUpdateTaskDueDate}
+											onUpdateText={(taskId, text) =>
+												handleUpdateTaskText(taskId, text, false)
+											}
+										/>
+									</div>
+									<TaskInput
+										onAddTask={handleAddTask}
+										selectedTags={selectedTags}
+									/>
+								</div>
+
+								{/* Right Column: Timer Bar (top 1/3) + Logs Panel (bottom 2/3) */}
+								<div className="w-1/2 flex flex-col min-h-0">
+									{/* Timer Bar - 1/3 height */}
+									<div className="h-[33.33%] border-b border-border overflow-visible relative">
+										<div className="w-full h-full">
+											<TimerBar
+												appState={displayedAppState}
+												workingTask={workingTask}
+												onStartTimer={handleRunTimer}
+												onPauseTimer={handlePauseTimer}
+												onResumeTimer={handleRunTimer}
+												onStopTimer={handleStopTimer}
+												onCompleteTask={handleCompleteWorkingTask}
+												onCancelTask={handleCancelWorkingTask}
+												onReenterTask={handlePanelReenterTask}
+												onAddTask={handleAddTask}
+												onAddTaskAndStart={handleAddTaskAndStart}
+												onStartTask={handleStartTask}
+												activeTasks={displayedActiveTasks}
+												pamphlets={pamphlets}
+												onUpdateDueDate={handleUpdateWorkingTaskDueDate}
+												onUpdateTaskTag={handleUpdateWorkingTaskTag}
+												onCompleteAdjacentTask={handleCompleteAdjacentTask}
+												onResetTime={handleResetTime}
+											/>
+										</div>
+									</div>
+
+									{/* Logs Panel - 2/3 height */}
+									<div className="flex-1 min-h-0">
+										<LogsPanel
+											onAddLoggedActivity={handleAddLoggedActivity}
+											workingTask={workingTask}
+											activeTasks={displayedActiveTasks}
+											onCompleteAdjacentTask={handleCompleteAdjacentTask}
+										/>
+									</div>
+								</div>
+							</div>
+
+							{/* Mobile: Original layout */}
+							<div className="md:hidden flex-1 flex flex-col min-h-0">
+								<TaskList
+									tasks={tasksForCurrentPage}
+									allTasks={displayedActiveTasks}
+									workingTaskId={displayedAppState.working_on_task_id}
+									selectedTags={selectedTags}
+									onRefresh={refreshAll}
+									onStartTask={handleStartTask}
+									onDoneTask={handleDoneTask}
+									onDeleteTask={handleDeleteTask}
+									onReenterTask={handleReenterTask}
+									onReorderTasks={handleReorderTasks}
+									onSwitchTask={handleSwitchTask}
+									onVisibleCapacityChange={handleVisibleTaskCapacityChange}
+									onPumpTask={handlePumpTask}
+									onSinkTask={handleSinkTask}
+									visibleTotalPages={getVisibleTotalPages(displayedActiveTasks)}
+									disableSwipeForWorkingTask={true}
+									pamphlets={pamphlets}
+									activePamphletId={activePamphletId}
+									onMoveTask={handleMoveTask}
+									onUpdateDueDate={handleUpdateTaskDueDate}
+									onUpdateText={(taskId, text) =>
+										handleUpdateTaskText(taskId, text, false)
+									}
+								/>
+							</div>
+						</>
 					))}
 				{activeView === "completed" && (
-					<CompletedList
-						tasks={filteredCompletedTasks}
-						selectedTags={selectedTags}
-						completedSort={completedSort}
-						completedViewType={completedViewType}
-						hasMore={hasMoreCompleted}
-						isLoadingMore={isLoadingMore}
-						onLoadMore={handleLoadMoreCompleted}
-						onRefresh={refreshAll}
-						onDeleteTask={handleDeleteTask}
-						onRevertTask={handleRevertTask}
-						onUpdateTaskTag={handleUpdateCompletedTaskTag}
-						onUpdateTaskNote={handleUpdateCompletedTaskNote}
-						onUpdateTaskText={handleUpdateCompletedTaskText}
-						onAddLoggedActivity={handleAddLoggedActivity}
-						pamphlets={pamphlets}
-						activePamphletId={activePamphletId}
-						buJoWidth={buJoWidth}
-						completedSearch={debouncedCompletedSearch}
-					/>
+					<div className="flex-1 flex flex-col min-h-0">
+						<CompletedList
+							tasks={filteredCompletedTasks}
+							selectedTags={selectedTags}
+							completedSort={completedSort}
+							completedViewType={completedViewType}
+							hasMore={hasMoreCompleted}
+							isLoadingMore={isLoadingMore}
+							onLoadMore={handleLoadMoreCompleted}
+							onRefresh={refreshAll}
+							onDeleteTask={handleDeleteTask}
+							onRevertTask={handleRevertTask}
+							onUpdateTaskTag={handleUpdateCompletedTaskTag}
+							onUpdateTaskNote={handleUpdateCompletedTaskNote}
+							onUpdateTaskText={handleUpdateCompletedTaskText}
+							onAddLoggedActivity={handleAddLoggedActivity}
+							pamphlets={pamphlets}
+							activePamphletId={activePamphletId}
+							buJoWidth={buJoWidth}
+							completedSearch={debouncedCompletedSearch}
+						/>
+					</div>
 				)}
 			</main>
 
 			{activeView === "tasks" && !scheduleViewActive && (
-				<>
+				<div className="md:hidden">
 					<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />
-				</>
+				</div>
 			)}
 		</div>
 	);

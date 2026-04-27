@@ -228,9 +228,9 @@ export function TimerBar({
 	const totalDisplayTime = effectiveWorkingTask.total_time_ms + sessionMs;
 
 	return (
-		<div className="border-y border-border/80 bg-card px-4 py-3 md:px-10 md:py-4">
-			<div className="mx-auto flex max-w-6xl flex-col gap-3 md:grid md:grid-cols-2 md:gap-6">
-				{/* LEFT COLUMN: Task info + Timer + Actions */}
+		<div className="w-full bg-card px-4 py-3 md:py-6 md:h-full md:flex md:items-center">
+			<div className="flex flex-col gap-3 md:gap-2 w-full">
+				{/* Task info + Timer + Actions */}
 				<WorkingTaskDisplay
 					effectiveWorkingTask={effectiveWorkingTask}
 					totalDisplayTime={totalDisplayTime}
@@ -252,8 +252,9 @@ export function TimerBar({
 					onResetTime={handleResetTime}
 				/>
 
-				{/* RIGHT COLUMN: Note input + display */}
-				<NoteInputSection
+				{/* Note input + display - Hidden in panel mode, shown in mobile */}
+				<div className="md:hidden">
+					<NoteInputSection
 					noteType={noteType}
 					setNoteType={setNoteType}
 					noteInput={noteInput}
@@ -277,9 +278,10 @@ export function TimerBar({
 					onDelete={handleNoteDelete}
 				/>
 			</div>
+		</div>
 
-			{/* Reset Time Confirmation Dialog */}
-			<ResetConfirmationDialog
+		{/* Reset Time Confirmation Dialog */}
+		<ResetConfirmationDialog
 				isOpen={showResetConfirm}
 				totalTimeMs={effectiveWorkingTask.total_time_ms}
 				onConfirm={handleConfirmReset}
