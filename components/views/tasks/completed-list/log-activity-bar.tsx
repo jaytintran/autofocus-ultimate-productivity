@@ -201,8 +201,8 @@ export const LogActivityBar = memo(function LogActivityBar({
 	);
 
 	return (
-		<div className="w-full">
-			<div className="bg-card border border-border rounded-full px-4 py-2.5 flex items-center gap-3 relative">
+		<div className="w-full px-6 py-4 border-t border-border bg-background">
+			<div className="bg-card border border-border rounded-full shadow-lg px-4 py-2.5 flex items-center gap-3 relative">
 				{logMentionQuery !== null && (
 					<div className="absolute bottom-full left-4 mb-2">
 						<LogTagMentionDropdown

@@ -577,16 +577,16 @@ export function ViewTabs({
 					</div>
 				)}
 
-				{/* Search bar — completed view only, positioned right */}
+				{/* Search bar — completed view only, mobile only (desktop version in completed-nav) */}
 				{activeView === "completed" && (
-					<div className="flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-4 h-8 border border-transparent focus-within:border-border transition-colors">
+					<div className="md:hidden flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-4 h-8 border border-transparent focus-within:border-border transition-colors">
 						<Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 						<input
 							type="text"
 							value={completedSearch}
 							onChange={(e) => onCompletedSearchChange(e.target.value)}
 							placeholder="Search completed..."
-							className="bg-transparent border-none outline-none text-xs w-56 max-sm:w-40 text-foreground placeholder:text-muted-foreground"
+							className="bg-transparent border-none outline-none text-xs w-40 text-foreground placeholder:text-muted-foreground"
 						/>
 						{completedSearch && (
 							<button
@@ -597,23 +597,6 @@ export function ViewTabs({
 							</button>
 						)}
 					</div>
-				)}
-
-				{/* Narrow/Full width toggle - visible on desktop when bullet view is active */}
-				{activeView === "completed" && completedViewType === "bullet" && (
-					<button
-						onClick={() =>
-							onBuJoWidthChange(buJoWidth === "full" ? "narrow" : "full")
-						}
-						className="hidden md:flex px-2 py-1.5 rounded-md text-xs transition-all duration-200 text-muted-foreground hover:text-foreground opacity-60 hover:opacity-100 h-8 items-center"
-						title={buJoWidth === "full" ? "Narrow view" : "Full width"}
-					>
-						{buJoWidth === "full" ? (
-							<PanelRightClose className="w-3.5 h-3.5" />
-						) : (
-							<PanelRightOpen className="w-3.5 h-3.5" />
-						)}
-					</button>
 				)}
 
 				{/* MOBILE: Everything in Sheet */}
@@ -646,7 +629,7 @@ export function ViewTabs({
 					)}
 				</MobileFilterSheet>
 
-				{/* DESKTOP: Show filters inline for tasks, preferences popover for completed */}
+				{/* DESKTOP: Show filters inline for tasks only (completed preferences moved to completed-nav) */}
 				<div className="hidden md:flex items-center gap-2">
 					{activeView === "tasks" && (
 						<>
@@ -656,20 +639,6 @@ export function ViewTabs({
 								onChange={onChangeContentFilter}
 							/>
 						</>
-					)}
-
-					{activeView === "completed" && (
-						<DesktopPreferencesPopover
-							activeFilterCount={activeFilterCount}
-							completedSort={completedSort}
-							onCompletedSortChange={onCompletedSortChange}
-							completedViewType={completedViewType}
-							onCompletedViewTypeChange={onCompletedViewTypeChange}
-							contentFilter={contentFilter}
-							onChangeContentFilter={onChangeContentFilter}
-							selectedTags={selectedTags}
-							onToggleTag={onToggleTag}
-						/>
 					)}
 				</div>
 			</div>

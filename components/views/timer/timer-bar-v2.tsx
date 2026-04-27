@@ -228,7 +228,7 @@ export function TimerBar({
 	const totalDisplayTime = effectiveWorkingTask.total_time_ms + sessionMs;
 
 	return (
-		<div className="w-full bg-card px-4 py-3 md:py-2">
+		<div className="w-full bg-card px-4 py-3 h-full flex items-center">
 			<div className="flex flex-col gap-3 md:gap-2">
 				{/* Task info + Timer + Actions */}
 				<WorkingTaskDisplay
