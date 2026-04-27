@@ -2196,7 +2196,7 @@ export function AutofocusApp() {
 								{/* Right Column: Timer Bar (top 1/3) + Logs Panel (bottom 2/3) */}
 								<div className="w-1/2 flex flex-col min-h-0">
 									{/* Timer Bar - 1/3 height */}
-									<div className="h-[33.33%] border-b border-border overflow-visible relative">
+									<div className="h-fit max-sm:h-full! border-b border-border overflow-visible relative">
 										<div className="w-full h-full">
 											<TimerBar
 												appState={displayedAppState}
@@ -2234,7 +2234,7 @@ export function AutofocusApp() {
 							</div>
 
 							{/* Mobile: Original layout */}
-							<div className="md:hidden flex-1 flex flex-col min-h-0">
+							<div className="md:hidden flex-1 flex flex-col min-h-0 w-full">
 								<TaskList
 									tasks={tasksForCurrentPage}
 									allTasks={displayedActiveTasks}

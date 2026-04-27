@@ -145,11 +145,11 @@ export function IdleInput({
 		parseDueDateShortcut(focusQuery);
 
 	return (
-		<div className="w-full bg-card px-4 py-3 md:py-6 md:h-full md:flex md:items-center">
+		<div className="w-full bg-card px-4 py-3 md:py-6 max-sm:py-6 md:h-full md:flex md:items-center">
 			<div className="flex flex-col items-center w-full">
 				<div
 					ref={inputContainerRef}
-					className="relative w-full flex justify-center items-center"
+					className="relative w-full flex md:justify-center items-center"
 				>
 					{/* Tag mention dropdown */}
 					{focusMentionQuery !== null && focusMentionResults.length > 0 && (
@@ -176,7 +176,7 @@ export function IdleInput({
 						</div>
 					)}
 
-					<div className="flex items-center gap-3 py-2 w-1/2 border-r">
+					<div className="flex items-center gap-3 py-2 md:w-1/2 w-full max-sm:justify-between md:border-r">
 						<KeyboardIcon className="w-5 h-5 text-muted-foreground shrink-0" />
 
 						{focusTagDef && (

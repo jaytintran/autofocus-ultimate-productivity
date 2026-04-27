@@ -360,9 +360,9 @@ export function TaskList({
 	);
 
 	return (
-		<div ref={containerRef} className="flex-1 flex flex-col min-h-0">
+		<div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
 			<div
-				className="flex-1 overflow-y-auto"
+				className="flex-1 w-full overflow-y-auto overflow-x-hidden"
 				style={{ scrollbarWidth: "thin" }}
 			>
 				<DndContext

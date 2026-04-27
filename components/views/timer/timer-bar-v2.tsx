@@ -228,8 +228,8 @@ export function TimerBar({
 	const totalDisplayTime = effectiveWorkingTask.total_time_ms + sessionMs;
 
 	return (
-		<div className="w-full bg-card px-4 py-3 md:py-6 md:h-full md:flex md:items-center">
-			<div className="flex flex-col gap-3 md:gap-2 w-full">
+		<div className="w-full bg-card px-4 py-3 md:py-2">
+			<div className="flex flex-col gap-3 md:gap-2">
 				{/* Task info + Timer + Actions */}
 				<WorkingTaskDisplay
 					effectiveWorkingTask={effectiveWorkingTask}
@@ -255,33 +255,33 @@ export function TimerBar({
 				{/* Note input + display - Hidden in panel mode, shown in mobile */}
 				<div className="md:hidden">
 					<NoteInputSection
-					noteType={noteType}
-					setNoteType={setNoteType}
-					noteInput={noteInput}
-					setNoteInput={setNoteInput}
-					handleNoteSubmit={handleNoteSubmit}
-					sidequestInput={sidequestInput}
-					sidequestMatches={sidequestMatches}
-					sidequestSubmitting={sidequestSubmitting}
-					handleSidequestChange={handleSidequestChange}
-					handleSidequestSubmit={handleSidequestSubmit}
-					clearSidequestMatches={clearSidequest}
-					noteEntries={noteEntries}
-					mobileNotesOpen={mobileNotesOpen}
-					setMobileNotesOpen={setMobileNotesOpen}
-					editingNoteId={editingNoteId}
-					editingNoteText={editingNoteText}
-					onEditStart={handleNoteEditStart}
-					onEditChange={handleNoteEditChange}
-					onEditSave={handleNoteEditSave}
-					onEditCancel={handleNoteEditCancel}
-					onDelete={handleNoteDelete}
-				/>
+						noteType={noteType}
+						setNoteType={setNoteType}
+						noteInput={noteInput}
+						setNoteInput={setNoteInput}
+						handleNoteSubmit={handleNoteSubmit}
+						sidequestInput={sidequestInput}
+						sidequestMatches={sidequestMatches}
+						sidequestSubmitting={sidequestSubmitting}
+						handleSidequestChange={handleSidequestChange}
+						handleSidequestSubmit={handleSidequestSubmit}
+						clearSidequestMatches={clearSidequest}
+						noteEntries={noteEntries}
+						mobileNotesOpen={mobileNotesOpen}
+						setMobileNotesOpen={setMobileNotesOpen}
+						editingNoteId={editingNoteId}
+						editingNoteText={editingNoteText}
+						onEditStart={handleNoteEditStart}
+						onEditChange={handleNoteEditChange}
+						onEditSave={handleNoteEditSave}
+						onEditCancel={handleNoteEditCancel}
+						onDelete={handleNoteDelete}
+					/>
+				</div>
 			</div>
-		</div>
 
-		{/* Reset Time Confirmation Dialog */}
-		<ResetConfirmationDialog
+			{/* Reset Time Confirmation Dialog */}
+			<ResetConfirmationDialog
 				isOpen={showResetConfirm}
 				totalTimeMs={effectiveWorkingTask.total_time_ms}
 				onConfirm={handleConfirmReset}

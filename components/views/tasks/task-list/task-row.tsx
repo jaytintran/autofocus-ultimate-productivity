@@ -289,7 +289,7 @@ export const TaskRow = memo(function TaskRow({
 					group relative flex select-none
 					${isWorking ? "bg-[#8b9a6b]/5 ring-1 ring-inset ring-[#8b9a6b]/30" : ""}
 					${isDragOverlay ? "shadow-lg bg-background border border-border rounded-md" : ""}
-					transition-colors overflow-hidden
+					transition-colors overflow-x-hidden
 				`}
 				onContextMenu={handleContextMenu}
 				{...(isMobile && !isWorking && !isEditing && !disabled
@@ -327,7 +327,7 @@ export const TaskRow = memo(function TaskRow({
 				{/* Sliding content wrapper */}
 				<div
 					ref={registerSlidingElement}
-					className="relative flex items-center gap-2 px-3 py-1.5 sm:py-2.5 w-full bg-background touch-pan-y overflow-hidden"
+					className="relative flex items-center gap-2 px-3 py-1.5 sm:py-2.5 w-full bg-background touch-pan-y"
 					style={{ zIndex: 1 }}
 					onTouchEnd={
 						isMobile && (swipedLeft || swipedRight)
@@ -353,7 +353,7 @@ export const TaskRow = memo(function TaskRow({
 					)}
 
 					{/* Task text / Edit input */}
-					<div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+					<div className="flex-1 min-w-0 flex items-center gap-2">
 						{isEditing ? (
 							<div className="flex-1 flex items-center gap-2 min-w-0">
 								<textarea
