@@ -2261,31 +2261,55 @@ export function AutofocusApp() {
 									setHabitsViewActive(false);
 								}}
 							/>
-							<TaskList
-								tasks={tasksForCurrentPage}
-								allTasks={displayedActiveTasks}
-								workingTaskId={displayedAppState.working_on_task_id}
-								selectedTags={selectedTags}
-								onRefresh={refreshAll}
-								onStartTask={handleStartTask}
-								onDoneTask={handleDoneTask}
-								onDeleteTask={handleDeleteTask}
-								onReenterTask={handleReenterTask}
-								onReorderTasks={handleReorderTasks}
-								onSwitchTask={handleSwitchTask}
-								onVisibleCapacityChange={handleVisibleTaskCapacityChange}
-								onPumpTask={handlePumpTask}
-								onSinkTask={handleSinkTask}
-								visibleTotalPages={getVisibleTotalPages(displayedActiveTasks)}
-								disableSwipeForWorkingTask={true}
-								pamphlets={pamphlets}
-								activePamphletId={activePamphletId}
-								onMoveTask={handleMoveTask}
-								onUpdateDueDate={handleUpdateTaskDueDate}
-								onUpdateText={(taskId, text) =>
-									handleUpdateTaskText(taskId, text, false)
-								}
-							/>
+							<div className="flex-1 overflow-y-auto">
+								{scheduleViewActive ? (
+									<ScheduleView
+										date={scheduleDate}
+										timeBlocks={timeBlocks}
+										tasks={displayedActiveTasks}
+										completedTasks={filteredCompletedTasks}
+										onScheduleTask={handleScheduleTask}
+										onUnscheduleTask={handleUnscheduleTask}
+										onCreateBlock={handleCreateBlock}
+										onUpdateBlock={handleUpdateBlock}
+										onDeleteBlock={handleDeleteBlock}
+										onStartTask={handleStartTask}
+										onDateChange={setScheduleDate}
+									/>
+								) : habitsViewActive ? (
+									<HabitGrid
+										habits={habits}
+										onToggle={handleToggleHabit}
+										onReorder={handleReorder}
+									/>
+								) : (
+									<TaskList
+										tasks={tasksForCurrentPage}
+										allTasks={displayedActiveTasks}
+										workingTaskId={displayedAppState.working_on_task_id}
+										selectedTags={selectedTags}
+										onRefresh={refreshAll}
+										onStartTask={handleStartTask}
+										onDoneTask={handleDoneTask}
+										onDeleteTask={handleDeleteTask}
+										onReenterTask={handleReenterTask}
+										onReorderTasks={handleReorderTasks}
+										onSwitchTask={handleSwitchTask}
+										onVisibleCapacityChange={handleVisibleTaskCapacityChange}
+										onPumpTask={handlePumpTask}
+										onSinkTask={handleSinkTask}
+										visibleTotalPages={getVisibleTotalPages(displayedActiveTasks)}
+										disableSwipeForWorkingTask={true}
+										pamphlets={pamphlets}
+										activePamphletId={activePamphletId}
+										onMoveTask={handleMoveTask}
+										onUpdateDueDate={handleUpdateTaskDueDate}
+										onUpdateText={(taskId, text) =>
+											handleUpdateTaskText(taskId, text, false)
+										}
+									/>
+								)}
+							</div>
 						</div>
 					</>
 				) : (
@@ -2397,7 +2421,7 @@ export function AutofocusApp() {
 				)}
 			</main>
 
-			{activeView === "tasks" && !scheduleViewActive && (
+			{activeView === "tasks" && !scheduleViewActive && !habitsViewActive && (
 				<div className="md:hidden">
 					<TaskInput onAddTask={handleAddTask} selectedTags={selectedTags} />
 				</div>
