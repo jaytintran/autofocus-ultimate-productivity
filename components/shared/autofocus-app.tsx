@@ -2104,7 +2104,7 @@ export function AutofocusApp() {
 			<main className="flex-1 flex min-h-0">
 				{activeView === "tasks" ? (
 					<>
-						{/* Desktop: 2-column layout */}
+						{/* Desktop: 2-column layout for TASK LIST*/}
 						<div className="hidden md:flex flex-1 min-h-0">
 							{/* Left Column: PageNav + Task List/Habits/Schedule + TaskInput */}
 							<div className="w-1/2 flex flex-col min-h-0 border-r border-border">
@@ -2290,7 +2290,7 @@ export function AutofocusApp() {
 					</>
 				) : (
 					<>
-						{/* Desktop: 2-column layout with completed list in left column */}
+						{/* Desktop: 2-column layout for COMPLETED LIST */}
 						<div className="hidden md:flex flex-1 min-h-0">
 							{/* Left Column: CompletedNav + Completed List */}
 							<div className="w-1/2 flex flex-col min-h-0 border-r border-border">

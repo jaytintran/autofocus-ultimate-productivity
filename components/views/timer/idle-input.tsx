@@ -145,8 +145,8 @@ export function IdleInput({
 		parseDueDateShortcut(focusQuery);
 
 	return (
-		<div className="w-full bg-card px-4 py-3 md:py-6 max-sm:py-6 md:h-full md:flex md:items-center">
-			<div className="flex flex-col items-center w-full">
+		<div className="w-full bg-card md:px-4 py-3 md:py-6 max-sm:py-6 md:h-full md:flex md:items-center">
+			<div className="flex flex-col items-center w-full px-4 md:px-0">
 				<div
 					ref={inputContainerRef}
 					className="relative w-full flex md:justify-center items-center"
