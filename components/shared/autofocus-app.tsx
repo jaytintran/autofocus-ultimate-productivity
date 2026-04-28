@@ -102,7 +102,6 @@ import { useHabits } from "@/hooks/data/use-habits";
 import { useViewPreferences } from "@/hooks/state/use-view-preferences";
 import { HabitGrid } from "@/components/views/habits/habit-grid";
 import { createClient } from "@/lib/supabase/client";
-import { LogsPanel } from "@/components/views/tasks/logs-panel/logs-panel";
 import { ScheduleView } from "../views/schedule/schedule-view";
 
 // =============================================================================
@@ -1539,10 +1538,7 @@ export function AutofocusApp() {
 					totalPages: getVisibleTotalPages(optimisticActiveTasks),
 				},
 				async () => {
-					if (note.trim()) {
-						await updateTask(task.id, { note: note.trim() });
-					}
-					await completeTask(task.id, totalTime);
+					await completeTask(task.id, totalTime, activePamphletId, note.trim() || null);
 					await reindexActiveTasks(activePamphletId);
 					await stopWorkingOnTask();
 				},
@@ -2193,10 +2189,9 @@ export function AutofocusApp() {
 								)}
 							</div>
 
-							{/* Right Column: Timer Bar (top 1/3) + Logs Panel (bottom 2/3) */}
+							{/* Right Column: Timer Bar - Full height */}
 							<div className="w-1/2 flex flex-col min-h-0">
-								{/* Timer Bar - 1/3 height */}
-								<div className="h-[33.33%] max-sm:h-full! border-b border-border overflow-visible relative">
+								<div className="h-full border-b border-border overflow-visible relative">
 									<div className="w-full h-full">
 										<TimerBar
 											appState={displayedAppState}
@@ -2219,16 +2214,6 @@ export function AutofocusApp() {
 											onResetTime={handleResetTime}
 										/>
 									</div>
-								</div>
-
-								{/* Logs Panel - 2/3 height */}
-								<div className="flex-1 min-h-0">
-									<LogsPanel
-										onAddLoggedActivity={handleAddLoggedActivity}
-										workingTask={workingTask}
-										activeTasks={displayedActiveTasks}
-										onCompleteAdjacentTask={handleCompleteAdjacentTask}
-									/>
 								</div>
 							</div>
 						</div>
@@ -2354,10 +2339,9 @@ export function AutofocusApp() {
 								/>
 							</div>
 
-							{/* Right Column: Timer Bar (top 1/3) + Logs Panel (bottom 2/3) */}
+							{/* Right Column: Timer Bar - Full height */}
 							<div className="w-1/2 flex flex-col min-h-0">
-								{/* Timer Bar - 1/3 height */}
-								<div className="h-[33.33%] border-b border-border overflow-visible relative">
+								<div className="h-full border-b border-border overflow-visible relative">
 									<div className="w-full h-full">
 										<TimerBar
 											appState={displayedAppState}
@@ -2380,16 +2364,6 @@ export function AutofocusApp() {
 											onResetTime={handleResetTime}
 										/>
 									</div>
-								</div>
-
-								{/* Logs Panel - 2/3 height */}
-								<div className="flex-1 min-h-0">
-									<LogsPanel
-										onAddLoggedActivity={handleAddLoggedActivity}
-										workingTask={workingTask}
-										activeTasks={displayedActiveTasks}
-										onCompleteAdjacentTask={handleCompleteAdjacentTask}
-									/>
 								</div>
 							</div>
 						</div>

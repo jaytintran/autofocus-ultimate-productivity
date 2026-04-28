@@ -64,7 +64,7 @@ export function NoteInputSection({
 	onDelete,
 }: NoteInputSectionProps) {
 	return (
-		<div className="flex flex-col gap-3 md:border-l md:border-border/50 md:pl-6 mt-2 md:mt-0 h-full">
+		<div className="flex flex-col gap-3 md:border-border/50 mt-2 md:mt-0 h-full">
 			{/* Input row — mobile cycling button + input + send, desktop toggler + input + send */}
 			<div className="flex items-center gap-2">
 				{/* Mobile: Single cycling button */}
@@ -182,7 +182,9 @@ export function NoteInputSection({
 										className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
 									>
 										<CheckCheck className="w-3 h-3 text-sky-500 flex-shrink-0" />
-										<span className="truncate text-foreground">{task.text}</span>
+										<span className="truncate text-foreground">
+											{task.text}
+										</span>
 									</button>
 								))}
 								{sidequestInput.trim() && (

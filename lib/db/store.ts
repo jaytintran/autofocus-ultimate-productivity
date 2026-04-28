@@ -256,18 +256,25 @@ export async function completeTask(
 	id: string,
 	totalTimeMs: number,
 	pamphletId?: string | null,
+	note?: string | null,
 ): Promise<Task> {
 	const supabase = createClient();
 	const now = new Date().toISOString();
 
+	const updateData: any = {
+		status: "completed",
+		completed_at: now,
+		total_time_ms: totalTimeMs,
+		updated_at: now,
+	};
+
+	if (note !== undefined) {
+		updateData.note = note;
+	}
+
 	const { data, error } = await supabase
 		.from("tasks")
-		.update({
-			status: "completed",
-			completed_at: now,
-			total_time_ms: totalTimeMs,
-			updated_at: now,
-		})
+		.update(updateData)
 		.eq("id", id)
 		.select()
 		.single();

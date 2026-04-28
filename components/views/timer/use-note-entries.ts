@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Task } from "@/lib/types";
 import type { NoteEntry } from "./timer-bar.types";
 
@@ -12,6 +12,26 @@ export function useNoteEntries({
 	sessionMs,
 }: UseNoteEntriesProps) {
 	const [noteEntries, setNoteEntries] = useState<NoteEntry[]>([]);
+
+	// Load persisted note entries when task changes
+	useEffect(() => {
+		if (effectiveWorkingTask?.note) {
+			try {
+				const parsed = JSON.parse(effectiveWorkingTask.note);
+				if (Array.isArray(parsed)) {
+					setNoteEntries(parsed);
+				} else {
+					// If it's already formatted text (not JSON array), clear entries
+					setNoteEntries([]);
+				}
+			} catch {
+				// Not JSON, it's formatted text - clear entries
+				setNoteEntries([]);
+			}
+		} else {
+			setNoteEntries([]);
+		}
+	}, [effectiveWorkingTask?.id]);
 	const [noteInput, setNoteInput] = useState("");
 	const [noteType, setNoteType] = useState<"log" | "achievement" | "sidequest">(
 		"log",
@@ -87,6 +107,7 @@ export function useNoteEntries({
 
 	return {
 		noteEntries,
+		setNoteEntries,
 		noteInput,
 		setNoteInput,
 		noteType,

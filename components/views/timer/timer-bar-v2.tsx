@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { formatTimeCompact } from "@/lib/utils/time-utils";
 import type { TimerBarProps } from "./timer-bar.types";
 import { IdleInput } from "./idle-input";
@@ -63,6 +63,7 @@ export function TimerBar({
 
 	const {
 		noteEntries,
+		setNoteEntries,
 		noteInput,
 		setNoteInput,
 		noteType,
@@ -98,6 +99,25 @@ export function TimerBar({
 		onSidequestComplete: addSidequestEntry,
 	});
 
+	// ── Auto-save note entries to task ────────────────────────────────────────
+	useEffect(() => {
+		if (!effectiveWorkingTask || noteEntries.length === 0) return;
+
+		const saveNotes = async () => {
+			try {
+				const { updateTask } = await import("@/lib/db/store");
+				await updateTask(effectiveWorkingTask.id, {
+					note: JSON.stringify(noteEntries),
+				});
+			} catch (error) {
+				console.error("Failed to save note entries:", error);
+			}
+		};
+
+		const timeoutId = setTimeout(saveNotes, 1000);
+		return () => clearTimeout(timeoutId);
+	}, [noteEntries, effectiveWorkingTask?.id]);
+
 	// ── Handlers ───────────────────────────────────────────────────────────────
 
 	const handleComplete = useCallback(async () => {
@@ -111,7 +131,10 @@ export function TimerBar({
 			const logs = noteEntries
 				.filter((e) => e.type === "log")
 				.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`);
-			combinedNote = [...achievements, ...logs].join("\n");
+			const sidequests = noteEntries
+				.filter((e) => e.type === "sidequest")
+				.map((e) => `✓ At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`);
+			combinedNote = [...achievements, ...sidequests, ...logs].join("\n");
 		} else {
 			combinedNote = note;
 		}
@@ -146,6 +169,9 @@ export function TimerBar({
 						...noteEntries
 							.filter((e) => e.type === "achievement")
 							.map((e) => e.text),
+						...noteEntries
+							.filter((e) => e.type === "sidequest")
+							.map((e) => `✓ At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`),
 						...noteEntries
 							.filter((e) => e.type === "log")
 							.map((e) => `• At ${formatTimeCompact(e.elapsedMs)}  ${e.text}`),
@@ -228,9 +254,9 @@ export function TimerBar({
 	const totalDisplayTime = effectiveWorkingTask.total_time_ms + sessionMs;
 
 	return (
-		<div className="w-full bg-card md:px-4 py-3 h-full flex items-center">
-			<div className="flex flex-col gap-3 md:gap-2 w-full md:w-auto px-4 md:px-0">
-				{/* Task info + Timer + Actions */}
+		<div className="w-full bg-card h-full flex flex-col">
+			{/* Top: Task info + Timer + Actions */}
+			<div className="md:px-4 pt-3 pb-0 px-4 md:py-3">
 				<WorkingTaskDisplay
 					effectiveWorkingTask={effectiveWorkingTask}
 					totalDisplayTime={totalDisplayTime}
@@ -251,33 +277,33 @@ export function TimerBar({
 					onReenter={handleReenter}
 					onResetTime={handleResetTime}
 				/>
+			</div>
 
-				{/* Note input + display - Hidden in panel mode, shown in mobile */}
-				<div className="md:hidden">
-					<NoteInputSection
-						noteType={noteType}
-						setNoteType={setNoteType}
-						noteInput={noteInput}
-						setNoteInput={setNoteInput}
-						handleNoteSubmit={handleNoteSubmit}
-						sidequestInput={sidequestInput}
-						sidequestMatches={sidequestMatches}
-						sidequestSubmitting={sidequestSubmitting}
-						handleSidequestChange={handleSidequestChange}
-						handleSidequestSubmit={handleSidequestSubmit}
-						clearSidequestMatches={clearSidequest}
-						noteEntries={noteEntries}
-						mobileNotesOpen={mobileNotesOpen}
-						setMobileNotesOpen={setMobileNotesOpen}
-						editingNoteId={editingNoteId}
-						editingNoteText={editingNoteText}
-						onEditStart={handleNoteEditStart}
-						onEditChange={handleNoteEditChange}
-						onEditSave={handleNoteEditSave}
-						onEditCancel={handleNoteEditCancel}
-						onDelete={handleNoteDelete}
-					/>
-				</div>
+			{/* Bottom: Note input + display - Full width */}
+			<div className="flex-1 min-h-0 border-border p-3 max-sm:pt-0">
+				<NoteInputSection
+					noteType={noteType}
+					setNoteType={setNoteType}
+					noteInput={noteInput}
+					setNoteInput={setNoteInput}
+					handleNoteSubmit={handleNoteSubmit}
+					sidequestInput={sidequestInput}
+					sidequestMatches={sidequestMatches}
+					sidequestSubmitting={sidequestSubmitting}
+					handleSidequestChange={handleSidequestChange}
+					handleSidequestSubmit={handleSidequestSubmit}
+					clearSidequestMatches={clearSidequest}
+					noteEntries={noteEntries}
+					mobileNotesOpen={mobileNotesOpen}
+					setMobileNotesOpen={setMobileNotesOpen}
+					editingNoteId={editingNoteId}
+					editingNoteText={editingNoteText}
+					onEditStart={handleNoteEditStart}
+					onEditChange={handleNoteEditChange}
+					onEditSave={handleNoteEditSave}
+					onEditCancel={handleNoteEditCancel}
+					onDelete={handleNoteDelete}
+				/>
 			</div>
 
 			{/* Reset Time Confirmation Dialog */}

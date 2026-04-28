@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo } from "react";
-import { Check, X, Circle, ChevronDown, ChevronRight } from "lucide-react";
+import { Check, X, Circle, ChevronDown, ChevronRight, CheckCheck } from "lucide-react";
 import type { TaskItemProps } from "./types";
 import type { TagId } from "@/lib/tags";
 import { TagPill } from "@/components/shared/tag-pill";
@@ -106,12 +106,14 @@ export const TaskAchievementNote = memo(function TaskNote({
 
 function parseNoteLines(note: string): {
 	achievements: string[];
+	sidequests: string[];
 	logs: string[];
 } {
 	const lines = note.split("\n").filter((l) => l.trim());
-	const achievements = lines.filter((l) => !l.startsWith("•"));
+	const achievements = lines.filter((l) => !l.startsWith("•") && !l.startsWith("✓"));
+	const sidequests = lines.filter((l) => l.startsWith("✓"));
 	const logs = lines.filter((l) => l.startsWith("•"));
-	return { achievements, logs };
+	return { achievements, sidequests, logs };
 }
 
 export const TaskSessionLogNote = memo(function TaskSessionLogNote({
@@ -120,7 +122,7 @@ export const TaskSessionLogNote = memo(function TaskSessionLogNote({
 	note: string;
 }) {
 	const [expanded, setExpanded] = useState(false);
-	const { achievements, logs } = parseNoteLines(note);
+	const { achievements, sidequests, logs } = parseNoteLines(note);
 
 	return (
 		<div className="mt-0.5">
@@ -133,6 +135,21 @@ export const TaskSessionLogNote = memo(function TaskSessionLogNote({
 							className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug"
 						>
 							🏆 {line}
+						</p>
+					))}
+				</div>
+			)}
+
+			{/* Sidequest section — always visible */}
+			{sidequests.length > 0 && (
+				<div className="mt-1 space-y-0.5">
+					{sidequests.map((line, i) => (
+						<p
+							key={i}
+							className="text-[11px] text-sky-600 dark:text-sky-400 leading-snug flex items-start gap-1"
+						>
+							<CheckCheck className="w-3 h-3 shrink-0 mt-0.5" />
+							<span>{line.replace(/^✓\s*/, '')}</span>
 						</p>
 					))}
 				</div>
@@ -189,7 +206,7 @@ export const BulletRow = memo(function BulletRow({
 	// session log — multi-line, logged in real-time during a work session, timestamped, granular
 	// achievement — single-line, written at completion, one reflection/summary of what was done
 	const isMultiLineNote =
-		!!task.note && (task.note.includes("\n") || task.note.startsWith("•"));
+		!!task.note && (task.note.includes("\n") || task.note.startsWith("•") || task.note.startsWith("✓"));
 
 	const handleSelect = useCallback(() => {
 		onSelect(task.id);

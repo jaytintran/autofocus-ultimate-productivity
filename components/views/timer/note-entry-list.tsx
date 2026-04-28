@@ -85,8 +85,8 @@ export function NoteEntryList({
 							</span>
 						)}
 
-						{/* Timestamp — only for logs */}
-						{!isAchievement && !isSidequest && (
+						{/* Timestamp — for logs and sidequests */}
+						{!isAchievement && (
 							<span className="font-mono text-[10px] flex-shrink-0 text-muted-foreground/50">
 								{formatTimeCompact(entry.elapsedMs)}
 							</span>
