@@ -1,18 +1,28 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Send, KeyboardIcon } from "lucide-react";
+import { Play, Send, KeyboardIcon, BookOpen, FolderKanban } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
 import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
 import type { TimerBarProps } from "./timer-bar.types";
 import { capitalizeText, parseTagMention } from "./timer-bar.utils";
+import { useBooks } from "@/hooks/data/use-books";
+import { useProjects } from "@/hooks/data/use-projects";
+import { CompactBooksList } from "./compact-books-list";
+import { CompactProjectsList } from "./compact-projects-list";
+import { BookModal } from "@/components/views/books/book-modal";
+import { ProjectModal } from "@/components/views/projects/project-modal";
+import type { Book, BookStatus } from "@/lib/db/books";
+import type { Project, ProjectStatus } from "@/lib/db/projects";
 
 interface IdleInputProps {
 	activeTasks: Task[];
 	onAddTaskAndStart: TimerBarProps["onAddTaskAndStart"];
 	onStartTask: TimerBarProps["onStartTask"];
 }
+
+type ViewMode = "books" | "projects";
 
 export function IdleInput({
 	activeTasks,
@@ -29,8 +39,15 @@ export function IdleInput({
 	const [dropdownPosition, setDropdownPosition] = useState<"top" | "bottom">(
 		"top",
 	);
+	const [viewMode, setViewMode] = useState<ViewMode>("books");
 	const inputRef = useRef<HTMLInputElement>(null);
 	const inputContainerRef = useRef<HTMLDivElement>(null);
+
+	const { books, handleUpdate: updateBook, handleDelete: deleteBook, handleStatusChange: changeBookStatus } = useBooks();
+	const { projects, handleUpdate: updateProject, handleDelete: deleteProject, handleStatusChange: changeProjectStatus } = useProjects();
+
+	const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedQuery(focusQuery), 400);
@@ -144,13 +161,29 @@ export function IdleInput({
 	const { dueDate: parsedDueDate, dueDateLabel } =
 		parseDueDateShortcut(focusQuery);
 
+	// Load viewMode from localStorage on mount
+	useEffect(() => {
+		const saved = localStorage.getItem("timer-idle-view");
+		if (saved === "books" || saved === "projects") {
+			setViewMode(saved);
+		}
+	}, []);
+
+	// Save viewMode to localStorage when it changes
+	const handleViewModeChange = (mode: ViewMode) => {
+		setViewMode(mode);
+		localStorage.setItem("timer-idle-view", mode);
+	};
+
 	return (
-		<div className="w-full bg-card md:px-4 py-3 md:py-6 max-sm:py-6 md:h-full md:flex md:items-center">
-			<div className="flex flex-col items-center w-full px-4 md:px-0">
-				<div
-					ref={inputContainerRef}
-					className="relative w-full flex md:justify-center items-center"
-				>
+		<div className="w-full bg-card h-full flex flex-col">
+			{/* Top: Input section */}
+			<div className="md:px-4 py-3 md:py-6 max-sm:py-6">
+				<div className="flex flex-col items-center w-full px-4 md:px-0">
+					<div
+						ref={inputContainerRef}
+						className="relative w-full flex md:justify-center items-center"
+					>
 					{/* Tag mention dropdown */}
 					{focusMentionQuery !== null && focusMentionResults.length > 0 && (
 						<div
@@ -265,5 +298,79 @@ export function IdleInput({
 				</div>
 			</div>
 		</div>
+
+		{/* Bottom: Books/Projects section - Desktop only */}
+		<div className="hidden md:block flex-1 border-t border-border p-4 overflow-y-auto">
+			{/* Switcher */}
+			<div className="flex items-center gap-2 mb-4">
+				<button
+					onClick={() => handleViewModeChange("books")}
+					className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+						viewMode === "books"
+							? "bg-[#8b9a6b]/10 text-[#8b9a6b]"
+							: "text-muted-foreground hover:bg-accent"
+					}`}
+				>
+					<BookOpen className="w-3.5 h-3.5" />
+					Books
+				</button>
+				<button
+					onClick={() => handleViewModeChange("projects")}
+					className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+						viewMode === "projects"
+							? "bg-[#8b9a6b]/10 text-[#8b9a6b]"
+							: "text-muted-foreground hover:bg-accent"
+					}`}
+				>
+					<FolderKanban className="w-3.5 h-3.5" />
+					Projects
+				</button>
+			</div>
+
+			{/* Content */}
+			{viewMode === "books" ? (
+				<CompactBooksList
+					books={books}
+					onBookClick={setSelectedBook}
+					onStatusChange={changeBookStatus}
+				/>
+			) : (
+				<CompactProjectsList
+					projects={projects}
+					onProjectClick={setSelectedProject}
+					onStatusChange={changeProjectStatus}
+				/>
+			)}
+		</div>
+
+		{/* Book Modal */}
+		{selectedBook && (
+			<BookModal
+				book={selectedBook}
+				allBooks={books}
+				onClose={() => setSelectedBook(null)}
+				onUpdate={updateBook}
+				onDelete={async (id) => {
+					setSelectedBook(null);
+					await deleteBook(id);
+				}}
+				onStatusChange={changeBookStatus}
+			/>
+		)}
+
+		{/* Project Modal */}
+		{selectedProject && (
+			<ProjectModal
+				project={selectedProject}
+				onClose={() => setSelectedProject(null)}
+				onUpdate={updateProject}
+				onDelete={async (id) => {
+					setSelectedProject(null);
+					await deleteProject(id);
+				}}
+				onStatusChange={changeProjectStatus}
+			/>
+		)}
+	</div>
 	);
 }
