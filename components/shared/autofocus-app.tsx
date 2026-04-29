@@ -5,6 +5,8 @@
 // =============================================================================
 
 import { useUserId } from "@/hooks/state/use-user-id";
+import { useAppInit } from "@/hooks/data/use-app-init";
+import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 
 // React & Core
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -177,9 +179,10 @@ function buildReorderedActiveTasks(
 
 export function AutofocusApp() {
 	// -------------------------------------------------------------------------
-	// State - User
+	// State - User & Parallel Init
 	// -------------------------------------------------------------------------
 	const userId = useUserId();
+	const { data: initData, isLoading: isInitLoading, refetch: refetchInit } = useAppInit();
 
 	// -------------------------------------------------------------------------
 	// State - View & Filter
@@ -317,10 +320,39 @@ export function AutofocusApp() {
 		mutateCompleted();
 	}, [activePamphletId, mutateCompleted]);
 
+	const getCachedAppState = useCallback((): AppState | null => {
+		// Only access localStorage on client-side
+		if (typeof window === "undefined") return null;
+		try {
+			const cached = localStorage.getItem("af4_app_state_cache");
+			return cached ? JSON.parse(cached) : null;
+		} catch {
+			return null;
+		}
+	}, []);
+
+	const [cachedAppState, setCachedAppState] = useState<AppState | null>(null);
+
+	// Load cache only after mount to avoid SSR/client mismatch
+	useEffect(() => {
+		setCachedAppState(getCachedAppState());
+	}, [getCachedAppState]);
+
 	const { data: appState, mutate: mutateAppState } = useSWR<AppState>(
 		userId ? `app-state-${userId}` : null,
 		getAppState,
-		{ refreshInterval: 1000 },
+		{
+			refreshInterval: 1000,
+			fallbackData: cachedAppState ?? undefined,
+			onSuccess: (data) => {
+				if (typeof window === "undefined") return;
+				try {
+					localStorage.setItem("af4_app_state_cache", JSON.stringify(data));
+				} catch (e) {
+					console.error("Failed to cache app state:", e);
+				}
+			},
+		},
 	);
 
 	const [totalPages, setTotalPages] = useState(1);
@@ -2027,12 +2059,14 @@ export function AutofocusApp() {
 	// -------------------------------------------------------------------------
 	// Render
 	// -------------------------------------------------------------------------
+	// Show skeleton UI while loading (no cached data)
+	if (isInitLoading && !initData) {
+		return <LoadingSkeleton />;
+	}
+
+	// Show skeleton if appState is not ready
 	if (!displayedAppState) {
-		return (
-			<div className="min-h-screen bg-background flex items-center justify-center">
-				<div className="text-muted-foreground">Loading...</div>
-			</div>
-		);
+		return <LoadingSkeleton />;
 	}
 
 	return (
