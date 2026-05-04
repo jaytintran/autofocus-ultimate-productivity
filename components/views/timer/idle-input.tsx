@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Send, KeyboardIcon, BookOpen, FolderKanban } from "lucide-react";
+import { Play, Send, KeyboardIcon, BookOpen, FolderKanban, GraduationCap, Briefcase } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { TAG_DEFINITIONS, getTagDefinition, type TagId } from "@/lib/tags";
 import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
@@ -9,12 +9,19 @@ import type { TimerBarProps } from "./timer-bar.types";
 import { capitalizeText, parseTagMention } from "./timer-bar.utils";
 import { useBooks } from "@/hooks/data/use-books";
 import { useProjects } from "@/hooks/data/use-projects";
+import { useCourses } from "@/hooks/data/use-courses";
 import { CompactBooksList } from "./compact-books-list";
 import { CompactProjectsList } from "./compact-projects-list";
+import { CompactCoursesList } from "./compact-courses-list";
 import { BookModal } from "@/components/views/books/book-modal";
 import { ProjectModal } from "@/components/views/projects/project-modal";
+import { CourseModal } from "@/components/views/courses/course-modal";
+import { AddBookModal } from "@/components/views/books/add-book-modal";
+import { AddProjectModal } from "@/components/views/projects/add-project-modal";
+import { AddCourseModal } from "@/components/views/courses/add-course-modal";
 import type { Book, BookStatus } from "@/lib/db/books";
 import type { Project, ProjectStatus } from "@/lib/db/projects";
+import type { Course, CourseStatus } from "@/lib/db/courses";
 
 interface IdleInputProps {
 	activeTasks: Task[];
@@ -22,7 +29,7 @@ interface IdleInputProps {
 	onStartTask: TimerBarProps["onStartTask"];
 }
 
-type ViewMode = "books" | "projects";
+type ViewMode = "books" | "projects" | "courses";
 
 export function IdleInput({
 	activeTasks,
@@ -40,14 +47,23 @@ export function IdleInput({
 		"top",
 	);
 	const [viewMode, setViewMode] = useState<ViewMode>("books");
+	const [booksSearchQuery, setBooksSearchQuery] = useState("");
+	const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
+	const [coursesSearchQuery, setCoursesSearchQuery] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 	const inputContainerRef = useRef<HTMLDivElement>(null);
 
-	const { books, handleUpdate: updateBook, handleDelete: deleteBook, handleStatusChange: changeBookStatus } = useBooks();
-	const { projects, handleUpdate: updateProject, handleDelete: deleteProject, handleStatusChange: changeProjectStatus } = useProjects();
+	const { books, handleUpdate: updateBook, handleDelete: deleteBook, handleStatusChange: changeBookStatus, handleAdd: addBook } = useBooks();
+	const { projects, handleUpdate: updateProject, handleDelete: deleteProject, handleStatusChange: changeProjectStatus, handleAdd: addProject } = useProjects();
+	const { courses, handleUpdate: updateCourse, handleDelete: deleteCourse, handleStatusChange: changeCourseStatus, handleAdd: addCourse } = useCourses();
 
 	const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+	const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
+	const [showAddBookModal, setShowAddBookModal] = useState(false);
+	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+	const [showAddCourseModal, setShowAddCourseModal] = useState(false);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedQuery(focusQuery), 400);
@@ -164,7 +180,7 @@ export function IdleInput({
 	// Load viewMode from localStorage on mount
 	useEffect(() => {
 		const saved = localStorage.getItem("timer-idle-view");
-		if (saved === "books" || saved === "projects") {
+		if (saved === "books" || saved === "projects" || saved === "courses") {
 			setViewMode(saved);
 		}
 	}, []);
@@ -173,6 +189,17 @@ export function IdleInput({
 	const handleViewModeChange = (mode: ViewMode) => {
 		setViewMode(mode);
 		localStorage.setItem("timer-idle-view", mode);
+		// Clear search when switching tabs
+		if (mode === "books") {
+			setProjectsSearchQuery("");
+			setCoursesSearchQuery("");
+		} else if (mode === "projects") {
+			setBooksSearchQuery("");
+			setCoursesSearchQuery("");
+		} else {
+			setBooksSearchQuery("");
+			setProjectsSearchQuery("");
+		}
 	};
 
 	return (
@@ -299,7 +326,7 @@ export function IdleInput({
 			</div>
 		</div>
 
-		{/* Bottom: Books/Projects section - Desktop only */}
+		{/* Bottom: Books/Projects/Courses section - Desktop only */}
 		<div className="hidden md:block flex-1 border-t border-border p-4 overflow-y-auto">
 			{/* Switcher */}
 			<div className="flex items-center gap-2 mb-4">
@@ -325,6 +352,17 @@ export function IdleInput({
 					<FolderKanban className="w-3.5 h-3.5" />
 					Projects
 				</button>
+				<button
+					onClick={() => handleViewModeChange("courses")}
+					className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+						viewMode === "courses"
+							? "bg-[#8b9a6b]/10 text-[#8b9a6b]"
+							: "text-muted-foreground hover:bg-accent"
+					}`}
+				>
+					<GraduationCap className="w-3.5 h-3.5" />
+					Courses
+				</button>
 			</div>
 
 			{/* Content */}
@@ -333,12 +371,27 @@ export function IdleInput({
 					books={books}
 					onBookClick={setSelectedBook}
 					onStatusChange={changeBookStatus}
+					searchQuery={booksSearchQuery}
+					onSearchChange={setBooksSearchQuery}
+					onAddBook={() => setShowAddBookModal(true)}
 				/>
-			) : (
+			) : viewMode === "projects" ? (
 				<CompactProjectsList
 					projects={projects}
 					onProjectClick={setSelectedProject}
 					onStatusChange={changeProjectStatus}
+					searchQuery={projectsSearchQuery}
+					onSearchChange={setProjectsSearchQuery}
+					onAddProject={() => setShowAddProjectModal(true)}
+				/>
+			) : (
+				<CompactCoursesList
+					courses={courses}
+					onCourseClick={setSelectedCourse}
+					onStatusChange={changeCourseStatus}
+					searchQuery={coursesSearchQuery}
+					onSearchChange={setCoursesSearchQuery}
+					onAddCourse={() => setShowAddCourseModal(true)}
 				/>
 			)}
 		</div>
@@ -369,6 +422,57 @@ export function IdleInput({
 					await deleteProject(id);
 				}}
 				onStatusChange={changeProjectStatus}
+			/>
+		)}
+
+		{/* Course Modal */}
+		{selectedCourse && (
+			<CourseModal
+				course={selectedCourse}
+				onClose={() => setSelectedCourse(null)}
+				onUpdate={updateCourse}
+				onDelete={async (id) => {
+					setSelectedCourse(null);
+					await deleteCourse(id);
+				}}
+				onStatusChange={changeCourseStatus}
+			/>
+		)}
+
+		{/* Add Book Modal */}
+		{showAddBookModal && (
+			<AddBookModal
+				onClose={() => setShowAddBookModal(false)}
+				onAdd={async (book) => {
+					await addBook(book);
+					setShowAddBookModal(false);
+				}}
+				domains={Array.from(new Set(books.map(b => b.domain)))}
+				books={books}
+			/>
+		)}
+
+		{/* Add Project Modal */}
+		{showAddProjectModal && (
+			<AddProjectModal
+				onClose={() => setShowAddProjectModal(false)}
+				onAdd={async (project) => {
+					await addProject(project);
+					setShowAddProjectModal(false);
+				}}
+				categories={Array.from(new Set(projects.map(p => p.category)))}
+			/>
+		)}
+
+		{/* Add Course Modal */}
+		{showAddCourseModal && (
+			<AddCourseModal
+				onClose={() => setShowAddCourseModal(false)}
+				onAdd={async (course) => {
+					await addCourse(course);
+					setShowAddCourseModal(false);
+				}}
+				categories={Array.from(new Set(courses.map(c => c.category)))}
 			/>
 		)}
 	</div>

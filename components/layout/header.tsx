@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, BookOpen, X, Folder, Flame } from "lucide-react";
+import { Settings, BookOpen, X, Folder, Flame, School } from "lucide-react";
 import { useState } from "react";
 import { AboutSection } from "@/components/shared/about-section";
 import { SettingsModal } from "@/components/shared/settings/settings-modal";
@@ -8,12 +8,14 @@ import { SettingsModal } from "@/components/shared/settings/settings-modal";
 import { BookView } from "@/components/views/books/book-view";
 import { ProjectView } from "@/components/views/projects/project-view";
 import { HabitView } from "@/components/views/habits/habit-view";
+import { CourseView } from "@/components/views/courses/course-view";
 
 export function Header() {
 	const [showSettings, setShowSettings] = useState(false);
 	const [showBooks, setShowBooks] = useState(false);
 	const [showProjects, setShowProjects] = useState(false);
 	const [showHabits, setShowHabits] = useState(false);
+	const [showCourses, setShowCourses] = useState(false);
 
 	return (
 		<header className="flex items-center justify-between px-6 py-4 relative">
@@ -44,6 +46,16 @@ export function Header() {
 					title="Projects"
 				>
 					<Folder className="w-4 h-4" />
+				</button>
+
+				{/* Courses Button */}
+				<button
+					onClick={() => setShowCourses(true)}
+					className="p-2 hover:bg-accent rounded transition-colors"
+					aria-label="Courses"
+					title="Courses"
+				>
+					<School className="w-4 h-4" />
 				</button>
 
 				{/* Habits Button */}
@@ -151,6 +163,32 @@ export function Header() {
 					</div>
 					<div className="flex-1 min-h-0">
 						<HabitView />
+					</div>
+				</div>
+			)}
+
+			{/* Courses overlay */}
+			{showCourses && (
+				<div className="fixed inset-0 z-50 bg-background flex flex-col">
+					<div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+						<div>
+							<h2 className="text-sm tracking-[0.3em] font-medium">
+								C<span className="text-af4-olive">O</span>URSES
+							</h2>
+							<p className="text-[0.625rem] uppercase text-muted-foreground mt-0.5">
+								Your learning journey
+							</p>
+						</div>
+						<button
+							onClick={() => setShowCourses(false)}
+							className="p-2 hover:bg-accent rounded transition-colors"
+							aria-label="Close courses"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</div>
+					<div className="flex-1 min-h-0">
+						<CourseView />
 					</div>
 				</div>
 			)}

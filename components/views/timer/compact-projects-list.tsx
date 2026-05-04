@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FolderKanban, CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { FolderKanban, CalendarDays, ChevronDown, ChevronRight, Search, X, Briefcase } from "lucide-react";
 import type { Project, ProjectStatus } from "@/lib/db/projects";
 import { STATUS_CONFIG } from "@/components/views/projects/constants";
 
@@ -9,15 +9,37 @@ interface CompactProjectsListProps {
 	projects: Project[];
 	onProjectClick?: (project: Project) => void;
 	onStatusChange?: (id: string, status: ProjectStatus) => void;
+	searchQuery: string;
+	onSearchChange: (query: string) => void;
+	onAddProject: () => void;
 }
 
 export function CompactProjectsList({
 	projects,
 	onProjectClick,
 	onStatusChange,
+	searchQuery,
+	onSearchChange,
+	onAddProject,
 }: CompactProjectsListProps) {
 	const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
 	const [showCompleted, setShowCompleted] = useState(false);
+	const [debouncedQuery, setDebouncedQuery] = useState("");
+
+	useEffect(() => {
+		const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+		return () => clearTimeout(timer);
+	}, [searchQuery]);
+
+	const filteredProjects = useMemo(() => {
+		if (!debouncedQuery.trim()) return null;
+		const query = debouncedQuery.toLowerCase();
+		return projects.filter(
+			(p) =>
+				p.title.toLowerCase().includes(query) ||
+				p.category.toLowerCase().includes(query),
+		);
+	}, [projects, debouncedQuery]);
 
 	const activeProjects = useMemo(
 		() => projects.filter((p) => p.status === "active"),
@@ -48,15 +70,6 @@ export function CompactProjectsList({
 		onStatusChange?.(projectId, status);
 		setStatusDropdown(null);
 	};
-
-	if (activeProjects.length === 0 && planningProjects.length === 0 && completedProjects.length === 0) {
-		return (
-			<div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
-				<FolderKanban className="w-6 h-6 opacity-20" />
-				<p className="text-xs">No projects yet</p>
-			</div>
-		);
-	}
 
 	const renderProjectCard = (project: Project) => {
 		const isOverdue =
@@ -163,10 +176,63 @@ export function CompactProjectsList({
 		);
 	};
 
+	if (activeProjects.length === 0 && planningProjects.length === 0 && completedProjects.length === 0) {
+		return (
+			<div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+				<FolderKanban className="w-6 h-6 opacity-20" />
+				<p className="text-xs">No projects yet</p>
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex flex-col gap-4">
-			{/* Active Projects */}
-			{activeProjects.length > 0 && (
+			{/* Search Bar with Add Button */}
+			<div className="flex items-center gap-2">
+				<div className="relative flex-1">
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+					<input
+						type="text"
+						value={searchQuery}
+						onChange={(e) => onSearchChange(e.target.value)}
+						placeholder="Search projects..."
+						className="w-full pl-9 pr-9 py-2 text-sm bg-secondary/50 border border-border rounded-lg outline-none focus:border-[#8b9a6b]/50 transition-colors placeholder:text-muted-foreground/50"
+					/>
+					{searchQuery && (
+						<button
+							onClick={() => onSearchChange("")}
+							className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+						>
+							<X className="w-3.5 h-3.5" />
+						</button>
+					)}
+				</div>
+				<button
+					onClick={onAddProject}
+					className="px-3 py-2 bg-secondary/50 border border-border rounded-lg hover:bg-secondary transition-colors shrink-0 flex items-center gap-1.5 text-sm font-medium"
+					title="Add Project"
+				>
+					<Briefcase className="w-3.5 h-3.5" />
+					<span>Add</span>
+				</button>
+			</div>
+
+			{/* Search Results */}
+			{filteredProjects !== null ? (
+				filteredProjects.length > 0 ? (
+					<div className="flex flex-col gap-2">
+						{filteredProjects.map(renderProjectCard)}
+					</div>
+				) : (
+					<div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+						<Search className="w-6 h-6 opacity-20" />
+						<p className="text-xs">No projects match your search</p>
+					</div>
+				)
+			) : (
+				<>
+					{/* Active Projects */}
+					{activeProjects.length > 0 && (
 				<div className="flex flex-col gap-2">
 					<h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1">
 						Active ({activeProjects.length})
@@ -185,100 +251,36 @@ export function CompactProjectsList({
 				</div>
 			)}
 
-			{/* Completed Projects Section */}
-			{completedProjects.length > 0 && (
-				<div className="flex flex-col gap-2">
-					<button
-						onClick={() => setShowCompleted(!showCompleted)}
-						className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors py-1 px-1"
-					>
-						{showCompleted ? (
-							<ChevronDown className="w-3 h-3" />
-						) : (
-							<ChevronRight className="w-3 h-3" />
-						)}
-						Completed Projects ({completedProjects.length})
-					</button>
-
-					{showCompleted && (
+					{/* Completed Projects Section */}
+					{completedProjects.length > 0 && (
 						<div className="flex flex-col gap-2">
-							{completedProjects.map((project) => {
-								const status = STATUS_CONFIG[project.status];
+							<button
+								onClick={() => setShowCompleted(!showCompleted)}
+								className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors py-1 px-1"
+							>
+								{showCompleted ? (
+									<ChevronDown className="w-3 h-3" />
+								) : (
+									<ChevronRight className="w-3 h-3" />
+								)}
+								Completed Projects ({completedProjects.length})
+							</button>
 
-								return (
-									<div
-										key={project.id}
-										onClick={() => onProjectClick?.(project)}
-										className="group relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-border/80 hover:bg-accent/30 transition-all cursor-pointer opacity-60 hover:opacity-100 min-h-[100px]"
-									>
-										{/* Status badge */}
-										<div className="absolute top-3 right-3 z-10">
-											<button
-												onClick={(e) => handleStatusClick(e, project.id)}
-												className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-full ${status.bg} ${status.text} hover:opacity-80 transition-opacity`}
-											>
-												<div className={`w-1 h-1 rounded-full ${status.dot}`} />
-												{status.label}
-											</button>
-
-											{statusDropdown === project.id && (
-												<div className="absolute top-full right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-50">
-													{(Object.keys(STATUS_CONFIG) as ProjectStatus[]).map(
-														(statusKey) => {
-															const statusOption = STATUS_CONFIG[statusKey];
-															return (
-																<button
-																	key={statusKey}
-																	onClick={(e) =>
-																		handleStatusChange(e, project.id, statusKey)
-																	}
-																	className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2 ${
-																		project.status === statusKey ? "bg-accent/50" : ""
-																	}`}
-																>
-																	<div
-																		className={`w-1.5 h-1.5 rounded-full ${statusOption.dot}`}
-																	/>
-																	{statusOption.label}
-																</button>
-															);
-														},
-													)}
-												</div>
-											)}
+							{showCompleted && (
+								<div className="flex flex-col gap-2">
+									{completedProjects.map((project) => (
+										<div
+											key={project.id}
+											className="opacity-60 hover:opacity-100"
+										>
+											{renderProjectCard(project)}
 										</div>
-
-										{/* Priority badge - bottom right corner */}
-										{project.priority && (
-											<div className="absolute bottom-3 right-3">
-												<span
-													className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${getPriorityStyle(project.priority)}`}
-												>
-													{project.priority}
-												</span>
-											</div>
-										)}
-
-										{/* Project icon */}
-										<div className="w-10 h-10 rounded-md bg-[#8b9a6b]/10 flex items-center justify-center flex-shrink-0">
-											<FolderKanban className="w-5 h-5 text-[#8b9a6b]" />
-										</div>
-
-										{/* Content */}
-										<div className="flex-1 min-w-0 pr-24">
-											<p className="text-sm font-medium text-muted-foreground truncate mb-1">
-												{project.title}
-											</p>
-											<span className="text-[10px] text-muted-foreground/60 truncate">
-												{project.category}
-											</span>
-										</div>
-									</div>
-								);
-							})}
+									))}
+								</div>
+							)}
 						</div>
 					)}
-				</div>
+				</>
 			)}
 		</div>
 	);

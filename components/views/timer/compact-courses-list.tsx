@@ -1,28 +1,27 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { BookOpen, Search, X } from "lucide-react";
-import type { Book, BookStatus } from "@/lib/db/books";
-import { STATUS_CONFIG } from "@/components/views/books/book-constants";
+import { useState, useMemo, useEffect } from "react";
+import type { Course, CourseStatus } from "@/lib/db/courses";
+import { Search, GraduationCap, X } from "lucide-react";
+import { STATUS_CONFIG } from "@/components/views/courses/constants";
 
-interface CompactBooksListProps {
-	books: Book[];
-	onBookClick?: (book: Book) => void;
-	onStatusChange?: (id: string, status: BookStatus) => void;
-	searchQuery: string;
-	onSearchChange: (query: string) => void;
-	onAddBook: () => void;
-}
-
-export function CompactBooksList({
-	books,
-	onBookClick,
+export function CompactCoursesList({
+	courses,
+	onCourseClick,
+	onStatusChange,
 	searchQuery,
 	onSearchChange,
-	onAddBook,
-}: CompactBooksListProps) {
-	const [expandedStatuses, setExpandedStatuses] = useState<Set<BookStatus>>(
-		new Set(["reading"]),
+	onAddCourse,
+}: {
+	courses: Course[];
+	onCourseClick: (course: Course) => void;
+	onStatusChange: (id: string, status: CourseStatus) => Promise<void>;
+	searchQuery: string;
+	onSearchChange: (query: string) => void;
+	onAddCourse: () => void;
+}) {
+	const [expandedStatuses, setExpandedStatuses] = useState<Set<CourseStatus>>(
+		new Set(["in_progress"]),
 	);
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -31,47 +30,48 @@ export function CompactBooksList({
 		return () => clearTimeout(timer);
 	}, [searchQuery]);
 
-	const filteredBooks = useMemo(() => {
+	const filteredCourses = useMemo(() => {
 		if (!debouncedQuery.trim()) return null;
-		const query = debouncedQuery.toLowerCase();
-		return books.filter(
-			(b) =>
-				b.title.toLowerCase().includes(query) ||
-				b.author.toLowerCase().includes(query),
+		const lower = debouncedQuery.toLowerCase();
+		return courses.filter(
+			(c) =>
+				c.title.toLowerCase().includes(lower) ||
+				c.description?.toLowerCase().includes(lower) ||
+				c.platform?.toLowerCase().includes(lower) ||
+				c.instructor?.toLowerCase().includes(lower) ||
+				c.category.toLowerCase().includes(lower),
 		);
-	}, [books, debouncedQuery]);
+	}, [courses, debouncedQuery]);
 
 	const groupedByStatus = useMemo(() => {
-		const groups: Record<BookStatus, Book[]> = {
-			reading: [],
-			unread: [],
+		const groups: Record<CourseStatus, Course[]> = {
+			not_started: [],
+			in_progress: [],
+			paused: [],
 			completed: [],
-			abandoned: [],
+			dropped: [],
 		};
 
-		const booksToGroup = filteredBooks !== null ? filteredBooks : books;
+		const coursesToGroup = filteredCourses !== null ? filteredCourses : courses;
 
-		booksToGroup.forEach((book) => {
-			groups[book.status].push(book);
+		coursesToGroup.forEach((course) => {
+			groups[course.status].push(course);
 		});
 
 		return groups;
-	}, [filteredBooks, books]);
+	}, [filteredCourses, courses]);
 
-	const statusOrder: BookStatus[] = ["reading", "unread", "completed", "abandoned"];
-
-	if (books.length === 0) {
-		return (
-			<div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
-				<BookOpen className="w-6 h-6 opacity-20" />
-				<p className="text-xs">No books yet</p>
-			</div>
-		);
-	}
+	const statusOrder: CourseStatus[] = [
+		"in_progress",
+		"not_started",
+		"paused",
+		"completed",
+		"dropped",
+	];
 
 	return (
-		<div className="flex flex-col gap-3">
-			{/* Search Bar with Add Button */}
+		<div className="space-y-3">
+			{/* Search with Add Button */}
 			<div className="flex items-center gap-2">
 				<div className="relative flex-1">
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -79,7 +79,7 @@ export function CompactBooksList({
 						type="text"
 						value={searchQuery}
 						onChange={(e) => onSearchChange(e.target.value)}
-						placeholder="Search books..."
+						placeholder="Search courses..."
 						className="w-full pl-9 pr-9 py-2 text-sm bg-secondary/50 border border-border rounded-lg outline-none focus:border-[#8b9a6b]/50 transition-colors placeholder:text-muted-foreground/50"
 					/>
 					{searchQuery && (
@@ -92,44 +92,45 @@ export function CompactBooksList({
 					)}
 				</div>
 				<button
-					onClick={onAddBook}
+					onClick={onAddCourse}
 					className="px-3 py-2 bg-secondary/50 border border-border rounded-lg hover:bg-secondary transition-colors shrink-0 flex items-center gap-1.5 text-sm font-medium"
-					title="Add Book"
+					title="Add Course"
 				>
-					<BookOpen className="w-3.5 h-3.5" />
+					<GraduationCap className="w-3.5 h-3.5" />
 					<span>Add</span>
 				</button>
 			</div>
 
 			{/* Search Results */}
-			{filteredBooks !== null ? (
-				filteredBooks.length > 0 ? (
-					<div className="grid grid-cols-3 gap-2">
-						{filteredBooks.map((book) => {
+			{filteredCourses !== null ? (
+				filteredCourses.length > 0 ? (
+					<div className="grid grid-cols-2 gap-2">
+						{filteredCourses.map((course) => {
 							const progress =
-								book.total_pages && book.current_page
-									? Math.min(
-											100,
-											Math.round((book.current_page / book.total_pages) * 100),
-										)
+								course.progress !== null && course.progress > 0
+									? course.progress
 									: null;
 
 							return (
 								<button
-									key={book.id}
-									onClick={() => onBookClick?.(book)}
+									key={course.id}
+									onClick={() => onCourseClick(course)}
 									className="w-full text-left px-2 py-1.5 hover:bg-accent rounded border border-border transition-colors group"
 								>
 									<div className="flex items-start gap-2">
-										<BookOpen className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+										<GraduationCap className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
 										<div className="flex-1 min-w-0">
 											<p className="text-xs font-medium text-foreground truncate group-hover:text-[#8b9a6b] transition-colors">
-												{book.title}
+												{course.title}
 											</p>
-											<p className="text-[10px] text-muted-foreground truncate mt-0.5">
-												{book.author}
-											</p>
-											{progress !== null && progress > 0 && (
+											{(course.platform || course.instructor) && (
+												<p className="text-[10px] text-muted-foreground truncate mt-0.5">
+													{[course.platform, course.instructor]
+														.filter(Boolean)
+														.join(" • ")}
+												</p>
+											)}
+											{progress !== null && (
 												<div className="mt-1">
 													<div className="h-1 bg-secondary rounded-full overflow-hidden">
 														<div
@@ -146,18 +147,18 @@ export function CompactBooksList({
 						})}
 					</div>
 				) : (
-					<div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
-						<Search className="w-6 h-6 opacity-20" />
-						<p className="text-xs">No books match your search</p>
+					<div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+						<GraduationCap className="w-8 h-8 mb-2 opacity-20" />
+						<p className="text-xs">No courses match your search</p>
 					</div>
 				)
 			) : (
 				<>
-					{/* Books by status */}
+					{/* Courses by status */}
 					<div className="space-y-2">
 						{statusOrder.map((status) => {
-							const statusBooks = groupedByStatus[status];
-							if (statusBooks.length === 0) return null;
+							const statusCourses = groupedByStatus[status];
+							if (statusCourses.length === 0) return null;
 
 							const config = STATUS_CONFIG[status];
 							const isExpanded = expandedStatuses.has(status);
@@ -187,39 +188,38 @@ export function CompactBooksList({
 											{config.label}
 										</span>
 										<span className="text-xs text-muted-foreground">
-											{statusBooks.length}
+											{statusCourses.length}
 										</span>
 									</button>
 
 									{isExpanded && (
-										<div className="grid grid-cols-3 gap-2 pl-2">
-											{statusBooks.map((book) => {
+										<div className="grid grid-cols-2 gap-2 pl-2">
+											{statusCourses.map((course) => {
 												const progress =
-													book.total_pages && book.current_page
-														? Math.min(
-																100,
-																Math.round(
-																	(book.current_page / book.total_pages) * 100,
-																),
-															)
+													course.progress !== null && course.progress > 0
+														? course.progress
 														: null;
 
 												return (
 													<button
-														key={book.id}
-														onClick={() => onBookClick?.(book)}
+														key={course.id}
+														onClick={() => onCourseClick(course)}
 														className="w-full text-left px-2 py-1.5 hover:bg-accent rounded border border-border transition-colors group"
 													>
 														<div className="flex items-start gap-2">
-															<BookOpen className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+															<GraduationCap className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
 															<div className="flex-1 min-w-0">
 																<p className="text-xs font-medium text-foreground truncate group-hover:text-[#8b9a6b] transition-colors">
-																	{book.title}
+																	{course.title}
 																</p>
-																<p className="text-[10px] text-muted-foreground truncate mt-0.5">
-																	{book.author}
-																</p>
-																{progress !== null && progress > 0 && (
+																{(course.platform || course.instructor) && (
+																	<p className="text-[10px] text-muted-foreground truncate mt-0.5">
+																		{[course.platform, course.instructor]
+																			.filter(Boolean)
+																			.join(" • ")}
+																	</p>
+																)}
+																{progress !== null && (
 																	<div className="mt-1">
 																		<div className="h-1 bg-secondary rounded-full overflow-hidden">
 																			<div
@@ -240,6 +240,14 @@ export function CompactBooksList({
 							);
 						})}
 					</div>
+
+					{/* Empty state */}
+					{courses.length === 0 && (
+						<div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+							<GraduationCap className="w-8 h-8 mb-2 opacity-20" />
+							<p className="text-xs">No courses yet</p>
+						</div>
+					)}
 				</>
 			)}
 		</div>

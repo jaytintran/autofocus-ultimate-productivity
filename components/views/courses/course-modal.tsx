@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { Project, ProjectStatus } from "@/lib/db/projects";
+import type { Course, CourseStatus } from "@/lib/db/courses";
 import {
 	Dialog,
 	DialogContent,
@@ -10,91 +10,120 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "./constants";
-import { CalendarDays, Target, FileText, Lightbulb } from "lucide-react";
+import {
+	CalendarDays,
+	Target,
+	FileText,
+	Lightbulb,
+	GraduationCap,
+	User,
+	Link as LinkIcon,
+	Clock,
+	Award,
+} from "lucide-react";
 
-export function ProjectModal({
-	project,
+export function CourseModal({
+	course,
 	onClose,
 	onUpdate,
 	onDelete,
 	onStatusChange,
 }: {
-	project: Project;
+	course: Course;
 	onClose: () => void;
-	onUpdate: (id: string, updates: Partial<Project>) => Promise<void>;
+	onUpdate: (id: string, updates: Partial<Course>) => Promise<void>;
 	onDelete: (id: string) => Promise<void>;
-	onStatusChange: (id: string, status: ProjectStatus) => Promise<void>;
+	onStatusChange: (id: string, status: CourseStatus) => Promise<void>;
 }) {
-	const [title, setTitle] = useState(project.title);
-	const [notes, setNotes] = useState(project.notes ?? "");
-	const [outcomes, setOutcomes] = useState(project.key_outcomes ?? "");
-	const [description, setDescription] = useState(project.description ?? "");
-	const [progress, setProgress] = useState(project.progress?.toString() ?? "");
-	const [dueDate, setDueDate] = useState(
-		project.due_date
-			? new Date(project.due_date).toISOString().split("T")[0]
+	const [title, setTitle] = useState(course.title);
+	const [notes, setNotes] = useState(course.notes ?? "");
+	const [description, setDescription] = useState(course.description ?? "");
+	const [progress, setProgress] = useState(course.progress?.toString() ?? "");
+	const [platform, setPlatform] = useState(course.platform ?? "");
+	const [instructor, setInstructor] = useState(course.instructor ?? "");
+	const [url, setUrl] = useState(course.url ?? "");
+	const [duration, setDuration] = useState(course.duration?.toString() ?? "");
+	const [certificateUrl, setCertificateUrl] = useState(
+		course.certificate_url ?? "",
+	);
+	const [completionDate, setCompletionDate] = useState(
+		course.completion_date
+			? new Date(course.completion_date).toISOString().split("T")[0]
 			: "",
 	);
 	const [isSaving, setIsSaving] = useState(false);
-	const [localStatus, setLocalStatus] = useState<ProjectStatus>(project.status);
+	const [localStatus, setLocalStatus] = useState<CourseStatus>(course.status);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	const descriptionRef = useRef<HTMLTextAreaElement>(null);
 	const notesRef = useRef<HTMLTextAreaElement>(null);
-	const outcomesRef = useRef<HTMLTextAreaElement>(null);
 
-	const priority = project.priority ? PRIORITY_CONFIG[project.priority] : null;
+	const priority = course.priority ? PRIORITY_CONFIG[course.priority] : null;
 
 	// Track changes
 	useEffect(() => {
 		const changed =
-			title !== project.title ||
-			notes !== (project.notes ?? "") ||
-			outcomes !== (project.key_outcomes ?? "") ||
-			description !== (project.description ?? "") ||
-			progress !== (project.progress?.toString() ?? "") ||
-			dueDate !==
-				(project.due_date
-					? new Date(project.due_date).toISOString().split("T")[0]
+			title !== course.title ||
+			notes !== (course.notes ?? "") ||
+			description !== (course.description ?? "") ||
+			progress !== (course.progress?.toString() ?? "") ||
+			platform !== (course.platform ?? "") ||
+			instructor !== (course.instructor ?? "") ||
+			url !== (course.url ?? "") ||
+			duration !== (course.duration?.toString() ?? "") ||
+			certificateUrl !== (course.certificate_url ?? "") ||
+			completionDate !==
+				(course.completion_date
+					? new Date(course.completion_date).toISOString().split("T")[0]
 					: "") ||
-			localStatus !== project.status;
+			localStatus !== course.status;
 		setHasChanges(changed);
 	}, [
 		title,
 		notes,
-		outcomes,
 		description,
 		progress,
-		dueDate,
+		platform,
+		instructor,
+		url,
+		duration,
+		certificateUrl,
+		completionDate,
 		localStatus,
-		project,
+		course,
 	]);
 
 	// Auto-grow textareas
 	useEffect(() => {
-		[descriptionRef, notesRef, outcomesRef].forEach((ref) => {
+		[descriptionRef, notesRef].forEach((ref) => {
 			if (ref.current) {
 				ref.current.style.height = "auto";
 				ref.current.style.height = `${ref.current.scrollHeight}px`;
 			}
 		});
-	}, [description, notes, outcomes]);
+	}, [description, notes]);
 
 	const handleSave = async () => {
 		setIsSaving(true);
 		try {
-			await onUpdate(project.id, {
-				title: title.trim() || project.title,
+			await onUpdate(course.id, {
+				title: title.trim() || course.title,
 				description: description.trim() || null,
 				notes: notes.trim() || null,
-				key_outcomes: outcomes.trim() || null,
 				progress: progress
 					? Math.min(100, Math.max(0, parseInt(progress)))
 					: null,
-				due_date: dueDate ? new Date(dueDate).toISOString() : null,
+				platform: platform.trim() || null,
+				instructor: instructor.trim() || null,
+				url: url.trim() || null,
+				duration: duration ? parseInt(duration) : null,
+				certificate_url: certificateUrl.trim() || null,
+				completion_date: completionDate
+					? new Date(completionDate).toISOString()
+					: null,
 			});
-			if (localStatus !== project.status) {
-				await onStatusChange(project.id, localStatus);
+			if (localStatus !== course.status) {
+				await onStatusChange(course.id, localStatus);
 			}
 			setHasChanges(false);
 		} finally {
@@ -114,7 +143,7 @@ export function ProjectModal({
 									value={title}
 									onChange={(e) => setTitle(e.target.value)}
 									className="text-lg font-semibold bg-transparent border-b border-transparent hover:border-border focus:border-ring focus:outline-none transition-colors w-full"
-									placeholder="Project title"
+									placeholder="Course title"
 								/>
 							</DialogTitle>
 						</DialogHeader>
@@ -130,13 +159,13 @@ export function ProjectModal({
 							</span>
 						)}
 						<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-							{project.category}
+							{course.category}
 						</span>
 					</div>
 
 					{/* Status selector */}
 					<div className="flex items-center gap-1.5 mt-3 flex-wrap">
-						{(Object.keys(STATUS_CONFIG) as ProjectStatus[]).map((s) => {
+						{(Object.keys(STATUS_CONFIG) as CourseStatus[]).map((s) => {
 							const cfg = STATUS_CONFIG[s];
 							return (
 								<button
@@ -168,12 +197,57 @@ export function ProjectModal({
 							ref={descriptionRef}
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
-							placeholder="What is this project about..."
+							placeholder="What is this course about..."
 							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-hidden min-h-[60px]"
 						/>
 					</div>
 
-					{/* Progress + Due Date */}
+					{/* Platform + Instructor */}
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
+								<GraduationCap className="w-3 h-3" />
+								Platform
+							</label>
+							<input
+								type="text"
+								value={platform}
+								onChange={(e) => setPlatform(e.target.value)}
+								placeholder="Udemy, Coursera, etc."
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+						</div>
+						<div className="space-y-2">
+							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
+								<User className="w-3 h-3" />
+								Instructor
+							</label>
+							<input
+								type="text"
+								value={instructor}
+								onChange={(e) => setInstructor(e.target.value)}
+								placeholder="Instructor name"
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+						</div>
+					</div>
+
+					{/* URL */}
+					<div className="space-y-2">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
+							<LinkIcon className="w-3 h-3" />
+							Course URL
+						</label>
+						<input
+							type="url"
+							value={url}
+							onChange={(e) => setUrl(e.target.value)}
+							placeholder="https://..."
+							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+						/>
+					</div>
+
+					{/* Progress + Duration */}
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">
 							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
@@ -202,13 +276,44 @@ export function ProjectModal({
 						</div>
 						<div className="space-y-2">
 							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
+								<Clock className="w-3 h-3" />
+								Duration (hours)
+							</label>
+							<input
+								type="number"
+								min="0"
+								value={duration}
+								onChange={(e) => setDuration(e.target.value)}
+								placeholder="Estimated hours"
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+						</div>
+					</div>
+
+					{/* Completion Date + Certificate URL */}
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
 								<CalendarDays className="w-3 h-3" />
-								Due Date
+								Completion Date
 							</label>
 							<input
 								type="date"
-								value={dueDate}
-								onChange={(e) => setDueDate(e.target.value)}
+								value={completionDate}
+								onChange={(e) => setCompletionDate(e.target.value)}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+						</div>
+						<div className="space-y-2">
+							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
+								<Award className="w-3 h-3" />
+								Certificate URL
+							</label>
+							<input
+								type="url"
+								value={certificateUrl}
+								onChange={(e) => setCertificateUrl(e.target.value)}
+								placeholder="https://..."
 								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 							/>
 						</div>
@@ -224,22 +329,7 @@ export function ProjectModal({
 							ref={notesRef}
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
-							placeholder="Raw thoughts, blockers, context..."
-							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-hidden min-h-[60px]"
-						/>
-					</div>
-
-					{/* Key Outcomes */}
-					<div className="space-y-2">
-						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold flex items-center gap-1.5">
-							<Target className="w-3 h-3" />
-							Key Outcomes
-						</label>
-						<textarea
-							ref={outcomesRef}
-							value={outcomes}
-							onChange={(e) => setOutcomes(e.target.value)}
-							placeholder="What does done look like, one per line..."
+							placeholder="Key takeaways, thoughts, blockers..."
 							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-hidden min-h-[60px]"
 						/>
 					</div>
@@ -250,14 +340,14 @@ export function ProjectModal({
 					<button
 						type="button"
 						onClick={async () => {
-							if (confirm("Are you sure you want to delete this project?")) {
+							if (confirm("Are you sure you want to delete this course?")) {
 								onClose();
-								await onDelete(project.id);
+								await onDelete(course.id);
 							}
 						}}
-						className="text-xs text-muted-foreground/50 hover:text-destructive transition-colors border border-destructive py-2 px-3"
+						className="text-xs text-muted-foreground/50 hover:text-destructive transition-colors"
 					>
-						Delete
+						Delete course
 					</button>
 					<div className="flex gap-2">
 						<Button variant="outline" size="sm" onClick={onClose}>
