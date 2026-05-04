@@ -9,6 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "./constants";
 
 export function AddProjectModal({
@@ -24,22 +25,21 @@ export function AddProjectModal({
 }) {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
-	const [category, setCategory] = useState("");
+	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 	const [priority, setPriority] = useState<Project["priority"]>("MEDIUM");
 	const [status, setStatus] = useState<ProjectStatus>("planning");
 	const [progress, setProgress] = useState("");
 	const [dueDate, setDueDate] = useState("");
 	const [saving, setSaving] = useState(false);
-	const [showNewCategory, setShowNewCategory] = useState(false);
 
 	const handleSubmit = async () => {
-		if (!title.trim() || !category.trim()) return;
+		if (!title.trim() || selectedCategories.length === 0) return;
 		setSaving(true);
 		try {
 			await onAdd({
 				title: title.trim(),
 				description: description.trim() || null,
-				category: category.trim(),
+				category: selectedCategories,
 				priority,
 				status,
 				progress: progress ? parseInt(progress) : null,
@@ -94,50 +94,15 @@ export function AddProjectModal({
 					{/* Category */}
 					<div className="space-y-1.5">
 						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-							Category *
+							Categories *
 						</label>
-						{showNewCategory ? (
-							<div className="flex gap-2">
-								<input
-									autoFocus
-									value={category}
-									onChange={(e) => setCategory(e.target.value)}
-									placeholder="New category name"
-									className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-								/>
-								<button
-									type="button"
-									onClick={() => {
-										setShowNewCategory(false);
-										setCategory("");
-									}}
-									className="text-xs text-muted-foreground hover:text-foreground"
-								>
-									Cancel
-								</button>
-							</div>
-						) : (
-							<select
-								value={category}
-								onChange={(e) => {
-									if (e.target.value === "__new__") {
-										setShowNewCategory(true);
-										setCategory("");
-									} else {
-										setCategory(e.target.value);
-									}
-								}}
-								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-							>
-								<option value="">Select a category...</option>
-								{categories.map((c) => (
-									<option key={c} value={c}>
-										{c}
-									</option>
-								))}
-								<option value="__new__">+ Create new category</option>
-							</select>
-						)}
+						<MultiSelect
+							value={selectedCategories}
+							onChange={setSelectedCategories}
+							options={categories}
+							placeholder="Select categories..."
+							allowCustom={true}
+						/>
 					</div>
 
 					{/* Priority */}
@@ -229,7 +194,7 @@ export function AddProjectModal({
 						<Button
 							size="sm"
 							onClick={handleSubmit}
-							disabled={saving || !title.trim() || !category.trim()}
+							disabled={saving || !title.trim() || selectedCategories.length === 0}
 						>
 							{saving ? "Adding..." : "Add Project"}
 						</Button>

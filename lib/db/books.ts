@@ -15,7 +15,7 @@ export interface Book {
 	author: string;
 	rating: number | null;
 	priority: BookPriority | null;
-	domain: string;
+	domain: string[];
 	tags: string[] | null;
 	book_type: BookType;
 	status: BookStatus;

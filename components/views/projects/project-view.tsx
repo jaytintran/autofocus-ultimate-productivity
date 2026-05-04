@@ -67,16 +67,29 @@ export function ProjectView() {
 	};
 
 	const handleUpdateCategory = async (oldName: string, newName: string) => {
-		const affected = projects.filter((p) => p.category === oldName);
+		const affected = projects.filter((p) => p.category.includes(oldName));
 		await Promise.all(
-			affected.map((p) => handleUpdate(p.id, { category: newName })),
+			affected.map((p) => {
+				const updatedCategories = p.category.map((cat) =>
+					cat === oldName ? newName : cat
+				);
+				return handleUpdate(p.id, { category: updatedCategories });
+			}),
 		);
 		if (activeCategory === oldName) setActiveCategory(newName);
 	};
 
 	const handleDeleteCategory = async (category: string) => {
-		const affected = projects.filter((p) => p.category === category);
-		await Promise.all(affected.map((p) => handleDelete(p.id)));
+		const affected = projects.filter((p) => p.category.includes(category));
+		await Promise.all(
+			affected.map((p) => {
+				const updatedCategories = p.category.filter((cat) => cat !== category);
+				if (updatedCategories.length === 0) {
+					return handleDelete(p.id);
+				}
+				return handleUpdate(p.id, { category: updatedCategories });
+			}),
+		);
 		if (activeCategory === category) setActiveCategory("__dashboard__");
 	};
 
@@ -86,7 +99,13 @@ export function ProjectView() {
 	);
 
 	const categories = useMemo(() => {
-		const existing = Array.from(new Set(projects.map((p) => p.category)));
+		const allCategories = new Set<string>();
+		projects.forEach((p) => {
+			// Handle both old format (string) and new format (array)
+			const categories = Array.isArray(p.category) ? p.category : [p.category];
+			categories.forEach((cat) => allCategories.add(cat));
+		});
+		const existing = Array.from(allCategories);
 		return existing.sort((a, b) => {
 			const indexA = CATEGORY_ORDER.indexOf(a.toLowerCase());
 			const indexB = CATEGORY_ORDER.indexOf(b.toLowerCase());
@@ -99,7 +118,10 @@ export function ProjectView() {
 
 	const categoryProjects = useMemo(() => {
 		if (activeCategory === "__dashboard__") return [];
-		return projects.filter((p) => p.category === activeCategory);
+		return projects.filter((p) => {
+			const categories = Array.isArray(p.category) ? p.category : [p.category];
+			return categories.includes(activeCategory);
+		});
 	}, [projects, activeCategory]);
 
 	if (isLoading) {
@@ -170,6 +192,7 @@ export function ProjectView() {
 						await handleDelete(id);
 					}}
 					onStatusChange={handleStatusChange}
+					allCategories={categories}
 				/>
 			)}
 

@@ -47,16 +47,29 @@ export function BookView() {
 		setDomainMenu({ domain, x: e.clientX, y: e.clientY });
 	};
 	const handleUpdateDomain = async (oldName: string, newName: string) => {
-		const affected = books.filter((b) => b.domain === oldName);
+		const affected = books.filter((b) => b.domain.includes(oldName));
 		await Promise.all(
-			affected.map((b) => handleUpdate(b.id, { domain: newName })),
+			affected.map((b) => {
+				const updatedDomains = b.domain.map((d) =>
+					d === oldName ? newName : d
+				);
+				return handleUpdate(b.id, { domain: updatedDomains });
+			}),
 		);
 
 		if (activeDomain === oldName) setActiveDomain(newName);
 	};
 	const handleDeleteDomain = async (domain: string) => {
-		const affected = books.filter((b) => b.domain === domain);
-		await Promise.all(affected.map((b) => handleDelete(b.id)));
+		const affected = books.filter((b) => b.domain.includes(domain));
+		await Promise.all(
+			affected.map((b) => {
+				const updatedDomains = b.domain.filter((d) => d !== domain);
+				if (updatedDomains.length === 0) {
+					return handleDelete(b.id);
+				}
+				return handleUpdate(b.id, { domain: updatedDomains });
+			}),
+		);
 		if (activeDomain === domain) setActiveDomain("__dashboard__");
 	};
 
@@ -83,13 +96,21 @@ export function BookView() {
 	);
 
 	const domains = useMemo(() => {
-		const d = new Set(books.map((b) => b.domain));
-		return Array.from(d).sort();
+		const allDomains = new Set<string>();
+		books.forEach((b) => {
+			// Handle both old format (string) and new format (array)
+			const domains = Array.isArray(b.domain) ? b.domain : [b.domain];
+			domains.forEach((d) => allDomains.add(d));
+		});
+		return Array.from(allDomains).sort();
 	}, [books]);
 
 	const domainBooks = useMemo(() => {
 		if (activeDomain === "__dashboard__") return [];
-		return books.filter((b) => b.domain === activeDomain);
+		return books.filter((b) => {
+			const domains = Array.isArray(b.domain) ? b.domain : [b.domain];
+			return domains.includes(activeDomain);
+		});
 	}, [books, activeDomain]);
 
 	if (isLoading) {
@@ -173,6 +194,7 @@ export function BookView() {
 				<BookModal
 					book={selectedBook}
 					allBooks={books}
+					allDomains={domains}
 					onClose={() => setSelectedBookId(null)}
 					onUpdate={async (id, updates) => {
 						await handleUpdate(id, updates);

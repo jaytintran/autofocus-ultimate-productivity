@@ -9,6 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "./constants";
 import {
 	CalendarDays,
@@ -28,14 +29,19 @@ export function CourseModal({
 	onUpdate,
 	onDelete,
 	onStatusChange,
+	allCategories,
 }: {
 	course: Course;
 	onClose: () => void;
 	onUpdate: (id: string, updates: Partial<Course>) => Promise<void>;
 	onDelete: (id: string) => Promise<void>;
 	onStatusChange: (id: string, status: CourseStatus) => Promise<void>;
+	allCategories: string[];
 }) {
 	const [title, setTitle] = useState(course.title);
+	const [categories, setCategories] = useState<string[]>(
+		Array.isArray(course.category) ? course.category : [course.category]
+	);
 	const [notes, setNotes] = useState(course.notes ?? "");
 	const [description, setDescription] = useState(course.description ?? "");
 	const [progress, setProgress] = useState(course.progress?.toString() ?? "");
@@ -76,7 +82,8 @@ export function CourseModal({
 				(course.completion_date
 					? new Date(course.completion_date).toISOString().split("T")[0]
 					: "") ||
-			localStatus !== course.status;
+			localStatus !== course.status ||
+			JSON.stringify(categories) !== JSON.stringify(course.category);
 		setHasChanges(changed);
 	}, [
 		title,
@@ -90,6 +97,7 @@ export function CourseModal({
 		certificateUrl,
 		completionDate,
 		localStatus,
+		categories,
 		course,
 	]);
 
@@ -108,6 +116,7 @@ export function CourseModal({
 		try {
 			await onUpdate(course.id, {
 				title: title.trim() || course.title,
+				category: categories,
 				description: description.trim() || null,
 				notes: notes.trim() || null,
 				progress: progress
@@ -158,9 +167,25 @@ export function CourseModal({
 								{priority.label}
 							</span>
 						)}
-						<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-							{course.category}
-						</span>
+						{(Array.isArray(course.category) ? course.category : [course.category]).map((cat) => (
+							<span key={cat} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+								{cat}
+							</span>
+						))}
+					</div>
+
+					{/* Categories Editor */}
+					<div className="mt-3">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1.5 block">
+							Categories
+						</label>
+						<MultiSelect
+							value={categories}
+							onChange={setCategories}
+							options={allCategories}
+							placeholder="Select categories..."
+							allowCustom={true}
+						/>
 					</div>
 
 					{/* Status selector */}

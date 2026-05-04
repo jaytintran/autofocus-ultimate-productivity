@@ -56,6 +56,22 @@ export function ProjectCard({
 				)}
 			</div>
 
+			{/* Categories */}
+			{project.category.length > 0 && (
+				<div className="flex items-center gap-1.5 flex-wrap">
+					{(Array.isArray(project.category) ? project.category : [project.category]).slice(0, 2).map((cat) => (
+						<span key={cat} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+							{cat}
+						</span>
+					))}
+					{(Array.isArray(project.category) ? project.category : [project.category]).length > 2 && (
+						<span className="text-[10px] text-muted-foreground/60">
+							+{(Array.isArray(project.category) ? project.category : [project.category]).length - 2} more
+						</span>
+					)}
+				</div>
+			)}
+
 			{/* Footer */}
 			<div className="flex items-center justify-between gap-2">
 				{dueLabel && (
@@ -64,11 +80,6 @@ export function ProjectCard({
 					>
 						<CalendarDays className="w-2.5 h-2.5" />
 						{dueLabel}
-					</span>
-				)}
-				{!dueLabel && (
-					<span className="text-[10px] text-muted-foreground/30">
-						{project.category}
 					</span>
 				)}
 

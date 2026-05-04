@@ -32,6 +32,22 @@ export function CourseCard({
 				)}
 			</div>
 
+			{/* Categories */}
+			{course.category.length > 0 && (
+				<div className="flex items-center gap-1.5 flex-wrap mb-2">
+					{(Array.isArray(course.category) ? course.category : [course.category]).slice(0, 2).map((cat) => (
+						<span key={cat} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+							{cat}
+						</span>
+					))}
+					{(Array.isArray(course.category) ? course.category : [course.category]).length > 2 && (
+						<span className="text-[10px] text-muted-foreground/60">
+							+{(Array.isArray(course.category) ? course.category : [course.category]).length - 2} more
+						</span>
+					)}
+				</div>
+			)}
+
 			{/* Description */}
 			{course.description && (
 				<p className="text-xs text-muted-foreground line-clamp-2 mb-3">

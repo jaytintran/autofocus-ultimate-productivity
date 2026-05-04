@@ -9,6 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { PRIORITY_CONFIG } from "./constants";
 
 export function AddCourseModal({
@@ -21,8 +22,7 @@ export function AddCourseModal({
 	categories: string[];
 }) {
 	const [title, setTitle] = useState("");
-	const [category, setCategory] = useState("");
-	const [customCategory, setCustomCategory] = useState("");
+	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 	const [priority, setPriority] = useState<CoursePriority | null>(null);
 	const [platform, setPlatform] = useState("");
 	const [instructor, setInstructor] = useState("");
@@ -31,17 +31,13 @@ export function AddCourseModal({
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!title.trim()) return;
-
-		const finalCategory =
-			category === "__custom__" ? customCategory.trim() : category;
-		if (!finalCategory) return;
+		if (!title.trim() || selectedCategories.length === 0) return;
 
 		setIsAdding(true);
 		try {
 			await onAdd({
 				title: title.trim(),
-				category: finalCategory,
+				category: selectedCategories,
 				priority,
 				status: "not_started",
 				description: null,
@@ -82,35 +78,15 @@ export function AddCourseModal({
 
 					{/* Category */}
 					<div className="space-y-2">
-						<label className="text-sm font-medium">Category</label>
-						<select
-							value={category}
-							onChange={(e) => setCategory(e.target.value)}
-							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-						>
-							<option value="">Select a category</option>
-							{categories.map((cat) => (
-								<option key={cat} value={cat}>
-									{cat}
-								</option>
-							))}
-							<option value="__custom__">+ New Category</option>
-						</select>
+						<label className="text-sm font-medium">Categories</label>
+						<MultiSelect
+							value={selectedCategories}
+							onChange={setSelectedCategories}
+							options={categories}
+							placeholder="Select categories..."
+							allowCustom={true}
+						/>
 					</div>
-
-					{/* Custom Category */}
-					{category === "__custom__" && (
-						<div className="space-y-2">
-							<label className="text-sm font-medium">New Category Name</label>
-							<input
-								type="text"
-								value={customCategory}
-								onChange={(e) => setCustomCategory(e.target.value)}
-								placeholder="Enter category name"
-								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-							/>
-						</div>
-					)}
 
 					{/* Platform */}
 					<div className="space-y-2">
@@ -176,7 +152,7 @@ export function AddCourseModal({
 						<Button type="button" variant="outline" onClick={onClose}>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={isAdding || !title.trim()}>
+						<Button type="submit" disabled={isAdding || !title.trim() || selectedCategories.length === 0}>
 							{isAdding ? "Adding..." : "Add Course"}
 						</Button>
 					</div>

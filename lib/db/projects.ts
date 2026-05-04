@@ -12,7 +12,7 @@ export interface Project {
 	id: string;
 	title: string;
 	description: string | null;
-	category: string;
+	category: string[];
 	priority: ProjectPriority | null;
 	status: ProjectStatus;
 	progress: number | null; // 0–100

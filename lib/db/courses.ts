@@ -12,7 +12,7 @@ export interface Course {
 	id: string;
 	title: string;
 	description: string | null;
-	category: string;
+	category: string[];
 	priority: CoursePriority | null;
 	status: CourseStatus;
 	progress: number | null; // 0–100

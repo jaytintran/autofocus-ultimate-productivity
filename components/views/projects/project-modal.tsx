@@ -9,6 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "./constants";
 import { CalendarDays, Target, FileText, Lightbulb } from "lucide-react";
 
@@ -18,14 +19,19 @@ export function ProjectModal({
 	onUpdate,
 	onDelete,
 	onStatusChange,
+	allCategories,
 }: {
 	project: Project;
 	onClose: () => void;
 	onUpdate: (id: string, updates: Partial<Project>) => Promise<void>;
 	onDelete: (id: string) => Promise<void>;
 	onStatusChange: (id: string, status: ProjectStatus) => Promise<void>;
+	allCategories: string[];
 }) {
 	const [title, setTitle] = useState(project.title);
+	const [categories, setCategories] = useState<string[]>(
+		Array.isArray(project.category) ? project.category : [project.category]
+	);
 	const [notes, setNotes] = useState(project.notes ?? "");
 	const [outcomes, setOutcomes] = useState(project.key_outcomes ?? "");
 	const [description, setDescription] = useState(project.description ?? "");
@@ -57,7 +63,8 @@ export function ProjectModal({
 				(project.due_date
 					? new Date(project.due_date).toISOString().split("T")[0]
 					: "") ||
-			localStatus !== project.status;
+			localStatus !== project.status ||
+			JSON.stringify(categories) !== JSON.stringify(project.category);
 		setHasChanges(changed);
 	}, [
 		title,
@@ -67,6 +74,7 @@ export function ProjectModal({
 		progress,
 		dueDate,
 		localStatus,
+		categories,
 		project,
 	]);
 
@@ -85,6 +93,7 @@ export function ProjectModal({
 		try {
 			await onUpdate(project.id, {
 				title: title.trim() || project.title,
+				category: categories,
 				description: description.trim() || null,
 				notes: notes.trim() || null,
 				key_outcomes: outcomes.trim() || null,
@@ -129,9 +138,25 @@ export function ProjectModal({
 								{priority.label}
 							</span>
 						)}
-						<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-							{project.category}
-						</span>
+						{(Array.isArray(project.category) ? project.category : [project.category]).map((cat) => (
+							<span key={cat} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+								{cat}
+							</span>
+						))}
+					</div>
+
+					{/* Categories Editor */}
+					<div className="mt-3">
+						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1.5 block">
+							Categories
+						</label>
+						<MultiSelect
+							value={categories}
+							onChange={setCategories}
+							options={allCategories}
+							placeholder="Select categories..."
+							allowCustom={true}
+						/>
 					</div>
 
 					{/* Status selector */}

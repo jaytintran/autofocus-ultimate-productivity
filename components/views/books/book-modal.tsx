@@ -7,6 +7,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Star, X, RefreshCw } from "lucide-react";
 import { parseDueDateShortcut } from "@/lib/utils/due-date-parser";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "./book-constants";
@@ -19,6 +20,7 @@ export function BookModal({
 	onDelete,
 	onStatusChange,
 	allBooks,
+	allDomains,
 }: {
 	book: Book;
 	onClose: () => void;
@@ -26,7 +28,11 @@ export function BookModal({
 	onDelete: (id: string) => Promise<void>;
 	onStatusChange: (id: string, status: BookStatus) => Promise<void>;
 	allBooks: Book[];
+	allDomains: string[];
 }) {
+	const [domains, setDomains] = useState<string[]>(
+		Array.isArray(book.domain) ? book.domain : [book.domain]
+	);
 	const [tags, setTags] = useState<string[]>(book.tags ?? []);
 	const [notes, setNotes] = useState(book.notes ?? "");
 	const [takeaways, setTakeaways] = useState(book.key_takeaways ?? "");
@@ -52,11 +58,15 @@ export function BookModal({
 
 	// Get all tags from books in the same domain
 	const domainTags = useMemo(() => {
+		if (domains.length === 0) return [];
 		const all = allBooks
-			.filter((b) => b.domain === book.domain && b.tags)
+			.filter((b) => {
+				const bookDomains = Array.isArray(b.domain) ? b.domain : [b.domain];
+				return domains.some((d) => bookDomains.includes(d)) && b.tags;
+			})
 			.flatMap((b) => b.tags as string[]);
 		return Array.from(new Set(all)).sort();
-	}, [allBooks, book.domain]);
+	}, [allBooks, domains]);
 
 	const handleSave = async () => {
 		setIsSaving(true);
@@ -64,6 +74,7 @@ export function BookModal({
 			await onUpdate(book.id, {
 				title: title.trim() || book.title,
 				author: author.trim() || book.author,
+				domain: domains,
 				notes: notes.trim() || null,
 				key_takeaways: takeaways.trim() || null,
 				current_page: currentPage ? parseInt(currentPage) : null,
@@ -116,12 +127,28 @@ export function BookModal({
 									{priority.label}
 								</span>
 							)}
-							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-								{book.domain}
-							</span>
+							{(Array.isArray(book.domain) ? book.domain : [book.domain]).map((d) => (
+								<span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+									{d}
+								</span>
+							))}
 							<span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
 								{book.book_type}
 							</span>
+						</div>
+
+						{/* Domains Editor */}
+						<div>
+							<label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium mb-1.5 block">
+								Domains
+							</label>
+							<MultiSelect
+								value={domains}
+								onChange={setDomains}
+								options={allDomains}
+								placeholder="Select domains..."
+								allowCustom={true}
+							/>
 						</div>
 
 						{/* Rating selector */}

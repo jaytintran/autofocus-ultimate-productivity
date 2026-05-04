@@ -7,6 +7,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Star, X } from "lucide-react";
 import { PRIORITY_CONFIG } from "./book-constants";
 import { TagChipSelector } from "./tag-chip-selector";
@@ -26,8 +27,7 @@ export function AddBookModal({
 }) {
 	const [title, setTitle] = useState("");
 	const [author, setAuthor] = useState("");
-	const [domain, setDomain] = useState("");
-	const [showNewDomain, setShowNewDomain] = useState(false);
+	const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
 	const [tags, setTags] = useState<string[]>([]);
 	const [priority, setPriority] = useState<Book["priority"]>("MEDIUM");
 	const [bookType, setBookType] = useState<Book["book_type"]>("Core");
@@ -37,24 +37,24 @@ export function AddBookModal({
 
 	useEffect(() => {
 		setTags([]);
-	}, [domain]);
+	}, [selectedDomains]);
 
 	const domainTags = useMemo(() => {
-		if (!domain || domain === "__new__") return [];
+		if (selectedDomains.length === 0) return [];
 		const all = books
-			.filter((b) => b.domain === domain && b.tags)
+			.filter((b) => selectedDomains.some((d) => b.domain.includes(d)) && b.tags)
 			.flatMap((b) => b.tags as string[]);
 		return Array.from(new Set(all)).sort();
-	}, [books, domain]);
+	}, [books, selectedDomains]);
 
 	const handleSubmit = async () => {
-		if (!title.trim() || !author.trim() || !domain.trim()) return;
+		if (!title.trim() || !author.trim() || selectedDomains.length === 0) return;
 		setSaving(true);
 		try {
 			await onAdd({
 				title: title.trim(),
 				author: author.trim(),
-				domain: domain.trim(),
+				domain: selectedDomains,
 				tags: tags.length ? tags : null,
 				priority,
 				rating: rating,
@@ -112,51 +112,18 @@ export function AddBookModal({
 					{/* Domain */}
 					<div className="space-y-1.5">
 						<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-							Domain *
+							Domains *
 						</label>
-						{showNewDomain ? (
-							<div className="flex gap-2">
-								<input
-									autoFocus
-									value={domain}
-									onChange={(e) => setDomain(e.target.value)}
-									placeholder="New domain name"
-									className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-								/>
-								<button
-									type="button"
-									onClick={() => {
-										setShowNewDomain(false);
-										setDomain("");
-									}}
-									className="text-xs text-muted-foreground hover:text-foreground"
-								>
-									Cancel
-								</button>
-							</div>
-						) : (
-							<select
-								value={domain}
-								onChange={(e) => {
-									if (e.target.value === "__new__") {
-										setShowNewDomain(true);
-										setDomain("");
-									} else setDomain(e.target.value);
-								}}
-								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-							>
-								<option value="">Select a domain...</option>
-								{domains.map((d) => (
-									<option key={d} value={d}>
-										{d}
-									</option>
-								))}
-								<option value="__new__">+ Create new domain</option>
-							</select>
-						)}
+						<MultiSelect
+							value={selectedDomains}
+							onChange={setSelectedDomains}
+							options={domains}
+							placeholder="Select domains..."
+							allowCustom={true}
+						/>
 					</div>
 					{/* Tags */}
-					{domain && !showNewDomain && (
+					{selectedDomains.length > 0 && (
 						<div className="space-y-1.5">
 							<label className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
 								Tags
@@ -273,7 +240,7 @@ export function AddBookModal({
 							size="sm"
 							onClick={handleSubmit}
 							disabled={
-								saving || !title.trim() || !author.trim() || !domain.trim()
+								saving || !title.trim() || !author.trim() || selectedDomains.length === 0
 							}
 						>
 							{saving ? "Adding..." : "Add Book"}

@@ -21,15 +21,27 @@ export function CompactBooksList({
 	onSearchChange,
 	onAddBook,
 }: CompactBooksListProps) {
-	const [expandedStatuses, setExpandedStatuses] = useState<Set<BookStatus>>(
-		new Set(["reading"]),
-	);
+	const [expandedStatuses, setExpandedStatuses] = useState<Set<BookStatus>>(() => {
+		const saved = localStorage.getItem("timer-books-expanded");
+		if (saved) {
+			try {
+				return new Set(JSON.parse(saved));
+			} catch {
+				return new Set();
+			}
+		}
+		return new Set();
+	});
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 
 	useEffect(() => {
 		const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
 		return () => clearTimeout(timer);
 	}, [searchQuery]);
+
+	useEffect(() => {
+		localStorage.setItem("timer-books-expanded", JSON.stringify(Array.from(expandedStatuses)));
+	}, [expandedStatuses]);
 
 	const filteredBooks = useMemo(() => {
 		if (!debouncedQuery.trim()) return null;

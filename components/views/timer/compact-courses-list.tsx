@@ -20,9 +20,17 @@ export function CompactCoursesList({
 	onSearchChange: (query: string) => void;
 	onAddCourse: () => void;
 }) {
-	const [expandedStatuses, setExpandedStatuses] = useState<Set<CourseStatus>>(
-		new Set(["in_progress"]),
-	);
+	const [expandedStatuses, setExpandedStatuses] = useState<Set<CourseStatus>>(() => {
+		const saved = localStorage.getItem("timer-courses-expanded");
+		if (saved) {
+			try {
+				return new Set(JSON.parse(saved));
+			} catch {
+				return new Set();
+			}
+		}
+		return new Set();
+	});
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 
 	useEffect(() => {
@@ -30,16 +38,24 @@ export function CompactCoursesList({
 		return () => clearTimeout(timer);
 	}, [searchQuery]);
 
+	useEffect(() => {
+		localStorage.setItem("timer-courses-expanded", JSON.stringify(Array.from(expandedStatuses)));
+	}, [expandedStatuses]);
+
 	const filteredCourses = useMemo(() => {
 		if (!debouncedQuery.trim()) return null;
 		const lower = debouncedQuery.toLowerCase();
 		return courses.filter(
-			(c) =>
-				c.title.toLowerCase().includes(lower) ||
-				c.description?.toLowerCase().includes(lower) ||
-				c.platform?.toLowerCase().includes(lower) ||
-				c.instructor?.toLowerCase().includes(lower) ||
-				c.category.toLowerCase().includes(lower),
+			(c) => {
+				const categories = Array.isArray(c.category) ? c.category : [c.category];
+				return (
+					c.title.toLowerCase().includes(lower) ||
+					c.description?.toLowerCase().includes(lower) ||
+					c.platform?.toLowerCase().includes(lower) ||
+					c.instructor?.toLowerCase().includes(lower) ||
+					categories.some((cat) => cat.toLowerCase().includes(lower))
+				);
+			}
 		);
 	}, [courses, debouncedQuery]);
 

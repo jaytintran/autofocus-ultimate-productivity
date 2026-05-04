@@ -66,16 +66,29 @@ export function CourseView() {
 	};
 
 	const handleUpdateCategory = async (oldName: string, newName: string) => {
-		const affected = courses.filter((c) => c.category === oldName);
+		const affected = courses.filter((c) => c.category.includes(oldName));
 		await Promise.all(
-			affected.map((c) => handleUpdate(c.id, { category: newName })),
+			affected.map((c) => {
+				const updatedCategories = c.category.map((cat) =>
+					cat === oldName ? newName : cat
+				);
+				return handleUpdate(c.id, { category: updatedCategories });
+			}),
 		);
 		if (activeCategory === oldName) setActiveCategory(newName);
 	};
 
 	const handleDeleteCategory = async (category: string) => {
-		const affected = courses.filter((c) => c.category === category);
-		await Promise.all(affected.map((c) => handleDelete(c.id)));
+		const affected = courses.filter((c) => c.category.includes(category));
+		await Promise.all(
+			affected.map((c) => {
+				const updatedCategories = c.category.filter((cat) => cat !== category);
+				if (updatedCategories.length === 0) {
+					return handleDelete(c.id);
+				}
+				return handleUpdate(c.id, { category: updatedCategories });
+			}),
+		);
 		if (activeCategory === category) setActiveCategory("__dashboard__");
 	};
 
@@ -85,7 +98,13 @@ export function CourseView() {
 	);
 
 	const categories = useMemo(() => {
-		const existing = Array.from(new Set(courses.map((c) => c.category)));
+		const allCategories = new Set<string>();
+		courses.forEach((c) => {
+			// Handle both old format (string) and new format (array)
+			const categories = Array.isArray(c.category) ? c.category : [c.category];
+			categories.forEach((cat) => allCategories.add(cat));
+		});
+		const existing = Array.from(allCategories);
 		return existing.sort((a, b) => {
 			const indexA = CATEGORY_ORDER.indexOf(a.toLowerCase());
 			const indexB = CATEGORY_ORDER.indexOf(b.toLowerCase());
@@ -98,7 +117,10 @@ export function CourseView() {
 
 	const categoryCourses = useMemo(() => {
 		if (activeCategory === "__dashboard__") return [];
-		return courses.filter((c) => c.category === activeCategory);
+		return courses.filter((c) => {
+			const categories = Array.isArray(c.category) ? c.category : [c.category];
+			return categories.includes(activeCategory);
+		});
 	}, [courses, activeCategory]);
 
 	if (isLoading) {
@@ -167,6 +189,7 @@ export function CourseView() {
 						await handleDelete(id);
 					}}
 					onStatusChange={handleStatusChange}
+					allCategories={categories}
 				/>
 			)}
 

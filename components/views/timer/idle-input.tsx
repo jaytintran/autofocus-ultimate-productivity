@@ -57,6 +57,36 @@ export function IdleInput({
 	const { projects, handleUpdate: updateProject, handleDelete: deleteProject, handleStatusChange: changeProjectStatus, handleAdd: addProject } = useProjects();
 	const { courses, handleUpdate: updateCourse, handleDelete: deleteCourse, handleStatusChange: changeCourseStatus, handleAdd: addCourse } = useCourses();
 
+	const bookDomains = useMemo(() => {
+		const allDomains = new Set<string>();
+		books.forEach((b) => {
+			// Handle both old format (string) and new format (array)
+			const domains = Array.isArray(b.domain) ? b.domain : [b.domain];
+			domains.forEach((d) => allDomains.add(d));
+		});
+		return Array.from(allDomains);
+	}, [books]);
+
+	const projectCategories = useMemo(() => {
+		const allCategories = new Set<string>();
+		projects.forEach((p) => {
+			// Handle both old format (string) and new format (array)
+			const categories = Array.isArray(p.category) ? p.category : [p.category];
+			categories.forEach((c) => allCategories.add(c));
+		});
+		return Array.from(allCategories);
+	}, [projects]);
+
+	const courseCategories = useMemo(() => {
+		const allCategories = new Set<string>();
+		courses.forEach((c) => {
+			// Handle both old format (string) and new format (array)
+			const categories = Array.isArray(c.category) ? c.category : [c.category];
+			categories.forEach((cat) => allCategories.add(cat));
+		});
+		return Array.from(allCategories);
+	}, [courses]);
+
 	const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 	const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -401,6 +431,7 @@ export function IdleInput({
 			<BookModal
 				book={selectedBook}
 				allBooks={books}
+				allDomains={bookDomains}
 				onClose={() => setSelectedBook(null)}
 				onUpdate={updateBook}
 				onDelete={async (id) => {
@@ -415,6 +446,7 @@ export function IdleInput({
 		{selectedProject && (
 			<ProjectModal
 				project={selectedProject}
+				allCategories={projectCategories}
 				onClose={() => setSelectedProject(null)}
 				onUpdate={updateProject}
 				onDelete={async (id) => {
@@ -429,6 +461,7 @@ export function IdleInput({
 		{selectedCourse && (
 			<CourseModal
 				course={selectedCourse}
+				allCategories={courseCategories}
 				onClose={() => setSelectedCourse(null)}
 				onUpdate={updateCourse}
 				onDelete={async (id) => {
@@ -447,7 +480,7 @@ export function IdleInput({
 					await addBook(book);
 					setShowAddBookModal(false);
 				}}
-				domains={Array.from(new Set(books.map(b => b.domain)))}
+				domains={bookDomains}
 				books={books}
 			/>
 		)}
@@ -460,7 +493,7 @@ export function IdleInput({
 					await addProject(project);
 					setShowAddProjectModal(false);
 				}}
-				categories={Array.from(new Set(projects.map(p => p.category)))}
+				categories={projectCategories}
 			/>
 		)}
 
@@ -472,7 +505,7 @@ export function IdleInput({
 					await addCourse(course);
 					setShowAddCourseModal(false);
 				}}
-				categories={Array.from(new Set(courses.map(c => c.category)))}
+				categories={courseCategories}
 			/>
 		)}
 	</div>
