@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { Course } from "@/lib/db/courses";
 import { CourseCard } from "./course-card";
 import { STATUS_CONFIG } from "./constants";
@@ -14,6 +15,22 @@ export function DashboardView({
 	search: string;
 	onCourseClick: (course: Course) => void;
 }) {
+	const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+		new Set(),
+	);
+
+	const toggleSection = (status: string) => {
+		setCollapsedSections((prev) => {
+			const next = new Set(prev);
+			if (next.has(status)) {
+				next.delete(status);
+			} else {
+				next.add(status);
+			}
+			return next;
+		});
+	};
+
 	const filteredCourses = useMemo(() => {
 		if (!search) return courses;
 		const lower = search.toLowerCase();
@@ -85,24 +102,35 @@ export function DashboardView({
 				{Object.entries(groupedByStatus).map(([status, statusCourses]) => {
 					if (statusCourses.length === 0) return null;
 					const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
+					const collapsed = collapsedSections.has(status);
 
 					return (
-						<div key={status}>
-							<h2
-								className={`text-sm font-semibold mb-3 flex items-center gap-2 ${config.text}`}
+						<div key={status} className="space-y-3">
+							<button
+								onClick={() => toggleSection(status)}
+								className="flex items-center gap-2 w-full group"
 							>
+								<ChevronRight
+									className={`w-4 h-4 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`}
+								/>
 								<div className={`w-2 h-2 rounded-full ${config.dot}`} />
-								{config.label} ({statusCourses.length})
-							</h2>
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-								{statusCourses.map((course) => (
-									<CourseCard
-										key={course.id}
-										course={course}
-										onClick={() => onCourseClick(course)}
-									/>
-								))}
-							</div>
+								<h2
+									className={`text-sm font-semibold flex items-center gap-2 ${config.text} group-hover:opacity-80 transition-opacity`}
+								>
+									{config.label} ({statusCourses.length})
+								</h2>
+							</button>
+							{!collapsed && (
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+									{statusCourses.map((course) => (
+										<CourseCard
+											key={course.id}
+											course={course}
+											onClick={() => onCourseClick(course)}
+										/>
+									))}
+								</div>
+							)}
 						</div>
 					);
 				})}

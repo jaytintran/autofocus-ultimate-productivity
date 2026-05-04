@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Project, ProjectStatus } from "@/lib/db/projects";
+import { ChevronRight } from "lucide-react";
 import { ProjectCard } from "./project-card";
 import { STATUS_CONFIG } from "./constants";
 import { sortByPriority } from "./utils";
@@ -15,6 +16,22 @@ export function CategoryView({
 	search: string;
 	onProjectClick: (p: Project) => void;
 }) {
+	const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+		new Set(),
+	);
+
+	const toggleSection = (status: string) => {
+		setCollapsedSections((prev) => {
+			const next = new Set(prev);
+			if (next.has(status)) {
+				next.delete(status);
+			} else {
+				next.add(status);
+			}
+			return next;
+		});
+	};
+
 	const filtered = useMemo(() => {
 		if (!search.trim()) return projects;
 		const q = search.toLowerCase();
@@ -62,29 +79,38 @@ export function CategoryView({
 
 			{grouped.map(({ status, projects: statusProjects }) => {
 				const cfg = STATUS_CONFIG[status];
+				const collapsed = collapsedSections.has(status);
 				return (
 					<div key={status} className="space-y-3">
-						<div className="flex items-center gap-2">
+						<button
+							onClick={() => toggleSection(status)}
+							className="flex items-center gap-2 w-full group"
+						>
+							<ChevronRight
+								className={`w-4 h-4 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`}
+							/>
 							<div
 								className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`}
 							/>
-							<h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+							<h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
 								{cfg.label}
 							</h3>
 							<div className="flex-1 h-px bg-border/40" />
 							<span className="text-[10px] text-muted-foreground/40">
 								{statusProjects.length}
 							</span>
-						</div>
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-							{statusProjects.map((p) => (
-								<ProjectCard
-									key={p.id}
-									project={p}
-									onClick={() => onProjectClick(p)}
-								/>
-							))}
-						</div>
+						</button>
+						{!collapsed && (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+								{statusProjects.map((p) => (
+									<ProjectCard
+										key={p.id}
+										project={p}
+										onClick={() => onProjectClick(p)}
+									/>
+								))}
+							</div>
+						)}
 					</div>
 				);
 			})}

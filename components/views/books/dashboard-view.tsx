@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { BookOpen, Flame, CheckCircle2, Circle } from "lucide-react";
+import { BookOpen, Flame, CheckCircle2, Circle, ChevronRight } from "lucide-react";
 import type { Book } from "@/lib/db/books";
 import { BookCard } from "./book-card";
 import { sortByPriority } from "./book-helpers";
@@ -13,6 +13,22 @@ export function DashboardView({
 	search: string;
 	onBookClick: (book: Book) => void;
 }) {
+	const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+		new Set(),
+	);
+
+	const toggleSection = (section: string) => {
+		setCollapsedSections((prev) => {
+			const next = new Set(prev);
+			if (next.has(section)) {
+				next.delete(section);
+			} else {
+				next.add(section);
+			}
+			return next;
+		});
+	};
+
 	const stats = useMemo(
 		() => ({
 			total: books.length,
@@ -107,21 +123,32 @@ export function DashboardView({
 			{/* Currently Reading */}
 			{currentlyReading.length > 0 && (
 				<div className="space-y-3">
-					<div className="flex items-center gap-2">
+					<button
+						onClick={() => toggleSection("reading")}
+						className="flex items-center gap-2 w-full group"
+					>
+						<ChevronRight
+							className={`w-4 h-4 text-muted-foreground transition-transform ${collapsedSections.has("reading") ? "" : "rotate-90"}`}
+						/>
 						<Flame className="w-3.5 h-3.5 text-sky-500" />
-						<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+						<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 							Currently Reading
 						</h3>
-					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-						{currentlyReading.map((book) => (
-							<BookCard
-								key={book.id}
-								book={book}
-								onClick={() => onBookClick(book)}
-							/>
-						))}
-					</div>
+						<span className="text-[10px] text-muted-foreground/40 tabular-nums">
+							{currentlyReading.length}
+						</span>
+					</button>
+					{!collapsedSections.has("reading") && (
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+							{currentlyReading.map((book) => (
+								<BookCard
+									key={book.id}
+									book={book}
+									onClick={() => onBookClick(book)}
+								/>
+							))}
+						</div>
+					)}
 				</div>
 			)}
 			{/* Completed */}
@@ -131,24 +158,32 @@ export function DashboardView({
 					.sort(sortByPriority);
 				return completed.length > 0 ? (
 					<div className="space-y-3">
-						<div className="flex items-center gap-2">
+						<button
+							onClick={() => toggleSection("completed")}
+							className="flex items-center gap-2 w-full group"
+						>
+							<ChevronRight
+								className={`w-4 h-4 text-muted-foreground transition-transform ${collapsedSections.has("completed") ? "" : "rotate-90"}`}
+							/>
 							<CheckCircle2 className="w-3.5 h-3.5 text-[#8b9a6b]" />
-							<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+							<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 								Completed
 							</h3>
 							<span className="text-[10px] text-muted-foreground/40 tabular-nums">
 								{completed.length}
 							</span>
-						</div>
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-							{completed.map((book) => (
-								<BookCard
-									key={book.id}
-									book={book}
-									onClick={() => onBookClick(book)}
-								/>
-							))}
-						</div>
+						</button>
+						{!collapsedSections.has("completed") && (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+								{completed.map((book) => (
+									<BookCard
+										key={book.id}
+										book={book}
+										onClick={() => onBookClick(book)}
+									/>
+								))}
+							</div>
+						)}
 					</div>
 				) : null;
 			})()}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Project, ProjectStatus } from "@/lib/db/projects";
-import { Target, Flame, CheckCircle2, Circle, X } from "lucide-react";
+import { Target, Flame, CheckCircle2, Circle, X, ChevronRight } from "lucide-react";
 import { ProjectCard } from "./project-card";
 import { sortByPriority } from "./utils";
 
@@ -16,6 +16,22 @@ export function DashboardView({
 	onProjectClick: (p: Project) => void;
 }) {
 	const [filterStatus, setFilterStatus] = useState<FilterStatus>(null);
+	const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+		new Set(),
+	);
+
+	const toggleSection = (section: string) => {
+		setCollapsedSections((prev) => {
+			const next = new Set(prev);
+			if (next.has(section)) {
+				next.delete(section);
+			} else {
+				next.add(section);
+			}
+			return next;
+		});
+	};
+
 	const stats = useMemo(
 		() => ({
 			total: projects.length,
@@ -165,45 +181,64 @@ export function DashboardView({
 					{/* Active */}
 					{activeProjects.length > 0 && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2">
+							<button
+								onClick={() => toggleSection("active")}
+								className="flex items-center gap-2 w-full group"
+							>
+								<ChevronRight
+									className={`w-4 h-4 text-muted-foreground transition-transform ${collapsedSections.has("active") ? "" : "rotate-90"}`}
+								/>
 								<Flame className="w-3.5 h-3.5 text-sky-500" />
-								<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+								<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 									Active
 								</h3>
-							</div>
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-								{activeProjects.map((p) => (
-									<ProjectCard
-										key={p.id}
-										project={p}
-										onClick={() => onProjectClick(p)}
-									/>
-								))}
-							</div>
+								<span className="text-[10px] text-muted-foreground/40 tabular-nums">
+									{activeProjects.length}
+								</span>
+							</button>
+							{!collapsedSections.has("active") && (
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+									{activeProjects.map((p) => (
+										<ProjectCard
+											key={p.id}
+											project={p}
+											onClick={() => onProjectClick(p)}
+										/>
+									))}
+								</div>
+							)}
 						</div>
 					)}
 
 					{/* Completed */}
 					{completedProjects.length > 0 && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2">
+							<button
+								onClick={() => toggleSection("completed")}
+								className="flex items-center gap-2 w-full group"
+							>
+								<ChevronRight
+									className={`w-4 h-4 text-muted-foreground transition-transform ${collapsedSections.has("completed") ? "" : "rotate-90"}`}
+								/>
 								<CheckCircle2 className="w-3.5 h-3.5 text-[#8b9a6b]" />
-								<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+								<h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 									Completed
 								</h3>
 								<span className="text-[10px] text-muted-foreground/40 tabular-nums">
 									{completedProjects.length}
 								</span>
-							</div>
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-								{completedProjects.map((p) => (
-									<ProjectCard
-										key={p.id}
-										project={p}
-										onClick={() => onProjectClick(p)}
-									/>
-								))}
-							</div>
+							</button>
+							{!collapsedSections.has("completed") && (
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+									{completedProjects.map((p) => (
+										<ProjectCard
+											key={p.id}
+											project={p}
+											onClick={() => onProjectClick(p)}
+										/>
+									))}
+								</div>
+							)}
 						</div>
 					)}
 				</>
