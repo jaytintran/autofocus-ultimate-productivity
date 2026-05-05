@@ -2129,6 +2129,10 @@ export function AutofocusApp() {
 				pamphlets={pamphlets}
 				activePamphlet={activePamphlet}
 				onSwitchPamphlet={switchPamphlet}
+				onAddPamphlet={addPamphlet}
+				onRenamePamphlet={renamePamphlet}
+				onRemovePamphlet={removePamphlet}
+				onReorderPamphlet={reorderPamphletsList}
 			/>
 
 			<main className="flex-1 flex min-h-0">

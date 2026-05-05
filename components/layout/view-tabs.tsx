@@ -526,6 +526,10 @@ interface ViewTabsProps {
 	pamphlets: Pamphlet[];
 	activePamphlet: Pamphlet | null;
 	onSwitchPamphlet: (id: string) => void;
+	onAddPamphlet: (name: string, color: import("@/lib/types").PamphletColor) => Promise<Pamphlet>;
+	onRenamePamphlet: (id: string, name: string, color: import("@/lib/types").PamphletColor) => Promise<void>;
+	onRemovePamphlet: (id: string, action: "transfer" | "delete-all", transferToId?: string) => Promise<void>;
+	onReorderPamphlet: (orderedIds: string[]) => Promise<void>;
 }
 
 export function ViewTabs({
@@ -547,6 +551,10 @@ export function ViewTabs({
 	pamphlets,
 	activePamphlet,
 	onSwitchPamphlet,
+	onAddPamphlet,
+	onRenamePamphlet,
+	onRemovePamphlet,
+	onReorderPamphlet,
 }: ViewTabsProps) {
 	// Calculate active filter count for badge
 	const activeFilterCount =
@@ -563,6 +571,10 @@ export function ViewTabs({
 						pamphlets={pamphlets}
 						activePamphlet={activePamphlet}
 						onSwitch={onSwitchPamphlet}
+						onAdd={onAddPamphlet}
+						onRename={onRenamePamphlet}
+						onRemove={onRemovePamphlet}
+						onReorder={onReorderPamphlet}
 					/>
 				</div>
 				<MainViewToggle activeView={activeView} onChange={onViewChange} />
